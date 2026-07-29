@@ -1,0 +1,6 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Route /api/v1/hospitals/... to backend/inventory_api.php
+    RewriteRule ^api/v1/hospitals(?:/.*)?$ backend/inventory_api.php [QSA,L]
+</IfModule>
