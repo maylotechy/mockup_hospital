@@ -6,6 +6,11 @@
 // ========================================================
 
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/../vendor/autoload.php';
+
+// safeLoad() prevents crashes if the .env file is missing in production
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
+$dotenv->safeLoad();
 
 // Handle CORS preflight
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
@@ -60,8 +65,10 @@ $response = false;
 $httpCode = 0;
 $curlErrno = 0;
 
+$iolHost = $_ENV['IOL_HOST'] ?? 'localhost';
+
 foreach ($portsToTry as $port) {
-    $centralUrl = "http://127.0.0.1:{$port}" . $path . $queryString;
+    $centralUrl = "http://{$iolHost}:{$port}" . $path . $queryString;
     $ch = curl_init($centralUrl);
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
 

@@ -3,11 +3,18 @@
 // Configuration, Database Connection & Session Management
 // ========================================================
 
+require_once __DIR__ . '/../vendor/autoload.php';
+
+// safeLoad() prevents crashes if the .env file is missing in production
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
+$dotenv->safeLoad(); 
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-define('IOL_ENDPOINT_URL', 'http://127.0.0.1:8081/api/v1/referral/initiate');
+$iolHost = $_ENV['IOL_HOST'] ?? 'localhost'; 
+define('IOL_ENDPOINT_URL', 'http://' . $iolHost . ':8081/api/v1/referral/initiate');
 
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'hospital_db');
