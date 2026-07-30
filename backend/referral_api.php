@@ -1,18 +1,18 @@
 <?php
 // ========================================================
-// Direct Proxy to Central FastAPI Server
-// Target: http://127.0.0.1:8000/api/v1/hospitals/...
-// 100% Dynamic Data directly from FastAPI Backend (PostgreSQL)
+// Direct Proxy to Central FastAPI Server for Referral Operations
+// Target: http://127.0.0.1:8000/api/v1/referral/...
+// Handles: GET /incoming, PATCH /{referral_id}/respond, etc.
 // ========================================================
 
 require_once __DIR__ . '/config.php';
 
 // Handle CORS preflight
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
 if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    $origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
     header("Access-Control-Allow-Origin: {$origin}");
     header('Access-Control-Allow-Credentials: true');
-    header('Access-Control-Allow-Methods: GET, PATCH, POST, PUT, DELETE, OPTIONS');
+    header('Access-Control-Allow-Methods: GET, POST, PATCH, PUT, DELETE, OPTIONS');
     header('Access-Control-Allow-Headers: Content-Type, X-API-Key, Authorization');
     http_response_code(200);
     exit;
@@ -43,11 +43,11 @@ if (empty($apiKey)) {
 
 // 2. Query target URI path on central FastAPI backend
 $requestUri = $_SERVER['REQUEST_URI'] ?? '';
-$path = '/api/v1/hospitals/me/inventory';
+$path = '/api/v1/referral/incoming';
 
-if (preg_match('#/api/v1/hospitals(/.*)?$#i', $requestUri, $matches)) {
-    $subPath = $matches[1] ?? '/me/inventory';
-    $path = '/api/v1/hospitals' . $subPath;
+if (preg_match('#/api/v1/referral(/.*)?$#i', $requestUri, $matches)) {
+    $subPath = $matches[1] ?? '/incoming';
+    $path = '/api/v1/referral' . $subPath;
 }
 
 $centralUrl = 'http://127.0.0.1:8081' . $path;
@@ -89,12 +89,11 @@ curl_close($ch);
 // 4. If cURL connection failed (e.g. FastAPI server unreachable)
 if ($curlErrno) {
     sendJsonResponse([
-        'detail' => "Can't reach the server, contact devs @ irdss.devs@up.edu.ph"
+        'detail' => "Can't reach the central server."
     ], 503);
 }
 
 // 5. Output response and status code 100% directly from Central FastAPI Server
-$origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
 http_response_code($httpCode);
 header("Access-Control-Allow-Origin: {$origin}");
 header('Access-Control-Allow-Credentials: true');

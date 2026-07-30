@@ -7,7 +7,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-define('IOL_ENDPOINT_URL', 'http://127.0.0.1:8000/api/v1/referral/initiate');
+define('IOL_ENDPOINT_URL', 'http://127.0.0.1:8081/api/v1/referral/initiate');
 
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'hospital_db');

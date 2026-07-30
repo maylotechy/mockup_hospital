@@ -15,6 +15,7 @@ $(document).ready(function () {
     const isIdeServer = location.port === '63343';
     const API_BASE = isIdeServer ? 'http://localhost/mock_hospitals/backend' : '../backend';
     const API_V1_ME = isIdeServer ? 'http://localhost/mock_hospitals/api/v1/hospitals/me/inventory' : '../api/v1/hospitals/me/inventory';
+    const API_V1_REFERRAL = isIdeServer ? 'http://localhost/mock_hospitals/api/v1/referral' : '../api/v1/referral';
 
     // Active Hospital State
     let currentHospital = null;
@@ -742,6 +743,217 @@ $(document).ready(function () {
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;");
     }
+
+    // Track prompted incoming referral IDs & polling state
+    const promptedReferralIds = new Set();
+    let isPromptActive = false;
+    let isPollingInProgress = false;
+
+    /**
+     * Poll Incoming Referrals for active hospital session
+     */
+    function pollIncomingReferrals() {
+        if (!currentHospital || isPollingInProgress) return;
+
+        const apiKey = currentHospital.api_key || '';
+        isPollingInProgress = true;
+
+        $.ajax({
+            url: `${API_V1_REFERRAL}/incoming`,
+            type: 'GET',
+            headers: {
+                'X-API-Key': apiKey
+            },
+            dataType: 'json',
+            success: function (res) {
+                isPollingInProgress = false;
+                let items = [];
+                if (Array.isArray(res)) {
+                    items = res;
+                } else if (res && Array.isArray(res.referrals)) {
+                    items = res.referrals;
+                } else if (res && Array.isArray(res.data)) {
+                    items = res.data;
+                } else if (res && Array.isArray(res.incoming)) {
+                    items = res.incoming;
+                } else if (res && (res.referral_id || res.id)) {
+                    items = [res];
+                }
+
+                // Filter for pending/unprompted items
+                const pendingItems = items.filter(item => {
+                    const id = item.referral_id || item.id;
+                    const status = (item.status || '').toUpperCase();
+                    return id && !promptedReferralIds.has(id) && status !== 'ACCEPTED' && status !== 'REDIRECTED';
+                });
+
+                if (pendingItems.length > 0 && !isPromptActive) {
+                    promptNextIncomingReferral(pendingItems[0]);
+                }
+            },
+            error: function () {
+                isPollingInProgress = false;
+            }
+        });
+    }
+
+    /**
+     * Prompt user to Accept or Redirect an incoming referral
+     */
+    function promptNextIncomingReferral(incomingAlert) {
+        const referralId = incomingAlert.referral_id || incomingAlert.id || 'N/A';
+        window.currentActiveReferralId = referralId;
+        promptedReferralIds.add(referralId);
+        isPromptActive = true;
+
+        const referringFacility = incomingAlert.referring_facility || incomingAlert.referring_hospital || (incomingAlert.serviceProvider && incomingAlert.serviceProvider.display) || 'Unknown Hospital';
+        const patientId = incomingAlert.patient_id || (incomingAlert.subject && incomingAlert.subject.reference) || 'N/A';
+        const age = incomingAlert.patient_age !== undefined ? incomingAlert.patient_age : (incomingAlert.age !== undefined ? incomingAlert.age : 'N/A');
+        const gender = incomingAlert.patient_gender || incomingAlert.gender || 'N/A';
+        const patientInfo = `${age} years old (${gender})`;
+        const severity = incomingAlert.disease_severity !== undefined ? incomingAlert.disease_severity : (incomingAlert.severity !== undefined ? incomingAlert.severity : '3');
+        const clinicalReason = incomingAlert.clinical_reason || incomingAlert.reason_text || incomingAlert.reason || 'Referral Request';
+
+        // Update placeholder elements if present in DOM
+        $('#modal-referring-hospital').text(referringFacility);
+        $('#modal-patient-id').text(patientId);
+        $('#modal-patient-age').text(patientInfo);
+        $('#modal-severity').text("Triage Category: " + severity);
+        $('#modal-reason').text(clinicalReason);
+
+        Swal.fire({
+            title: '<div class="flex items-center justify-center gap-2 text-blue-600"><i class="bi bi-hospital text-2xl"></i> <span>Incoming Patient Referral</span></div>',
+            html: `
+                <div class="text-start space-y-3 p-2 text-sm text-slate-700">
+                    <p class="text-xs text-slate-500 uppercase font-semibold tracking-wider mb-2">Hospital Referral Notification</p>
+                    
+                    <div class="p-3 bg-blue-50 rounded-xl border border-blue-100 space-y-1">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-bold text-blue-900 font-mono">Referral ID: ${escapeHtml(referralId)}</span>
+                            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">Pending Decision</span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2 bg-slate-50 p-3.5 rounded-xl border border-slate-200/70 text-xs">
+                        <div class="flex justify-between border-b border-slate-200/60 pb-1.5">
+                            <span class="text-slate-400 font-semibold">Referring Facility:</span>
+                            <span class="font-bold text-slate-800" id="modal-referring-hospital">${escapeHtml(referringFacility)}</span>
+                        </div>
+                        <div class="flex justify-between border-b border-slate-200/60 pb-1.5">
+                            <span class="text-slate-400 font-semibold">Patient ID:</span>
+                            <span class="font-bold text-slate-800 font-mono" id="modal-patient-id">${escapeHtml(String(patientId))}</span>
+                        </div>
+                        <div class="flex justify-between border-b border-slate-200/60 pb-1.5">
+                            <span class="text-slate-400 font-semibold">Patient Details:</span>
+                            <span class="font-bold text-slate-800" id="modal-patient-age">${escapeHtml(patientInfo)}</span>
+                        </div>
+                        <div class="flex justify-between border-b border-slate-200/60 pb-1.5">
+                            <span class="text-slate-400 font-semibold">Severity:</span>
+                            <span class="font-bold text-amber-700" id="modal-severity">Triage Category: ${escapeHtml(String(severity))}</span>
+                        </div>
+                        <div class="flex justify-between pt-0.5">
+                            <span class="text-slate-400 font-semibold">Clinical Reason:</span>
+                            <span class="font-bold text-slate-800" id="modal-reason">${escapeHtml(clinicalReason)}</span>
+                        </div>
+                    </div>
+
+                    <p class="text-xs text-slate-500 text-center mt-3">Please choose your decision for this incoming referral:</p>
+                </div>
+            `,
+            showCancelButton: false,
+            showDenyButton: true,
+            confirmButtonText: '<i class="bi bi-check-circle-fill me-1"></i> ACCEPT',
+            confirmButtonColor: '#16a34a',
+            denyButtonText: '<i class="bi bi-arrow-right-circle-fill me-1"></i> REDIRECTED',
+            denyButtonColor: '#dc2626',
+            allowOutsideClick: false,
+            customClass: { popup: 'rounded-3xl shadow-2xl border' }
+        }).then((result) => {
+            isPromptActive = false;
+
+            if (result.isConfirmed) {
+                submitReferralDecision(window.currentActiveReferralId, 'ACCEPTED');
+            } else if (result.isDenied) {
+                submitReferralDecision(window.currentActiveReferralId, 'REDIRECTED');
+            }
+        });
+    }
+
+    /**
+     * Submit Accept / Redirect decision to PATCH /api/v1/referral/{referral_id}/respond
+     */
+    function submitReferralDecision(referralId, decision) {
+        if (!currentHospital) return;
+        const apiKey = currentHospital.api_key || '';
+
+        Swal.fire({
+            title: 'Submitting Decision...',
+            text: `Transmitting ${decision} decision to central IOL...`,
+            allowOutsideClick: false,
+            didOpen: () => { Swal.showLoading(); }
+        });
+
+        const payload = JSON.stringify(decision);
+
+        $.ajax({
+            url: `${API_V1_REFERRAL}/${encodeURIComponent(referralId)}/respond`,
+            type: 'PATCH',
+            headers: {
+                'X-API-Key': apiKey,
+                'Content-Type': 'application/json'
+            },
+            data: payload,
+            dataType: 'json',
+            success: function (res) {
+                Swal.fire({
+                    icon: 'success',
+                    title: `Referral ${decision}!`,
+                    text: (res && res.message) || `Decision '${decision}' successfully submitted to central IOL.`,
+                    confirmButtonColor: '#0d6efd',
+                    customClass: { popup: 'rounded-4 shadow-lg' }
+                });
+            },
+            error: function (xhr) {
+                // Fallback attempt: if FastAPI expected JSON object {"status": "ACCEPTED"}
+                const altPayload = JSON.stringify({ status: decision, decision: decision, action: decision });
+
+                $.ajax({
+                    url: `${API_V1_REFERRAL}/${encodeURIComponent(referralId)}/respond`,
+                    type: 'PATCH',
+                    headers: {
+                        'X-API-Key': apiKey,
+                        'Content-Type': 'application/json'
+                    },
+                    data: altPayload,
+                    dataType: 'json',
+                    success: function (res) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: `Referral ${decision}!`,
+                            text: (res && res.message) || `Decision '${decision}' successfully submitted to central IOL.`,
+                            confirmButtonColor: '#0d6efd',
+                            customClass: { popup: 'rounded-4 shadow-lg' }
+                        });
+                    },
+                    error: function (errXhr) {
+                        const errData = errXhr.responseJSON || xhr.responseJSON || {};
+                        const rawMsg = errData.message || errData.detail || `Failed to submit referral decision (${errXhr.status || xhr.status}).`;
+
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Decision Submission Failed',
+                            text: cleanErrorMessage(rawMsg, errXhr.status || xhr.status),
+                            confirmButtonColor: '#0d6efd',
+                            customClass: { popup: 'rounded-4 shadow-lg' }
+                        });
+                    }
+                });
+            }
+        });
+    }
+
+    // Start incoming referral polling every 12 seconds
+    setInterval(pollIncomingReferrals, 12000);
 
     // Initialize session check
     checkSession();
