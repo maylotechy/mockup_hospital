@@ -6,6 +6,11 @@
 // ========================================================
 
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/../vendor/autoload.php';
+
+// safeLoad() prevents crashes if the .env file is missing in production
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
+$dotenv->safeLoad();
 
 // Handle CORS preflight
 if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -50,7 +55,8 @@ if (preg_match('#/api/v1/hospitals(/.*)?$#i', $requestUri, $matches)) {
     $path = '/api/v1/hospitals' . $subPath;
 }
 
-$centralUrl = 'http://127.0.0.1:8081' . $path;
+$iolHost = $_ENV['IOL_HOST'] ?? 'localhost';
+$centralUrl = 'http://' . $iolHost . ':8081' . $path;
 
 if (!empty($_SERVER['QUERY_STRING']) && strpos($path, '?') === false) {
     $centralUrl .= '?' . $_SERVER['QUERY_STRING'];
