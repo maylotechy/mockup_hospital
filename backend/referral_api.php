@@ -51,7 +51,7 @@ if (preg_match('#/api/v1/referral(/.*)?$#i', $requestUri, $matches)) {
 }
 
 $queryString = (!empty($_SERVER['QUERY_STRING']) && strpos($path, '?') === false) ? '?' . $_SERVER['QUERY_STRING'] : '';
-$portsToTry = [8081, 8000];
+$portsToTry = [8081, 8000, 8001];
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $rawInput = file_get_contents('php://input');

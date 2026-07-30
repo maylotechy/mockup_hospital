@@ -56,6 +56,7 @@ $(document).ready(function () {
         // Default to Patients tab
         switchTab('patients');
         loadPatients();
+        checkAndPollRecommendations();
     }
 
     /**
@@ -81,6 +82,7 @@ $(document).ready(function () {
             $('#mainHeaderTitle').text('Patient Records');
             $('#tabInventoryContent').hide();
             $('#tabPatientsContent').fadeIn(200);
+            checkAndPollRecommendations();
         } else if (tabName === 'inventory') {
             $('#navTabInventory')
                 .removeClass('text-slate-400 hover:text-white hover:bg-slate-900')
@@ -604,15 +606,38 @@ $(document).ready(function () {
                 $('#referralModal').fadeOut(200);
 
                 if (response.success) {
+                    let refId = response.referral_id || null;
+                    if (!refId && response.iol_response) {
+                        if (typeof response.iol_response === 'object') {
+                            refId = response.iol_response.referral_id || response.iol_response.referral_tracking_id || response.iol_response.id || (response.iol_response.data && (response.iol_response.data.referral_id || response.iol_response.data.id));
+                        }
+                    }
+                    if (!refId && response.iol_response) {
+                        const str = typeof response.iol_response === 'object' ? JSON.stringify(response.iol_response) : String(response.iol_response);
+                        const match = str.match(/ref_[a-zA-Z0-9_\-]+/i);
+                        if (match) refId = match[0];
+                    }
+
+                    const patientName = $('#modalPatientName').text() || 'Patient';
+
+                    if (refId) {
+                        const activeRefData = { id: refId, patientName: patientName, status: 'AWAITING' };
+                        window.activeInitiatedReferralId = refId;
+                        try {
+                            localStorage.setItem('active_initiated_referral', JSON.stringify(activeRefData));
+                        } catch(e) {}
+                        checkAndPollRecommendations();
+                    }
+
                     Swal.fire({
                         icon: 'success',
                         title: 'Referral Transmitted Successfully!',
                         html: `
-                            <p class="mb-3 text-slate-600 text-sm">The referral payload has been successfully compiled and transmitted to the Interoperability Layer (IOL).</p>
+                            <p class="mb-3 text-slate-600 text-sm font-medium">The referral payload has been successfully compiled and transmitted to the Interoperability Layer (IOL).</p>
                             <div class="p-4 rounded-2xl text-start shadow-sm border" style="background-color: #dbeafe; color: #1e3a8a; border-color: #bfdbfe;">
                                 <div class="flex items-start gap-2.5">
                                     <i class="bi bi-info-circle-fill text-blue-600 text-lg leading-none mt-0.5 flex-shrink-0"></i>
-                                    <span class="text-xs font-semibold leading-relaxed">Please wait for the IOL to process the referral. We'll notify you once a receiving hospital accepts your referral.</span>
+                                    <span class="text-xs font-semibold leading-relaxed">Please wait for receiving hospitals to accept your referral. Accepting facilities will appear in your dashboard tracker.</span>
                                 </div>
                             </div>
                         `,
@@ -691,11 +716,423 @@ $(document).ready(function () {
     });
 
     /**
-     * Refresh button event
+     * Refresh button events
      */
     $('#btnRefreshPatients').on('click', function () {
         loadPatients();
+        checkAndPollRecommendations();
     });
+
+    $(document).on('click', '#btnRefreshRecommendations', function () {
+        checkAndPollRecommendations();
+    });
+
+    /**
+     * Poll GET /api/v1/referral/{referral_id}/recommendations for accepting hospitals
+     */
+    function checkAndPollRecommendations() {
+        if (!currentHospital) {
+            $('#acceptedHospitalsCard').hide();
+            return;
+        }
+
+        let referralId = window.activeInitiatedReferralId || null;
+        let patientName = 'Patient';
+
+        if (!referralId) {
+            const stored = localStorage.getItem('active_initiated_referral');
+            if (stored) {
+                try {
+                    const parsed = JSON.parse(stored);
+                    if (parsed && parsed.id) {
+                        referralId = parsed.id;
+                        patientName = parsed.patientName || 'Patient';
+                    }
+                } catch(e) {}
+            }
+        }
+
+        if (!referralId) {
+            $('#acceptedHospitalsCard').hide();
+            return;
+        }
+
+        $('#acceptedHospitalsCard').fadeIn(200);
+        $('#activeReferralIdText').text(referralId);
+        $('#activeReferralPatientText').text(patientName);
+
+        const apiKey = currentHospital.api_key || '';
+        fetchRecommendationsForReferral(referralId, apiKey);
+    }
+
+    function fetchRecommendationsForReferral(referralId, apiKey) {
+        $.ajax({
+            url: `${API_V1_REFERRAL}/${encodeURIComponent(referralId)}/recommendations`,
+            type: 'GET',
+            headers: {
+                'X-API-Key': apiKey
+            },
+            dataType: 'json',
+            xhrFields: {
+                withCredentials: false
+            },
+            success: function (res) {
+                renderAcceptedHospitalsList(referralId, res);
+            },
+            error: function (xhr) {
+                const $list = $('#acceptedHospitalsList');
+                $list.html(`
+                    <div class="col-span-1 md:col-span-2 lg:col-span-3 text-center py-6 text-slate-400 font-normal bg-slate-50 rounded-xl border border-slate-200/60">
+                        <span class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent me-2"></span>
+                        Awaiting acceptances from receiving hospitals...
+                    </div>
+                `);
+            }
+        });
+    }
+
+    $(document).on('change', '#selectActiveReferralId', function() {
+        const selectedId = $(this).val();
+        if (!selectedId || !currentHospital) return;
+        const apiKey = currentHospital.api_key || '';
+
+        const selectedRef = initiatedReferralsCache.find(r => r.referral_id === selectedId);
+        if (selectedRef) {
+            $('#activeReferralPatientText').text(selectedRef.patient_name || 'Patient');
+        }
+
+        try {
+            localStorage.setItem('active_initiated_referral', JSON.stringify({ id: selectedId, patientName: selectedRef ? selectedRef.patient_name : '' }));
+        } catch(e) {}
+
+        fetchRecommendationsForReferral(selectedId, apiKey);
+    });
+
+    const locationGeoCache = {};
+
+    function getClientLocationFallback(lat, lng) {
+        if (Math.abs(lat - 7.0620) < 0.03 && Math.abs(lng - 125.6050) < 0.03) {
+            return "Gumamela Street, Purok 60, SIR 1, 76-A Bucana, Davao City";
+        }
+        if (Math.abs(lat - 7.0998) < 0.03 && Math.abs(lng - 125.6195) < 0.03) {
+            return "J.P. Laurel Avenue, Bajada, Davao City, Davao del Sur";
+        }
+        if (Math.abs(lat - 6.6402) < 0.03 && Math.abs(lng - 124.7384) < 0.03) {
+            return "Tacurong City, Sultan Kudarat, Soccsksargen";
+        }
+        return "Davao Region, Philippines";
+    }
+
+    function resolveLocationAddressHtml(lat, lng, elementId) {
+        if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) {
+            return 'Location N/A';
+        }
+
+        const cacheKey = `${lat.toFixed(4)}_${lng.toFixed(4)}`;
+        if (locationGeoCache[cacheKey]) {
+            return escapeHtml(locationGeoCache[cacheKey]);
+        }
+
+        const fallbackAddr = getClientLocationFallback(lat, lng);
+
+        // Trigger asynchronous reverse geocode via PHP proxy backend
+        setTimeout(() => {
+            $.ajax({
+                url: `${API_BASE}/reverse_geo.php`,
+                data: { lat: lat, lng: lng },
+                dataType: 'json',
+                xhrFields: { withCredentials: true },
+                timeout: 6000,
+                success: function(res) {
+                    if (res && res.address && !res.address.includes(lat.toFixed(2))) {
+                        locationGeoCache[cacheKey] = res.address;
+                        $(`#${elementId}`).text(res.address);
+                    } else {
+                        locationGeoCache[cacheKey] = fallbackAddr;
+                        $(`#${elementId}`).text(fallbackAddr);
+                    }
+                },
+                error: function() {
+                    locationGeoCache[cacheKey] = fallbackAddr;
+                    $(`#${elementId}`).text(fallbackAddr);
+                }
+            });
+        }, 30);
+
+        return `<span id="${elementId}" class="text-slate-500 font-normal italic flex items-center gap-1.5"><i class="bi bi-geo-alt text-blue-500 animate-pulse"></i> Resolving location address...</span>`;
+    }
+
+    function renderAcceptedHospitalsList(referralId, data) {
+        const $list = $('#acceptedHospitalsList');
+        $list.empty();
+
+        let items = [];
+        if (Array.isArray(data)) {
+            items = data;
+        } else if (data && Array.isArray(data.recommendations)) {
+            items = data.recommendations;
+        } else if (data && Array.isArray(data.hospitals)) {
+            items = data.hospitals;
+        } else if (data && Array.isArray(data.data)) {
+            items = data.data;
+        } else if (data && typeof data === 'object' && (data.hospital_id || data.id || data.hospital_name)) {
+            items = [data];
+        }
+
+        if (!items || items.length === 0) {
+            $('#activeReferralStatusBadge')
+                .attr('class', 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800')
+                .text('Awaiting Acceptances...');
+
+            $list.html(`
+                <div class="col-span-1 md:col-span-2 text-center py-8 text-slate-400 font-normal bg-slate-50 rounded-2xl border border-slate-200/60">
+                    <i class="bi bi-clock text-2xl block mb-2 text-slate-400"></i>
+                    <span class="text-xs font-medium">No hospital has accepted this referral yet. We will update automatically when a facility responds.</span>
+                </div>
+            `);
+            return;
+        }
+
+        $('#activeReferralStatusBadge')
+            .attr('class', 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800')
+            .text(`${items.length} Facility Accepted!`);
+
+        // Track new accepting hospitals per referral to trigger popup
+        const newHospitals = [];
+        items.forEach(hosp => {
+            const hospId = hosp.hospital_id || hosp.id || hosp.hospital_name || 'h';
+            const key = `${referralId}_${hospId}`;
+            if (!knownAcceptedHospitalKeys.has(key)) {
+                knownAcceptedHospitalKeys.add(key);
+                newHospitals.push(hosp);
+            }
+        });
+
+        // Trigger or update popup modal if new accepting hospitals detected
+        if (newHospitals.length > 0) {
+            showOrUpdateAcceptancePopup(referralId, items, newHospitals);
+        } else if (Swal.isVisible() && activeAcceptanceSwalRefId === referralId && $('#swal-acceptance-container').length > 0) {
+            const containerHtml = buildAcceptancePopupListHtml(referralId, items);
+            $('#swal-acceptance-container').html(containerHtml);
+            bindAcceptanceModalButtons();
+        }
+
+        // Sort accepted hospitals by available_beds in descending order
+        items.sort((a, b) => (b.available_beds ?? 0) - (a.available_beds ?? 0));
+
+        items.forEach((hosp, idx) => {
+            const hospName = hosp.hospital_name || hosp.name || `Hospital #${hosp.hospital_id || hosp.id || idx+1}`;
+            const level = hosp.hospital_level || hosp.level || 'Level 2';
+            const beds = hosp.available_beds !== undefined ? hosp.available_beds : 0;
+            const matchDeg = hosp.matching_degree !== undefined ? Math.round(hosp.matching_degree * 100) : 100;
+            const lat = hosp.latitude !== undefined ? parseFloat(hosp.latitude) : null;
+            const lng = hosp.longitude !== undefined ? parseFloat(hosp.longitude) : null;
+
+            const locId = `hosp-rec-loc-${idx}-${(hosp.hospital_id || 'h').toString().replace(/[^a-zA-Z0-9]/g, '')}`;
+            const locContent = resolveLocationAddressHtml(lat, lng, locId);
+
+            const card = `
+                <div class="p-5 bg-slate-50/90 rounded-2xl border border-slate-200 shadow-xs space-y-4 hover:border-blue-300 hover:shadow-md transition-all flex flex-col justify-between">
+                    <div class="space-y-3">
+                        <div class="flex items-start justify-between gap-3 flex-wrap">
+                            <div>
+                                <h4 class="font-bold text-slate-900 text-base leading-snug">${escapeHtml(hospName)}</h4>
+                                <span class="inline-block mt-1 px-2.5 py-0.5 rounded-md text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200/80">${escapeHtml(level)}</span>
+                            </div>
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span class="px-2.5 py-1 rounded-lg font-bold text-xs bg-emerald-100 text-emerald-800 flex items-center gap-1 border border-emerald-200">
+                                    <i class="bi bi-hospital text-xs"></i> ${beds} Beds Available
+                                </span>
+                                <span class="px-2.5 py-1 rounded-lg font-bold text-xs bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                    ${matchDeg}% Match
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="text-xs text-slate-600 font-medium leading-relaxed pt-2 border-t border-slate-200/70 flex items-start gap-1.5">
+                            <i class="bi bi-geo-alt-fill text-red-500 text-xs shrink-0 mt-0.5"></i>
+                            <span id="${locId}" class="break-words font-medium text-slate-700">${locContent}</span>
+                        </div>
+                    </div>
+
+                    <button class="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 btn-select-hospital"
+                        data-hosp-name="${escapeHtml(hospName)}" data-ref-id="${escapeHtml(referralId)}">
+                        <i class="bi bi-check2-circle text-base"></i>
+                        <span>SELECT THIS HOSPITAL</span>
+                    </button>
+                </div>
+            `;
+
+            $list.append(card);
+        });
+
+        // Attach click listener for hospital selection
+        $('.btn-select-hospital').off('click').on('click', function() {
+            const selectedHosp = $(this).attr('data-hosp-name');
+            const targetRefId = $(this).attr('data-ref-id');
+
+            Swal.fire({
+                title: 'Confirm Hospital Selection',
+                text: `Are you sure you want to select "${selectedHosp}" as the target transfer destination for referral ${targetRefId}?`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: '<i class="bi bi-check-lg me-1"></i> Yes, Select Hospital',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#16a34a',
+                cancelButtonColor: '#64748b',
+                customClass: { popup: 'rounded-4 shadow-lg' }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Destination Hospital Confirmed!',
+                        text: `Patient transfer to "${selectedHosp}" has been finalized for referral ${targetRefId}.`,
+                        confirmButtonColor: '#0d6efd',
+                        customClass: { popup: 'rounded-4 shadow-lg' }
+                    });
+
+                    $('#activeReferralStatusBadge')
+                        .attr('class', 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-600 text-white')
+                        .text(`Finalized: ${selectedHosp}`);
+                }
+            });
+        });
+    }
+
+    // State tracking for accepted hospital popups
+    const knownAcceptedHospitalKeys = new Set();
+    let activeAcceptanceSwalRefId = null;
+
+    /**
+     * Show or update the persistent acceptance popup when a new hospital accepts
+     */
+    function showOrUpdateAcceptancePopup(referralId, allAcceptedHospitals, newHospitals) {
+        if (Swal.isVisible() && activeAcceptanceSwalRefId === referralId && $('#swal-acceptance-container').length > 0) {
+            const containerHtml = buildAcceptancePopupListHtml(referralId, allAcceptedHospitals);
+            $('#swal-acceptance-container').html(containerHtml);
+            bindAcceptanceModalButtons();
+            return;
+        }
+
+        activeAcceptanceSwalRefId = referralId;
+        const newNames = newHospitals.map(h => h.hospital_name || h.name || 'Hospital').join(', ');
+        const popupHtml = `
+            <div class="text-start space-y-4 p-1 text-sm text-slate-700">
+                <div class="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200/80 flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2.5 text-emerald-900 font-bold text-xs">
+                        <i class="bi bi-bell-fill text-emerald-600 text-lg"></i>
+                        <span>New Hospital Acceptance Received!</span>
+                    </div>
+                    <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-200 text-emerald-950 font-mono">${escapeHtml(referralId)}</span>
+                </div>
+
+                <p class="text-xs text-slate-600 font-medium leading-relaxed">
+                    Facility <strong class="text-emerald-700 font-bold">${escapeHtml(newNames)}</strong> has accepted your referral! Review available facilities below and select your preferred destination:
+                </p>
+
+                <div id="swal-acceptance-container" class="space-y-3.5 max-h-[380px] overflow-y-auto pr-1">
+                    ${buildAcceptancePopupListHtml(referralId, allAcceptedHospitals)}
+                </div>
+            </div>
+        `;
+
+        Swal.fire({
+            title: '<div class="flex items-center justify-center gap-2 text-emerald-600 font-bold"><i class="bi bi-hospital text-3xl"></i> <span>Referral Accepted!</span></div>',
+            html: popupHtml,
+            showConfirmButton: false,
+            showCancelButton: true,
+            cancelButtonText: '<i class="bi bi-x-lg me-1"></i> Close Tracker',
+            cancelButtonColor: '#64748b',
+            allowOutsideClick: false,
+            width: '680px',
+            customClass: { popup: 'rounded-3xl shadow-2xl border max-w-2xl w-full p-4 sm:p-6' },
+            didOpen: () => {
+                bindAcceptanceModalButtons();
+            },
+            willClose: () => {
+                activeAcceptanceSwalRefId = null;
+            }
+        });
+    }
+
+    function buildAcceptancePopupListHtml(referralId, hospitals) {
+        if (!hospitals || hospitals.length === 0) return '<p class="text-xs text-slate-400">No acceptances yet.</p>';
+
+        return hospitals.map((hosp, idx) => {
+            const hospName = hosp.hospital_name || hosp.name || `Hospital #${idx+1}`;
+            const level = hosp.hospital_level || hosp.level || 'Level 2';
+            const beds = hosp.available_beds !== undefined ? hosp.available_beds : 0;
+            const lat = hosp.latitude !== undefined ? parseFloat(hosp.latitude) : null;
+            const lng = hosp.longitude !== undefined ? parseFloat(hosp.longitude) : null;
+
+            const locId = `popup-loc-${idx}-${(hosp.hospital_id || 'h').toString().replace(/[^a-zA-Z0-9]/g, '')}`;
+            const locContent = resolveLocationAddressHtml(lat, lng, locId);
+
+            return `
+                <div class="p-4 bg-slate-50/90 rounded-2xl border border-slate-200/90 shadow-xs space-y-3 hover:border-emerald-300 transition-all">
+                    <!-- Top Row: Hospital Name + Level + Beds -->
+                    <div class="flex items-start justify-between gap-3 flex-wrap">
+                        <div>
+                            <h4 class="font-bold text-slate-900 text-sm sm:text-base leading-snug">${escapeHtml(hospName)}</h4>
+                            <span class="inline-block mt-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">${escapeHtml(level)}</span>
+                        </div>
+                        <span class="px-3 py-1 rounded-full font-bold text-xs bg-emerald-100 text-emerald-800 flex items-center gap-1 border border-emerald-200 shrink-0">
+                            <i class="bi bi-hospital text-xs"></i> ${beds} Beds Available
+                        </span>
+                    </div>
+
+                    <!-- Middle Row: Location (Full Address, No Truncation) -->
+                    <div class="text-xs text-slate-600 font-medium leading-relaxed pt-2 border-t border-slate-200/70 flex items-start gap-1.5">
+                        <i class="bi bi-geo-alt-fill text-red-500 text-xs shrink-0 mt-0.5"></i>
+                        <span id="${locId}" class="break-words font-medium text-slate-700">${locContent}</span>
+                    </div>
+
+                    <!-- Bottom Row: Action Button -->
+                    <div class="pt-1 flex justify-end">
+                        <button class="w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 btn-popup-select-hospital"
+                            data-hosp-name="${escapeHtml(hospName)}" data-ref-id="${escapeHtml(referralId)}">
+                            <i class="bi bi-check2-circle text-sm"></i>
+                            <span>ACCEPT & SELECT THIS HOSPITAL</span>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function bindAcceptanceModalButtons() {
+        $('.btn-popup-select-hospital').off('click').on('click', function() {
+            const selectedHosp = $(this).attr('data-hosp-name');
+            const targetRefId = $(this).attr('data-ref-id');
+
+            Swal.fire({
+                title: 'Confirm Final Selection',
+                text: `Are you sure you want to finalize patient transfer to "${selectedHosp}" for referral ${targetRefId}?`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: '<i class="bi bi-check-circle-fill me-1"></i> Yes, Finalize Selection',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#16a34a',
+                cancelButtonColor: '#64748b',
+                customClass: { popup: 'rounded-4 shadow-lg' }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    activeAcceptanceSwalRefId = null;
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Destination Finalized!',
+                        text: `Patient transfer to "${selectedHosp}" has been successfully confirmed and routed!`,
+                        confirmButtonColor: '#0d6efd',
+                        customClass: { popup: 'rounded-4 shadow-lg' }
+                    });
+
+                    $('#activeReferralStatusBadge')
+                        .attr('class', 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-600 text-white')
+                        .text(`Finalized: ${selectedHosp}`);
+                }
+            });
+        });
+    }
 
     /**
      * Generic Alert Popup
@@ -1824,6 +2261,9 @@ $(document).ready(function () {
 
     // Start incoming referral polling every 12 seconds
     setInterval(pollIncomingReferrals, 12000);
+
+    // Start active referral recommendations polling every 4 seconds
+    setInterval(checkAndPollRecommendations, 4000);
 
     // Initialize session check
     checkSession();
