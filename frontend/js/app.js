@@ -89,6 +89,7 @@ $(document).ready(function () {
             $('#tabPatientsContent').hide();
             $('#tabInventoryContent').fadeIn(200);
             loadInventory();
+            initInventoryLocationDropdowns();
         }
     }
 
@@ -541,12 +542,15 @@ $(document).ready(function () {
                     const patient = response.data;
 
                     $('#modalPatientId').val(patient.id);
+                    $('#modalPatientIdBadge').text(`#${patient.id}`);
                     $('#modalPatientName').text(`${patient.first_name} ${patient.last_name}`);
                     $('#modalPatientDob').text(patient.dob);
                     $('#modalPatientGender').text(patient.gender);
                     $('#modalPatientPhone').text(patient.phone || 'N/A');
 
-                    $('#referralModal').fadeIn(200);
+                    $('#referralModal').fadeIn(200, function() {
+                        initLocationDropdowns();
+                    });
                 } else {
                     Swal.fire({
                         icon: 'error',
@@ -814,6 +818,38 @@ $(document).ready(function () {
         const severity = incomingAlert.disease_severity !== undefined ? incomingAlert.disease_severity : (incomingAlert.severity !== undefined ? incomingAlert.severity : '3');
         const clinicalReason = incomingAlert.clinical_reason || incomingAlert.reason_text || incomingAlert.reason || 'Referral Request';
 
+        // Extract patient coordinates (origin)
+        const patientLat = incomingAlert.patient_latitude !== undefined && incomingAlert.patient_latitude !== null ? parseFloat(incomingAlert.patient_latitude) : (incomingAlert.patient_lat !== undefined && incomingAlert.patient_lat !== null ? parseFloat(incomingAlert.patient_lat) : (incomingAlert.patient && incomingAlert.patient.latitude !== undefined && incomingAlert.patient.latitude !== null ? parseFloat(incomingAlert.patient.latitude) : null));
+        const patientLng = incomingAlert.patient_longitude !== undefined && incomingAlert.patient_longitude !== null ? parseFloat(incomingAlert.patient_longitude) : (incomingAlert.patient_lng !== undefined && incomingAlert.patient_lng !== null ? parseFloat(incomingAlert.patient_lng) : (incomingAlert.patient && incomingAlert.patient.longitude !== undefined && incomingAlert.patient.longitude !== null ? parseFloat(incomingAlert.patient.longitude) : null));
+
+        // Extract hospital coordinates (destination)
+        const hospitalLat = incomingAlert.hospital_latitude !== undefined && incomingAlert.hospital_latitude !== null ? parseFloat(incomingAlert.hospital_latitude) : (incomingAlert.hospital_lat !== undefined && incomingAlert.hospital_lat !== null ? parseFloat(incomingAlert.hospital_lat) : (currentHospital && currentHospital.latitude !== undefined && currentHospital.latitude !== null ? parseFloat(currentHospital.latitude) : null));
+        const hospitalLng = incomingAlert.hospital_longitude !== undefined && incomingAlert.hospital_longitude !== null ? parseFloat(incomingAlert.hospital_longitude) : (incomingAlert.hospital_lng !== undefined && incomingAlert.hospital_lng !== null ? parseFloat(incomingAlert.hospital_lng) : (currentHospital && currentHospital.longitude !== undefined && currentHospital.longitude !== null ? parseFloat(currentHospital.longitude) : null));
+
+        // Calculate Haversine distance and transfer ETA
+        let etaText = 'N/A';
+        let initialLocText = 'Location N/A';
+        let initialHospLocText = (hospitalLat != null && hospitalLng != null && !isNaN(hospitalLat) && !isNaN(hospitalLng)) ? `${hospitalLat.toFixed(4)}, ${hospitalLng.toFixed(4)}` : 'Location N/A';
+
+        if (patientLat != null && patientLng != null && !isNaN(patientLat) && !isNaN(patientLng)) {
+            initialLocText = `${patientLat.toFixed(4)}, ${patientLng.toFixed(4)}`;
+
+            if (hospitalLat != null && hospitalLng != null && !isNaN(hospitalLat) && !isNaN(hospitalLng)) {
+                const R = 6371; // Earth radius in km
+                const dLat = (hospitalLat - patientLat) * Math.PI / 180;
+                const dLon = (hospitalLng - patientLng) * Math.PI / 180;
+                const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                          Math.cos(patientLat * Math.PI / 180) * Math.cos(hospitalLat * Math.PI / 180) *
+                          Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                const distanceKm = R * c;
+
+                // 40 km/h avg ambulance speed + 5 min prep time
+                const estMinutes = Math.max(5, Math.round((distanceKm / 40) * 60));
+                etaText = `${distanceKm.toFixed(1)} km (~${estMinutes} mins transfer ETA)`;
+            }
+        }
+
         // Update placeholder elements if present in DOM
         $('#modal-referring-hospital').text(referringFacility);
         $('#modal-patient-id').text(patientId);
@@ -835,25 +871,41 @@ $(document).ready(function () {
                     </div>
 
                     <div class="space-y-2 bg-slate-50 p-3.5 rounded-xl border border-slate-200/70 text-xs">
-                        <div class="flex justify-between border-b border-slate-200/60 pb-1.5">
-                            <span class="text-slate-400 font-semibold">Referring Facility:</span>
-                            <span class="font-bold text-slate-800" id="modal-referring-hospital">${escapeHtml(referringFacility)}</span>
+                        <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
+                            <span class="text-slate-700 font-bold shrink-0">Referring Facility:</span>
+                            <span class="font-bold text-slate-800 text-right" id="modal-referring-hospital">${escapeHtml(referringFacility)}</span>
                         </div>
-                        <div class="flex justify-between border-b border-slate-200/60 pb-1.5">
-                            <span class="text-slate-400 font-semibold">Patient ID:</span>
-                            <span class="font-bold text-slate-800 font-mono" id="modal-patient-id">${escapeHtml(String(patientId))}</span>
+                        <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
+                            <span class="text-slate-700 font-bold shrink-0">Referring Facility Location:</span>
+                            <span class="font-normal text-slate-800 text-right leading-relaxed" id="modal-hospital-location">${escapeHtml(initialHospLocText)}</span>
                         </div>
-                        <div class="flex justify-between border-b border-slate-200/60 pb-1.5">
-                            <span class="text-slate-400 font-semibold">Patient Details:</span>
-                            <span class="font-bold text-slate-800" id="modal-patient-age">${escapeHtml(patientInfo)}</span>
+                        <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
+                            <span class="text-slate-700 font-bold shrink-0">Patient ID:</span>
+                            <span class="font-bold text-slate-800 font-mono text-right" id="modal-patient-id">${escapeHtml(String(patientId))}</span>
                         </div>
-                        <div class="flex justify-between border-b border-slate-200/60 pb-1.5">
-                            <span class="text-slate-400 font-semibold">Severity:</span>
-                            <span class="font-bold text-amber-700" id="modal-severity">Triage Category: ${escapeHtml(String(severity))}</span>
+                        <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
+                            <span class="text-slate-700 font-bold shrink-0">Age:</span>
+                            <span class="font-normal text-slate-800 text-right" id="modal-patient-age">${escapeHtml(String(age))}</span>
                         </div>
-                        <div class="flex justify-between pt-0.5">
-                            <span class="text-slate-400 font-semibold">Clinical Reason:</span>
-                            <span class="font-bold text-slate-800" id="modal-reason">${escapeHtml(clinicalReason)}</span>
+                        <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
+                            <span class="text-slate-700 font-bold shrink-0">Gender:</span>
+                            <span class="font-normal text-slate-800 text-right" id="modal-patient-gender">${escapeHtml(String(gender))}</span>
+                        </div>
+                        <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
+                            <span class="text-slate-700 font-bold shrink-0">Patient Location:</span>
+                            <span class="font-normal text-slate-800 text-right leading-relaxed" id="modal-patient-location">${escapeHtml(initialLocText)}</span>
+                        </div>
+                        <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
+                            <span class="text-slate-700 font-bold shrink-0">Transfer Distance & ETA:</span>
+                            <span class="font-bold text-blue-700 text-right" id="modal-transfer-eta">${escapeHtml(etaText)}</span>
+                        </div>
+                        <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
+                            <span class="text-slate-700 font-bold shrink-0">Severity:</span>
+                            <span class="font-bold text-amber-700 text-right" id="modal-severity">Triage Category: ${escapeHtml(String(severity))}</span>
+                        </div>
+                        <div class="flex justify-between pt-0.5 gap-2">
+                            <span class="text-slate-700 font-bold shrink-0">Clinical Reason:</span>
+                            <span class="font-bold text-slate-800 text-right" id="modal-reason">${escapeHtml(clinicalReason)}</span>
                         </div>
                     </div>
 
@@ -867,23 +919,93 @@ $(document).ready(function () {
             denyButtonText: '<i class="bi bi-arrow-right-circle-fill me-1"></i> REDIRECTED',
             denyButtonColor: '#dc2626',
             allowOutsideClick: false,
-            customClass: { popup: 'rounded-3xl shadow-2xl border' }
-        }).then((result) => {
-            isPromptActive = false;
+            customClass: { popup: 'rounded-3xl shadow-2xl border' },
+            didOpen: (popup) => {
+                const confirmBtn = Swal.getConfirmButton();
+                const denyBtn = Swal.getDenyButton();
 
-            if (result.isConfirmed) {
-                submitReferralDecision(window.currentActiveReferralId, 'ACCEPTED');
-            } else if (result.isDenied) {
-                submitReferralDecision(window.currentActiveReferralId, 'REDIRECTED');
+                if (confirmBtn) {
+                    confirmBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (confirmBtn) confirmBtn.disabled = true;
+                        if (denyBtn) denyBtn.disabled = true;
+                        isPromptActive = false;
+                        const refId = window.currentActiveReferralId;
+                        Swal.close();
+                        submitReferralDecision(refId, 'ACCEPTED');
+                    }, { capture: true });
+                }
+
+                if (denyBtn) {
+                    denyBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (confirmBtn) confirmBtn.disabled = true;
+                        if (denyBtn) denyBtn.disabled = true;
+                        isPromptActive = false;
+                        const refId = window.currentActiveReferralId;
+                        Swal.close();
+                        submitReferralDecision(refId, 'REDIRECTED');
+                    }, { capture: true });
+                }
+
+                // Perform Reverse Geocoding for Referring Facility Location
+                if (hospitalLat != null && hospitalLng != null && !isNaN(hospitalLat) && !isNaN(hospitalLng)) {
+                    $.ajax({
+                        url: 'https://nominatim.openstreetmap.org/reverse',
+                        data: {
+                            format: 'json',
+                            lat: hospitalLat,
+                            lon: hospitalLng
+                        },
+                        dataType: 'json',
+                        xhrFields: { withCredentials: false },
+                        timeout: 4000,
+                        success: function(res) {
+                            if (res && res.display_name) {
+                                const parts = res.display_name.split(',').map(s => s.trim());
+                                const fullAddress = parts.slice(0, 4).join(', ');
+                                $('#modal-hospital-location').text(fullAddress || res.display_name);
+                            }
+                        }
+                    });
+                }
+
+                // Perform Reverse Geocoding for Patient Origin Location
+                if (patientLat != null && patientLng != null && !isNaN(patientLat) && !isNaN(patientLng)) {
+                    $.ajax({
+                        url: 'https://nominatim.openstreetmap.org/reverse',
+                        data: {
+                            format: 'json',
+                            lat: patientLat,
+                            lon: patientLng
+                        },
+                        dataType: 'json',
+                        xhrFields: { withCredentials: false },
+                        timeout: 4000,
+                        success: function(res) {
+                            if (res && res.display_name) {
+                                const parts = res.display_name.split(',').map(s => s.trim());
+                                const fullAddress = parts.slice(0, 4).join(', ');
+                                $('#modal-patient-location').text(fullAddress || res.display_name);
+                            }
+                        }
+                    });
+                }
             }
         });
     }
+
+    let isSubmittingDecision = false;
 
     /**
      * Submit Accept / Redirect decision to PATCH /api/v1/referral/{referral_id}/respond
      */
     function submitReferralDecision(referralId, decision) {
-        if (!currentHospital) return;
+        if (!currentHospital || isSubmittingDecision) return;
+        isSubmittingDecision = true;
+
         const apiKey = currentHospital.api_key || '';
 
         Swal.fire({
@@ -893,7 +1015,7 @@ $(document).ready(function () {
             didOpen: () => { Swal.showLoading(); }
         });
 
-        const payload = JSON.stringify(decision);
+        const payload = JSON.stringify({ status: decision, decision: decision, action: decision });
 
         $.ajax({
             url: `${API_V1_REFERRAL}/${encodeURIComponent(referralId)}/respond`,
@@ -905,6 +1027,7 @@ $(document).ready(function () {
             data: payload,
             dataType: 'json',
             success: function (res) {
+                isSubmittingDecision = false;
                 Swal.fire({
                     icon: 'success',
                     title: `Referral ${decision}!`,
@@ -914,42 +1037,789 @@ $(document).ready(function () {
                 });
             },
             error: function (xhr) {
-                // Fallback attempt: if FastAPI expected JSON object {"status": "ACCEPTED"}
-                const altPayload = JSON.stringify({ status: decision, decision: decision, action: decision });
+                isSubmittingDecision = false;
+                const errData = xhr.responseJSON || {};
+                const rawMsg = errData.message || errData.detail || `Failed to submit referral decision (${xhr.status}).`;
 
-                $.ajax({
-                    url: `${API_V1_REFERRAL}/${encodeURIComponent(referralId)}/respond`,
-                    type: 'PATCH',
-                    headers: {
-                        'X-API-Key': apiKey,
-                        'Content-Type': 'application/json'
-                    },
-                    data: altPayload,
-                    dataType: 'json',
-                    success: function (res) {
-                        Swal.fire({
-                            icon: 'success',
-                            title: `Referral ${decision}!`,
-                            text: (res && res.message) || `Decision '${decision}' successfully submitted to central IOL.`,
-                            confirmButtonColor: '#0d6efd',
-                            customClass: { popup: 'rounded-4 shadow-lg' }
-                        });
-                    },
-                    error: function (errXhr) {
-                        const errData = errXhr.responseJSON || xhr.responseJSON || {};
-                        const rawMsg = errData.message || errData.detail || `Failed to submit referral decision (${errXhr.status || xhr.status}).`;
-
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Decision Submission Failed',
-                            text: cleanErrorMessage(rawMsg, errXhr.status || xhr.status),
-                            confirmButtonColor: '#0d6efd',
-                            customClass: { popup: 'rounded-4 shadow-lg' }
-                        });
-                    }
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Decision Submission Failed',
+                    text: cleanErrorMessage(rawMsg, xhr.status),
+                    confirmButtonColor: '#0d6efd',
+                    customClass: { popup: 'rounded-4 shadow-lg' }
                 });
             }
         });
+    }    // Global function to close referral modal
+    window.closeReferralModal = function() {
+        $('#referralModal').fadeOut(200);
+    };
+
+    /**
+     * PSGC API (https://psgc.cloud/api) Cascading Location Selector
+     */
+    let psgcCache = {
+        regions: null,
+        provinces: {},
+        cities: {},
+        barangays: {}
+    };
+
+    let geocodeDebounceTimer = null;
+    let isLocationEventsBound = false;
+
+    function setupLocationCascade() {
+        if (isLocationEventsBound) return;
+        isLocationEventsBound = true;
+
+        $('#selectRegion').on('change', function() {
+            loadProvincesForSelectedRegion();
+        });
+
+        $('#selectProvince').on('change', function() {
+            loadCitiesForSelectedProvince();
+        });
+
+        $('#selectCity').on('change', function() {
+            loadBarangaysForSelectedCity();
+        });
+
+        $('#selectBarangay').on('change', function() {
+            triggerGeocodeResolution();
+        });
+    }
+
+    function initLocationDropdowns() {
+        setupLocationCascade();
+        loadRegions();
+    }
+
+    function loadRegions() {
+        const $regionSelect = $('#selectRegion');
+        $regionSelect.empty().append('<option value="">Loading regions...</option>');
+
+        if (psgcCache.regions && psgcCache.regions.length > 0) {
+            populateRegionDropdown(psgcCache.regions);
+            return;
+        }
+
+        $.ajax({
+            url: 'https://psgc.cloud/api/regions',
+            type: 'GET',
+            dataType: 'json',
+            xhrFields: {
+                withCredentials: false
+            },
+            timeout: 5000,
+            success: function(data) {
+                if (Array.isArray(data) && data.length > 0) {
+                    psgcCache.regions = data;
+                    populateRegionDropdown(data);
+                } else {
+                    fallbackRegions();
+                }
+            },
+            error: function() {
+                fallbackRegions();
+            }
+        });
+    }
+
+    function populateRegionDropdown(regions) {
+        const $regionSelect = $('#selectRegion');
+        $regionSelect.empty();
+
+        regions.forEach(region => {
+            const option = $('<option>')
+                .attr('value', region.name)
+                .attr('data-code', region.code)
+                .text(region.name);
+
+            // Default to Region XI (Davao Region) or Mindanao if present
+            if (region.code === '1100000000' || region.name.includes('Davao')) {
+                option.prop('selected', true);
+            }
+
+            $regionSelect.append(option);
+        });
+
+        if (!$regionSelect.val() && regions.length > 0) {
+            $regionSelect.val(regions[0].name);
+        }
+
+        loadProvincesForSelectedRegion();
+    }
+
+    function fallbackRegions() {
+        const $regionSelect = $('#selectRegion');
+        $regionSelect.empty().append(`
+            <option value="Region XI (Davao Region)" data-code="1100000000" selected>Region XI (Davao Region)</option>
+            <option value="Region X (Northern Mindanao)" data-code="1000000000">Region X (Northern Mindanao)</option>
+            <option value="Region IX (Zamboanga Peninsula)" data-code="0900000000">Region IX (Zamboanga Peninsula)</option>
+            <option value="Region XII (SOCCSKSARGEN)" data-code="1200000000">Region XII (SOCCSKSARGEN)</option>
+            <option value="Region XIII (Caraga)" data-code="1600000000">Region XIII (Caraga)</option>
+            <option value="BARMM" data-code="1900000000">BARMM</option>
+            <option value="NCR (Metro Manila)" data-code="1300000000">NCR (Metro Manila)</option>
+        `);
+        loadProvincesForSelectedRegion();
+    }
+
+    function loadProvincesForSelectedRegion() {
+        const $regionSelect = $('#selectRegion');
+        const regionCode = $regionSelect.find('option:selected').attr('data-code');
+        const $provinceSelect = $('#selectProvince');
+        $provinceSelect.empty().append('<option value="">Loading provinces...</option>');
+
+        if (!regionCode) {
+            loadCitiesForSelectedProvince();
+            return;
+        }
+
+        if (psgcCache.provinces[regionCode]) {
+            populateProvinceDropdown(psgcCache.provinces[regionCode]);
+            return;
+        }
+
+        $.ajax({
+            url: `https://psgc.cloud/api/regions/${regionCode}/provinces`,
+            type: 'GET',
+            dataType: 'json',
+            xhrFields: {
+                withCredentials: false
+            },
+            timeout: 5000,
+            success: function(data) {
+                if (Array.isArray(data)) {
+                    psgcCache.provinces[regionCode] = data;
+                    populateProvinceDropdown(data);
+                } else {
+                    fallbackProvinces();
+                }
+            },
+            error: function() {
+                fallbackProvinces();
+            }
+        });
+    }
+
+    function populateProvinceDropdown(provinces) {
+        const $provinceSelect = $('#selectProvince');
+        $provinceSelect.empty();
+
+        if (provinces.length === 0) {
+            const regionName = $('#selectRegion').val();
+            $provinceSelect.append(`<option value="${regionName}" data-code="N/A">${regionName}</option>`);
+        } else {
+            provinces.forEach(prov => {
+                const option = $('<option>')
+                    .attr('value', prov.name)
+                    .attr('data-code', prov.code)
+                    .text(prov.name);
+                
+                if (prov.name.includes('Davao del Sur')) {
+                    option.prop('selected', true);
+                }
+                $provinceSelect.append(option);
+            });
+
+            if (!$provinceSelect.val() && provinces.length > 0) {
+                $provinceSelect.val(provinces[0].name);
+            }
+        }
+
+        loadCitiesForSelectedProvince();
+    }
+
+    function fallbackProvinces() {
+        const $provinceSelect = $('#selectProvince');
+        $provinceSelect.empty().append(`
+            <option value="Davao del Sur" data-code="1102400000" selected>Davao del Sur</option>
+            <option value="Davao del Norte" data-code="1102300000">Davao del Norte</option>
+            <option value="Misamis Oriental" data-code="1004300000">Misamis Oriental</option>
+            <option value="South Cotabato" data-code="1206300000">South Cotabato</option>
+        `);
+        loadCitiesForSelectedProvince();
+    }
+
+    function loadCitiesForSelectedProvince() {
+        const $provinceSelect = $('#selectProvince');
+        const provinceCode = $provinceSelect.find('option:selected').attr('data-code');
+        const regionCode = $('#selectRegion option:selected').attr('data-code');
+        const $citySelect = $('#selectCity');
+        $citySelect.empty().append('<option value="">Loading cities...</option>');
+
+        const fetchUrl = (provinceCode && provinceCode !== 'N/A')
+            ? `https://psgc.cloud/api/provinces/${provinceCode}/cities-municipalities`
+            : `https://psgc.cloud/api/regions/${regionCode}/cities-municipalities`;
+
+        const cacheKey = (provinceCode && provinceCode !== 'N/A') ? provinceCode : `region_${regionCode}`;
+
+        if (psgcCache.cities[cacheKey]) {
+            populateCityDropdown(psgcCache.cities[cacheKey]);
+            return;
+        }
+
+        $.ajax({
+            url: fetchUrl,
+            type: 'GET',
+            dataType: 'json',
+            xhrFields: {
+                withCredentials: false
+            },
+            timeout: 5000,
+            success: function(data) {
+                if (Array.isArray(data)) {
+                    psgcCache.cities[cacheKey] = data;
+                    populateCityDropdown(data);
+                } else {
+                    fallbackCities();
+                }
+            },
+            error: function() {
+                fallbackCities();
+            }
+        });
+    }
+
+    function populateCityDropdown(cities) {
+        const $citySelect = $('#selectCity');
+        $citySelect.empty();
+
+        cities.forEach(city => {
+            const option = $('<option>')
+                .attr('value', city.name)
+                .attr('data-code', city.code)
+                .text(city.name);
+
+            if (city.name.includes('Davao')) {
+                option.prop('selected', true);
+            }
+            $citySelect.append(option);
+        });
+
+        if (!$citySelect.val() && cities.length > 0) {
+            $citySelect.val(cities[0].name);
+        }
+
+        loadBarangaysForSelectedCity();
+    }
+
+    function fallbackCities() {
+        const $citySelect = $('#selectCity');
+        $citySelect.empty().append(`
+            <option value="City of Davao" data-code="1130700000" selected>City of Davao</option>
+            <option value="City of Digos" data-code="1102403000">City of Digos</option>
+            <option value="Santa Cruz" data-code="1102412000">Santa Cruz</option>
+        `);
+        loadBarangaysForSelectedCity();
+    }
+
+    function loadBarangaysForSelectedCity() {
+        const $citySelect = $('#selectCity');
+        const cityCode = $citySelect.find('option:selected').attr('data-code');
+        const $barangaySelect = $('#selectBarangay');
+        $barangaySelect.empty().append('<option value="">Loading barangays...</option>');
+
+        if (!cityCode) {
+            triggerGeocodeResolution();
+            return;
+        }
+
+        if (psgcCache.barangays[cityCode]) {
+            populateBarangayDropdown(psgcCache.barangays[cityCode]);
+            return;
+        }
+
+        $.ajax({
+            url: `https://psgc.cloud/api/cities-municipalities/${cityCode}/barangays`,
+            type: 'GET',
+            dataType: 'json',
+            xhrFields: {
+                withCredentials: false
+            },
+            timeout: 5000,
+            success: function(data) {
+                if (Array.isArray(data)) {
+                    psgcCache.barangays[cityCode] = data;
+                    populateBarangayDropdown(data);
+                } else {
+                    fallbackBarangays();
+                }
+            },
+            error: function() {
+                fallbackBarangays();
+            }
+        });
+    }
+
+    function populateBarangayDropdown(barangays) {
+        const $barangaySelect = $('#selectBarangay');
+        $barangaySelect.empty();
+
+        if (barangays.length === 0) {
+            $barangaySelect.append('<option value="Poblacion" data-code="N/A">Poblacion</option>');
+        } else {
+            barangays.forEach(brgy => {
+                const option = $('<option>')
+                    .attr('value', brgy.name)
+                    .attr('data-code', brgy.code)
+                    .text(brgy.name);
+                
+                if (brgy.name.toLowerCase().includes('buhangin') || brgy.name.toLowerCase().includes('poblacion')) {
+                    option.prop('selected', true);
+                }
+                $barangaySelect.append(option);
+            });
+
+            if (!$barangaySelect.val() && barangays.length > 0) {
+                $barangaySelect.val(barangays[0].name);
+            }
+        }
+
+        triggerGeocodeResolution();
+    }
+
+    function fallbackBarangays() {
+        const $barangaySelect = $('#selectBarangay');
+        $barangaySelect.empty().append(`
+            <option value="Buhangin" data-code="1130700100" selected>Buhangin</option>
+            <option value="Poblacion" data-code="1130700200">Poblacion</option>
+            <option value="Agdao" data-code="1130700300">Agdao</option>
+        `);
+        triggerGeocodeResolution();
+    }
+
+    function triggerGeocodeResolution() {
+        const region = $('#selectRegion').val();
+        const province = $('#selectProvince').val();
+        const city = $('#selectCity').val();
+        const barangay = $('#selectBarangay').val();
+
+        const resolvedAddress = [barangay, city, province, region].filter(Boolean).join(', ');
+        $('#displayResolvedAddress').text(resolvedAddress);
+
+        let defaultLat = 7.1907;
+        let defaultLng = 125.4553;
+
+        if (city) {
+            const cLower = city.toLowerCase();
+            if (cLower.includes('cagayan de oro')) { defaultLat = 8.4542; defaultLng = 124.6319; }
+            else if (cLower.includes('general santos')) { defaultLat = 6.1164; defaultLng = 125.1716; }
+            else if (cLower.includes('zamboanga')) { defaultLat = 6.9214; defaultLng = 122.0790; }
+            else if (cLower.includes('butuan')) { defaultLat = 8.9475; defaultLng = 125.5406; }
+            else if (cLower.includes('digos')) { defaultLat = 6.7583; defaultLng = 125.3572; }
+            else if (cLower.includes('cebu')) { defaultLat = 10.3157; defaultLng = 123.8854; }
+            else if (cLower.includes('manila') || cLower.includes('quezon')) { defaultLat = 14.5995; defaultLng = 120.9842; }
+        }
+
+        applyCoordinates(defaultLat, defaultLng);
+
+        if (geocodeDebounceTimer) clearTimeout(geocodeDebounceTimer);
+
+        geocodeDebounceTimer = setTimeout(() => {
+            const query = `${barangay ? barangay + ', ' : ''}${city}, ${province}, Philippines`;
+
+            $.ajax({
+                url: 'https://nominatim.openstreetmap.org/search',
+                data: {
+                    format: 'json',
+                    q: query,
+                    limit: 1
+                },
+                dataType: 'json',
+                xhrFields: {
+                    withCredentials: false
+                },
+                timeout: 4000,
+                success: function(results) {
+                    if (results && results.length > 0) {
+                        const lat = parseFloat(results[0].lat);
+                        const lng = parseFloat(results[0].lon);
+                        applyCoordinates(lat, lng);
+                    }
+                }
+            });
+        }, 400);
+    }
+
+    function applyCoordinates(lat, lng) {
+        const latFormatted = parseFloat(lat).toFixed(6);
+        const lngFormatted = parseFloat(lng).toFixed(6);
+
+        $('#modalLatitude').val(latFormatted);
+        $('#modalLongitude').val(lngFormatted);
+        $('#displayLatLongText').text(`${latFormatted}, ${lngFormatted}`);
+    }
+
+    /**
+     * Hospital Profile Inventory Location Selector
+     */
+    let invGeocodeDebounceTimer = null;
+    let isInvLocationEventsBound = false;
+
+    function setupInventoryLocationCascade() {
+        if (isInvLocationEventsBound) return;
+        isInvLocationEventsBound = true;
+
+        $('#invSelectRegion').on('change', function() {
+            loadInventoryProvinces();
+        });
+
+        $('#invSelectProvince').on('change', function() {
+            loadInventoryCities();
+        });
+
+        $('#invSelectCity').on('change', function() {
+            loadInventoryBarangays();
+        });
+
+        $('#invSelectBarangay').on('change', function() {
+            triggerInventoryGeocodeResolution();
+        });
+    }
+
+    function initInventoryLocationDropdowns() {
+        setupInventoryLocationCascade();
+        loadInventoryRegions();
+    }
+
+    function loadInventoryRegions() {
+        const $regionSelect = $('#invSelectRegion');
+        $regionSelect.empty().append('<option value="">Loading regions...</option>');
+
+        if (psgcCache.regions && psgcCache.regions.length > 0) {
+            populateInventoryRegionDropdown(psgcCache.regions);
+            return;
+        }
+
+        $.ajax({
+            url: 'https://psgc.cloud/api/regions',
+            type: 'GET',
+            dataType: 'json',
+            xhrFields: { withCredentials: false },
+            timeout: 5000,
+            success: function(data) {
+                if (Array.isArray(data) && data.length > 0) {
+                    psgcCache.regions = data;
+                    populateInventoryRegionDropdown(data);
+                } else {
+                    fallbackInventoryRegions();
+                }
+            },
+            error: function() {
+                fallbackInventoryRegions();
+            }
+        });
+    }
+
+    function populateInventoryRegionDropdown(regions) {
+        const $regionSelect = $('#invSelectRegion');
+        $regionSelect.empty();
+
+        regions.forEach(region => {
+            const option = $('<option>')
+                .attr('value', region.name)
+                .attr('data-code', region.code)
+                .text(region.name);
+
+            if (region.code === '1100000000' || region.name.includes('Davao')) {
+                option.prop('selected', true);
+            }
+
+            $regionSelect.append(option);
+        });
+
+        if (!$regionSelect.val() && regions.length > 0) {
+            $regionSelect.val(regions[0].name);
+        }
+
+        loadInventoryProvinces();
+    }
+
+    function fallbackInventoryRegions() {
+        const $regionSelect = $('#invSelectRegion');
+        $regionSelect.empty().append(`
+            <option value="Region XI (Davao Region)" data-code="1100000000" selected>Region XI (Davao Region)</option>
+            <option value="Region X (Northern Mindanao)" data-code="1000000000">Region X (Northern Mindanao)</option>
+            <option value="Region IX (Zamboanga Peninsula)" data-code="0900000000">Region IX (Zamboanga Peninsula)</option>
+            <option value="Region XII (SOCCSKSARGEN)" data-code="1200000000">Region XII (SOCCSKSARGEN)</option>
+            <option value="Region XIII (Caraga)" data-code="1600000000">Region XIII (Caraga)</option>
+            <option value="BARMM" data-code="1900000000">BARMM</option>
+            <option value="NCR (Metro Manila)" data-code="1300000000">NCR (Metro Manila)</option>
+        `);
+        loadInventoryProvinces();
+    }
+
+    function loadInventoryProvinces() {
+        const $regionSelect = $('#invSelectRegion');
+        const regionCode = $regionSelect.find('option:selected').attr('data-code');
+        const $provinceSelect = $('#invSelectProvince');
+        $provinceSelect.empty().append('<option value="">Loading provinces...</option>');
+
+        if (!regionCode) {
+            loadInventoryCities();
+            return;
+        }
+
+        if (psgcCache.provinces[regionCode]) {
+            populateInventoryProvinceDropdown(psgcCache.provinces[regionCode]);
+            return;
+        }
+
+        $.ajax({
+            url: `https://psgc.cloud/api/regions/${regionCode}/provinces`,
+            type: 'GET',
+            dataType: 'json',
+            xhrFields: { withCredentials: false },
+            timeout: 5000,
+            success: function(data) {
+                if (Array.isArray(data)) {
+                    psgcCache.provinces[regionCode] = data;
+                    populateInventoryProvinceDropdown(data);
+                } else {
+                    fallbackInventoryProvinces();
+                }
+            },
+            error: function() {
+                fallbackInventoryProvinces();
+            }
+        });
+    }
+
+    function populateInventoryProvinceDropdown(provinces) {
+        const $provinceSelect = $('#invSelectProvince');
+        $provinceSelect.empty();
+
+        if (provinces.length === 0) {
+            const regionName = $('#invSelectRegion').val();
+            $provinceSelect.append(`<option value="${regionName}" data-code="N/A">${regionName}</option>`);
+        } else {
+            provinces.forEach(prov => {
+                const option = $('<option>')
+                    .attr('value', prov.name)
+                    .attr('data-code', prov.code)
+                    .text(prov.name);
+                
+                if (prov.name.includes('Davao del Sur')) {
+                    option.prop('selected', true);
+                }
+                $provinceSelect.append(option);
+            });
+
+            if (!$provinceSelect.val() && provinces.length > 0) {
+                $provinceSelect.val(provinces[0].name);
+            }
+        }
+
+        loadInventoryCities();
+    }
+
+    function fallbackInventoryProvinces() {
+        const $provinceSelect = $('#invSelectProvince');
+        $provinceSelect.empty().append(`
+            <option value="Davao del Sur" data-code="1102400000" selected>Davao del Sur</option>
+            <option value="Davao del Norte" data-code="1102300000">Davao del Norte</option>
+            <option value="Misamis Oriental" data-code="1004300000">Misamis Oriental</option>
+        `);
+        loadInventoryCities();
+    }
+
+    function loadInventoryCities() {
+        const $provinceSelect = $('#invSelectProvince');
+        const provinceCode = $provinceSelect.find('option:selected').attr('data-code');
+        const regionCode = $('#invSelectRegion option:selected').attr('data-code');
+        const $citySelect = $('#invSelectCity');
+        $citySelect.empty().append('<option value="">Loading cities...</option>');
+
+        const fetchUrl = (provinceCode && provinceCode !== 'N/A')
+            ? `https://psgc.cloud/api/provinces/${provinceCode}/cities-municipalities`
+            : `https://psgc.cloud/api/regions/${regionCode}/cities-municipalities`;
+
+        const cacheKey = (provinceCode && provinceCode !== 'N/A') ? provinceCode : `region_${regionCode}`;
+
+        if (psgcCache.cities[cacheKey]) {
+            populateInventoryCityDropdown(psgcCache.cities[cacheKey]);
+            return;
+        }
+
+        $.ajax({
+            url: fetchUrl,
+            type: 'GET',
+            dataType: 'json',
+            xhrFields: { withCredentials: false },
+            timeout: 5000,
+            success: function(data) {
+                if (Array.isArray(data)) {
+                    psgcCache.cities[cacheKey] = data;
+                    populateInventoryCityDropdown(data);
+                } else {
+                    fallbackInventoryCities();
+                }
+            },
+            error: function() {
+                fallbackInventoryCities();
+            }
+        });
+    }
+
+    function populateInventoryCityDropdown(cities) {
+        const $citySelect = $('#invSelectCity');
+        $citySelect.empty();
+
+        cities.forEach(city => {
+            const option = $('<option>')
+                .attr('value', city.name)
+                .attr('data-code', city.code)
+                .text(city.name);
+
+            if (city.name.includes('Davao')) {
+                option.prop('selected', true);
+            }
+            $citySelect.append(option);
+        });
+
+        if (!$citySelect.val() && cities.length > 0) {
+            $citySelect.val(cities[0].name);
+        }
+
+        loadInventoryBarangays();
+    }
+
+    function fallbackInventoryCities() {
+        const $citySelect = $('#invSelectCity');
+        $citySelect.empty().append(`
+            <option value="City of Davao" data-code="1130700000" selected>City of Davao</option>
+            <option value="City of Digos" data-code="1102403000">City of Digos</option>
+        `);
+        loadInventoryBarangays();
+    }
+
+    function loadInventoryBarangays() {
+        const $citySelect = $('#invSelectCity');
+        const cityCode = $citySelect.find('option:selected').attr('data-code');
+        const $barangaySelect = $('#invSelectBarangay');
+        $barangaySelect.empty().append('<option value="">Loading barangays...</option>');
+
+        if (!cityCode) {
+            triggerInventoryGeocodeResolution();
+            return;
+        }
+
+        if (psgcCache.barangays[cityCode]) {
+            populateInventoryBarangayDropdown(psgcCache.barangays[cityCode]);
+            return;
+        }
+
+        $.ajax({
+            url: `https://psgc.cloud/api/cities-municipalities/${cityCode}/barangays`,
+            type: 'GET',
+            dataType: 'json',
+            xhrFields: { withCredentials: false },
+            timeout: 5000,
+            success: function(data) {
+                if (Array.isArray(data)) {
+                    psgcCache.barangays[cityCode] = data;
+                    populateInventoryBarangayDropdown(data);
+                } else {
+                    fallbackInventoryBarangays();
+                }
+            },
+            error: function() {
+                fallbackInventoryBarangays();
+            }
+        });
+    }
+
+    function populateInventoryBarangayDropdown(barangays) {
+        const $barangaySelect = $('#invSelectBarangay');
+        $barangaySelect.empty();
+
+        if (barangays.length === 0) {
+            $barangaySelect.append('<option value="Poblacion" data-code="N/A">Poblacion</option>');
+        } else {
+            barangays.forEach(brgy => {
+                const option = $('<option>')
+                    .attr('value', brgy.name)
+                    .attr('data-code', brgy.code)
+                    .text(brgy.name);
+                
+                if (brgy.name.toLowerCase().includes('buhangin') || brgy.name.toLowerCase().includes('poblacion')) {
+                    option.prop('selected', true);
+                }
+                $barangaySelect.append(option);
+            });
+
+            if (!$barangaySelect.val() && barangays.length > 0) {
+                $barangaySelect.val(barangays[0].name);
+            }
+        }
+
+        triggerInventoryGeocodeResolution();
+    }
+
+    function fallbackInventoryBarangays() {
+        const $barangaySelect = $('#invSelectBarangay');
+        $barangaySelect.empty().append(`
+            <option value="Buhangin" data-code="1130700100" selected>Buhangin</option>
+            <option value="Poblacion" data-code="1130700200">Poblacion</option>
+        `);
+        triggerInventoryGeocodeResolution();
+    }
+
+    function triggerInventoryGeocodeResolution() {
+        const region = $('#invSelectRegion').val();
+        const province = $('#invSelectProvince').val();
+        const city = $('#invSelectCity').val();
+        const barangay = $('#invSelectBarangay').val();
+
+        const resolvedAddress = [barangay, city, province, region].filter(Boolean).join(', ');
+        $('#invDisplayResolvedAddress').text(resolvedAddress);
+
+        let defaultLat = 7.1907;
+        let defaultLng = 125.4553;
+
+        if (city) {
+            const cLower = city.toLowerCase();
+            if (cLower.includes('cagayan de oro')) { defaultLat = 8.4542; defaultLng = 124.6319; }
+            else if (cLower.includes('general santos')) { defaultLat = 6.1164; defaultLng = 125.1716; }
+            else if (cLower.includes('zamboanga')) { defaultLat = 6.9214; defaultLng = 122.0790; }
+            else if (cLower.includes('butuan')) { defaultLat = 8.9475; defaultLng = 125.5406; }
+            else if (cLower.includes('digos')) { defaultLat = 6.7583; defaultLng = 125.3572; }
+            else if (cLower.includes('cebu')) { defaultLat = 10.3157; defaultLng = 123.8854; }
+            else if (cLower.includes('manila') || cLower.includes('quezon')) { defaultLat = 14.5995; defaultLng = 120.9842; }
+        }
+
+        applyInventoryCoordinates(defaultLat, defaultLng);
+
+        if (invGeocodeDebounceTimer) clearTimeout(invGeocodeDebounceTimer);
+
+        invGeocodeDebounceTimer = setTimeout(() => {
+            const query = `${barangay ? barangay + ', ' : ''}${city}, ${province}, Philippines`;
+
+            $.ajax({
+                url: 'https://nominatim.openstreetmap.org/search',
+                data: { format: 'json', q: query, limit: 1 },
+                dataType: 'json',
+                xhrFields: { withCredentials: false },
+                timeout: 4000,
+                success: function(results) {
+                    if (results && results.length > 0) {
+                        const lat = parseFloat(results[0].lat);
+                        const lng = parseFloat(results[0].lon);
+                        applyInventoryCoordinates(lat, lng);
+                    }
+                }
+            });
+        }, 400);
+    }
+
+    function applyInventoryCoordinates(lat, lng) {
+        const latFormatted = parseFloat(lat).toFixed(6);
+        const lngFormatted = parseFloat(lng).toFixed(6);
+
+        $('#inputLat').val(latFormatted);
+        $('#inputLng').val(lngFormatted);
+        $('#invDisplayLatLongText').text(`${latFormatted}, ${lngFormatted}`);
     }
 
     // Start incoming referral polling every 12 seconds

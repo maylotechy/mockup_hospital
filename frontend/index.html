@@ -24,7 +24,7 @@
                         }
                     },
                     fontFamily: {
-                        sans: ['Outfit', 'system-ui', 'sans-serif'],
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
                         mono: ['JetBrains Mono', 'monospace'],
                     }
                 }
@@ -32,15 +32,15 @@
         }
     </script>
 
-    <!-- Google Fonts: Outfit -->
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Bootstrap Icons CDN -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <!-- DataTables Bootstrap 5 / Tailwind Compatibility CSS -->
     <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
 
     <style>
-        body { font-family: 'Outfit', sans-serif; }
+        body { font-family: 'Inter', sans-serif; }
         
         /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -422,29 +422,29 @@
                             </div>
                             <div>
                                 <h3 class="font-bold text-slate-900 text-base">Update Hospital Inventory & Resource Profile</h3>
-                                <p class="text-xs text-slate-500">Transmits real-time updates directly to Central FastAPI Server</p>
+                                <p class="text-xs text-slate-500 font-normal">Transmits real-time updates directly to Central Server</p>
                             </div>
                         </div>
 
-                        <form id="updateInventoryForm" class="space-y-6">
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        <form id="updateInventoryForm" class="space-y-5">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                                 
                                 <div>
-                                    <label for="inputBeds" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Available Beds</label>
+                                    <label for="inputBeds" class="block text-xs font-bold text-slate-700 mb-1.5">Available Beds</label>
                                     <input type="number" id="inputBeds" name="available_beds" min="0" required
-                                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all">
+                                        class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition-all">
                                 </div>
 
                                 <div>
-                                    <label for="inputSpecs" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Specialists Count</label>
+                                    <label for="inputSpecs" class="block text-xs font-bold text-slate-700 mb-1.5">Specialists Count</label>
                                     <input type="number" id="inputSpecs" name="medical_specialists_count" min="0" required
-                                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all">
+                                        class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition-all">
                                 </div>
 
                                 <div>
-                                    <label for="inputLevel" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Hospital Level</label>
+                                    <label for="inputLevel" class="block text-xs font-bold text-slate-700 mb-1.5">Hospital Level</label>
                                     <select id="inputLevel" name="hospital_level" required
-                                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all">
+                                        class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition-all cursor-pointer">
                                         <option value="Level 1">Level 1</option>
                                         <option value="Level 2">Level 2</option>
                                         <option value="Level 3">Level 3</option>
@@ -452,51 +452,90 @@
                                 </div>
 
                                 <div>
-                                    <label for="inputEnv" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Environment</label>
+                                    <label for="inputEnv" class="block text-xs font-bold text-slate-700 mb-1.5">Environment</label>
                                     <select id="inputEnv" name="hospital_environment" required
-                                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all">
+                                        class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition-all cursor-pointer">
                                         <option value="Urban">Urban</option>
                                         <option value="Suburban">Suburban</option>
                                         <option value="Rural">Rural</option>
                                     </select>
                                 </div>
 
-                                <div>
-                                    <label for="inputLat" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Latitude</label>
-                                    <input type="number" step="any" id="inputLat" name="latitude" required
-                                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all font-mono">
-                                </div>
-
-                                <div>
-                                    <label for="inputLng" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Longitude</label>
-                                    <input type="number" step="any" id="inputLng" name="longitude" required
-                                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all font-mono">
-                                </div>
-
                             </div>
 
-                            <!-- Equipment Checkboxes -->
-                            <div class="pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                <label class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200/80 cursor-pointer hover:bg-slate-100 transition-colors">
-                                    <input type="checkbox" id="inputEmergencyEquip" name="emergency_equipment" class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500">
-                                    <span class="text-xs font-semibold text-slate-700">Emergency Equipment</span>
-                                </label>
+                            <!-- Equipment Checkboxes (Identical size and height) -->
+                            <div class="pt-4 border-t border-slate-100 space-y-2">
+                                <label class="block text-xs font-bold text-slate-900">Hospital Equipment & Resources</label>
 
-                                <label class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200/80 cursor-pointer hover:bg-slate-100 transition-colors">
-                                    <input type="checkbox" id="inputMedicalEquip" name="medical_equipment" class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500">
-                                    <span class="text-xs font-semibold text-slate-700">Medical Equipment</span>
-                                </label>
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    <label class="flex items-center gap-3 h-10 px-3.5 bg-slate-50 rounded-xl border border-slate-200/80 cursor-pointer hover:bg-slate-100 transition-colors">
+                                        <input type="checkbox" id="inputEmergencyEquip" name="emergency_equipment" class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500">
+                                        <span class="text-xs font-bold text-slate-700">Emergency Equipment</span>
+                                    </label>
 
-                                <label class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200/80 cursor-pointer hover:bg-slate-100 transition-colors">
-                                    <input type="checkbox" id="inputCommSystems" name="communication_systems" class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500">
-                                    <span class="text-xs font-semibold text-slate-700">Communication Systems</span>
-                                </label>
+                                    <label class="flex items-center gap-3 h-10 px-3.5 bg-slate-50 rounded-xl border border-slate-200/80 cursor-pointer hover:bg-slate-100 transition-colors">
+                                        <input type="checkbox" id="inputMedicalEquip" name="medical_equipment" class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500">
+                                        <span class="text-xs font-bold text-slate-700">Medical Equipment</span>
+                                    </label>
+
+                                    <label class="flex items-center gap-3 h-10 px-3.5 bg-slate-50 rounded-xl border border-slate-200/80 cursor-pointer hover:bg-slate-100 transition-colors">
+                                        <input type="checkbox" id="inputCommSystems" name="communication_systems" class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500">
+                                        <span class="text-xs font-bold text-slate-700">Communication Systems</span>
+                                    </label>
+                                </div>
                             </div>
 
-                            <div class="pt-2 flex justify-end">
+                            <input type="hidden" id="inputLat" name="latitude" value="7.1907">
+                            <input type="hidden" id="inputLng" name="longitude" value="125.4553">
+
+                            <!-- HOSPITAL LOCATION SELECTOR (Identical 4-column grid & sizing) -->
+                            <div class="space-y-2 pt-4 border-t border-slate-100">
+                                <label class="block text-xs font-bold text-slate-900">Hospital Location Selector</label>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div>
+                                        <label for="invSelectRegion" class="block text-xs font-bold text-slate-700 mb-1.5">Region</label>
+                                        <select id="invSelectRegion" class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition-all cursor-pointer">
+                                            <option value="Mindanao" selected>Mindanao</option>
+                                            <option value="Luzon">Luzon</option>
+                                            <option value="Visayas">Visayas</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label for="invSelectProvince" class="block text-xs font-bold text-slate-700 mb-1.5">Province</label>
+                                        <select id="invSelectProvince" class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition-all cursor-pointer">
+                                            <!-- Populated dynamically -->
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label for="invSelectCity" class="block text-xs font-bold text-slate-700 mb-1.5">City / Municipality</label>
+                                        <select id="invSelectCity" class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition-all cursor-pointer">
+                                            <!-- Populated dynamically -->
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label for="invSelectBarangay" class="block text-xs font-bold text-slate-700 mb-1.5">Barangay</label>
+                                        <select id="invSelectBarangay" class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition-all cursor-pointer">
+                                            <!-- Populated dynamically -->
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- Geocoded Location Text Badge -->
+                                <div class="px-3.5 py-2.5 bg-slate-50 rounded-xl border border-slate-200/60 flex items-center justify-between text-xs">
+                                    <span class="text-slate-600 truncate max-w-[280px] font-normal" id="invDisplayResolvedAddress">Davao City, Davao del Sur, Mindanao</span>
+                                    <span class="font-mono text-slate-500 font-normal" id="invDisplayLatLongText">7.190700, 125.455300</span>
+                                </div>
+                            </div>
+
+                            <!-- Submit Button (Rightmost Side) -->
+                            <div class="pt-4 border-t border-slate-100 flex justify-end">
                                 <button type="submit" id="btnSubmitInventory"
-                                    class="py-3 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-600/25 active:scale-[0.99] transition-all text-sm flex items-center gap-2">
-                                    <i class="bi bi-cloud-arrow-up text-base"></i>
+                                    class="py-2.5 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-600/25 active:scale-[0.99] transition-all text-xs flex items-center gap-2 ml-auto">
+                                    <i class="bi bi-cloud-arrow-up text-sm"></i>
                                     <span>Update Inventory</span>
                                 </button>
                             </div>
@@ -504,98 +543,133 @@
                     </div>
 
                 </div>
-
-            </div>
-        </main>
+            </main>
+        </div>
     </div>
 
 
     <!-- ======================================================== -->
-    <!-- 3. TRANSMIT REFERRAL MODAL                               -->
+    <!-- REFERRAL MODAL (MODERN MINIMALIST INTER DESIGN)          -->
     <!-- ======================================================== -->
-    <div id="referralModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" style="display: none;">
-        <div class="bg-white rounded-3xl shadow-2xl max-w-xl w-full overflow-hidden transform transition-all border border-slate-100">
+    <div id="referralModal" class="fixed inset-0 bg-slate-950/50 backdrop-blur-xs z-50 flex items-center justify-center p-4" style="display: none;">
+        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden border border-slate-200/80 transition-all">
             
-            <!-- Modal Header -->
-            <div class="px-6 py-5 bg-gradient-to-r from-slate-900 to-blue-950 text-white flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold">
-                        <i class="bi bi-send-plus text-lg"></i>
-                    </div>
-                    <div>
-                        <h3 class="font-bold text-base">Transmit Patient Referral</h3>
-                        <p class="text-xs text-slate-300">Inter-Hospital Telemetry & Referral Dispatch</p>
-                    </div>
+            <!-- Modal Header (Minimalist) -->
+            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                    <h3 class="font-bold text-slate-900 text-base">Refer Patient</h3>
+                    <p class="text-xs text-slate-500 font-normal">Select patient location and clinical severity</p>
                 </div>
-                <button type="button" class="text-slate-400 hover:text-white text-xl transition-colors" onclick="$('#referralModal').fadeOut(200);">
-                    <i class="bi bi-x-lg"></i>
+                <button type="button" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors" onclick="closeReferralModal();">
+                    <i class="bi bi-x-lg text-sm"></i>
                 </button>
             </div>
 
             <!-- Modal Form -->
-            <form id="referralForm" class="p-6 space-y-5">
+            <form id="referralForm" class="p-5 space-y-4">
                 <input type="hidden" id="modalPatientId" name="patient_id">
+                <input type="hidden" id="modalLatitude" name="latitude" value="7.1907">
+                <input type="hidden" id="modalLongitude" name="longitude" value="125.4553">
 
                 <!-- Patient Summary Card -->
-                <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Selected Patient</p>
-                    <h4 class="text-base font-bold text-slate-900" id="modalPatientName">Patient Name</h4>
-                    <p class="text-xs text-slate-600">
-                        DOB: <span id="modalPatientDob" class="font-semibold text-slate-800">--</span> | 
-                        Gender: <span id="modalPatientGender" class="font-semibold text-slate-800">--</span> | 
-                        Phone: <span id="modalPatientPhone" class="font-semibold text-slate-800">--</span>
-                    </p>
+                <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200/70 space-y-1.5 text-xs">
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-700 font-bold">Patient Name:</span>
+                        <span class="font-bold text-slate-900" id="modalPatientName">--</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-700 font-bold">Date of Birth:</span>
+                        <span class="font-normal text-slate-800" id="modalPatientDob">--</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-700 font-bold">Gender:</span>
+                        <span class="font-normal text-slate-800" id="modalPatientGender">--</span>
+                    </div>
                 </div>
 
-                <div class="space-y-4">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label for="modalLatitude" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Latitude <span class="text-red-500">*</span></label>
-                            <input type="number" step="any" id="modalLatitude" name="latitude" required value="7.1907"
-                                class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-mono focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all">
-                        </div>
-                        <div>
-                            <label for="modalLongitude" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Longitude <span class="text-red-500">*</span></label>
-                            <input type="number" step="any" id="modalLongitude" name="longitude" required value="125.4553"
-                                class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-mono focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all">
-                        </div>
-                    </div>
+                <!-- LOCATION DROPDOWNS -->
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-slate-900">Location Selector</label>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="grid grid-cols-2 gap-2.5">
                         <div>
-                            <label for="modalSalary" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Monthly Salary (PHP) <span class="text-red-500">*</span></label>
-                            <input type="number" step="any" id="modalSalary" name="salary" required value="12000"
-                                class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all">
+                            <label for="selectRegion" class="block text-xs font-bold text-slate-700 mb-1.5">Region</label>
+                            <select id="selectRegion" class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition-all cursor-pointer">
+                                <option value="Mindanao" selected>Mindanao</option>
+                                <option value="Luzon">Luzon</option>
+                                <option value="Visayas">Visayas</option>
+                            </select>
                         </div>
+
                         <div>
-                            <label for="modalSeverity" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Severity Level (1-5) <span class="text-red-500">*</span></label>
-                            <select id="modalSeverity" name="severity" required
-                                class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all">
-                                <option value="1">1 - Mild</option>
-                                <option value="2">2 - Moderate</option>
-                                <option value="3" selected>3 - Severe</option>
-                                <option value="4">4 - Critical</option>
-                                <option value="5">5 - Extreme</option>
+                            <label for="selectProvince" class="block text-xs font-bold text-slate-700 mb-1.5">Province</label>
+                            <select id="selectProvince" class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition-all cursor-pointer">
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="selectCity" class="block text-xs font-bold text-slate-700 mb-1.5">City / Municipality</label>
+                            <select id="selectCity" class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition-all cursor-pointer">
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="selectBarangay" class="block text-xs font-bold text-slate-700 mb-1.5">Barangay</label>
+                            <select id="selectBarangay" class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition-all cursor-pointer">
+                                <!-- Populated dynamically -->
                             </select>
                         </div>
                     </div>
 
-                    <div>
-                        <label for="modalReasonText" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Referral Reason / Diagnosis <span class="text-red-500">*</span></label>
-                        <input type="text" id="modalReasonText" name="reason_text" required
-                            class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all"
-                            placeholder="e.g. Severe Pneumonia" value="Severe Pneumonia">
+                    <!-- Geocoded Location Text Badge (Minimalist) -->
+                    <div class="px-3.5 py-2.5 bg-slate-50 rounded-xl border border-slate-200/60 flex items-center justify-between text-xs">
+                        <span class="text-slate-600 truncate max-w-[210px] font-normal" id="displayResolvedAddress">Davao City, Davao del Sur, Mindanao</span>
+                        <span class="font-mono text-slate-500 font-normal" id="displayLatLongText">7.190700, 125.455300</span>
                     </div>
                 </div>
 
-                <div class="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
-                    <button type="button" class="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-semibold transition-all" onclick="$('#referralModal').fadeOut(200);">
+                <!-- CLINICAL & FINANCIAL DETAILS -->
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div>
+                        <label for="modalSalary" class="block text-xs font-bold text-slate-700 mb-1.5">Monthly Income (PHP)</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-normal">₱</span>
+                            <input type="number" step="any" id="modalSalary" name="salary" required value="12000"
+                                class="w-full h-10 pl-7 pr-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-normal focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition-all">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="modalSeverity" class="block text-xs font-bold text-slate-700 mb-1.5">Severity Level</label>
+                        <select id="modalSeverity" name="severity" required
+                            class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-normal focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition-all cursor-pointer">
+                            <option value="1">1 - Mild</option>
+                            <option value="2">2 - Moderate</option>
+                            <option value="3" selected>3 - Severe</option>
+                            <option value="4">4 - Critical</option>
+                            <option value="5">5 - Extreme</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="modalReasonText" class="block text-xs font-bold text-slate-700 mb-1.5">Referral Reason / Diagnosis</label>
+                    <input type="text" id="modalReasonText" name="reason_text" required
+                        class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-normal focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition-all"
+                        placeholder="e.g. Severe Pneumonia" value="Severe Pneumonia">
+                </div>
+
+                <!-- Modal Actions -->
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                    <button type="button" class="h-10 px-4 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold transition-colors" onclick="closeReferralModal();">
                         Cancel
                     </button>
                     <button type="submit" id="btnSubmitReferral"
-                        class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-lg shadow-blue-600/25 active:scale-[0.99] transition-all flex items-center gap-2">
-                        <i class="bi bi-cloud-upload"></i>
-                        <span>Transmit Referral to IOL</span>
+                        class="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-sm active:scale-[0.99] transition-all flex items-center gap-1.5">
+                        <i class="bi bi-send text-xs"></i>
+                        <span>Transmit Referral</span>
                     </button>
                 </div>
             </form>

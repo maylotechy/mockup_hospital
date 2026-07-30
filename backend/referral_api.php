@@ -50,44 +50,53 @@ if (preg_match('#/api/v1/referral(/.*)?$#i', $requestUri, $matches)) {
     $path = '/api/v1/referral' . $subPath;
 }
 
-$centralUrl = 'http://127.0.0.1:8081' . $path;
-
-if (!empty($_SERVER['QUERY_STRING']) && strpos($path, '?') === false) {
-    $centralUrl .= '?' . $_SERVER['QUERY_STRING'];
-}
+$queryString = (!empty($_SERVER['QUERY_STRING']) && strpos($path, '?') === false) ? '?' . $_SERVER['QUERY_STRING'] : '';
+$portsToTry = [8081, 8000];
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $rawInput = file_get_contents('php://input');
 
-// 3. Perform cURL request directly to Central FastAPI Backend
-$ch = curl_init($centralUrl);
-curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+$response = false;
+$httpCode = 0;
+$curlErrno = 0;
 
-if (!empty($rawInput) && in_array($method, ['POST', 'PATCH', 'PUT'])) {
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $rawInput);
+foreach ($portsToTry as $port) {
+    $centralUrl = "http://127.0.0.1:{$port}" . $path . $queryString;
+    $ch = curl_init($centralUrl);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+
+    if (!empty($rawInput) && in_array($method, ['POST', 'PATCH', 'PUT'])) {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $rawInput);
+    }
+
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+    $requestHeaders = [
+        'Content-Type: application/json',
+        'Accept: application/json',
+        'Connection: close',
+        'X-API-Key: ' . $apiKey
+    ];
+
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $requestHeaders);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 2);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErrno = curl_errno($ch);
+    curl_close($ch);
+
+    if (!$curlErrno && $httpCode > 0) {
+        break;
+    }
 }
 
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
-$requestHeaders = [
-    'Content-Type: application/json',
-    'Accept: application/json',
-    'Connection: close',
-    'X-API-Key: ' . $apiKey
-];
-
-curl_setopt($ch, CURLOPT_HTTPHEADER, $requestHeaders);
-curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
-curl_setopt($ch, CURLOPT_TIMEOUT, 3);
-
-$response = curl_exec($ch);
-$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-$curlErrno = curl_errno($ch);
-$curlError = curl_error($ch);
-curl_close($ch);
-
-// 4. If cURL connection failed (e.g. FastAPI server unreachable)
-if ($curlErrno) {
+// 4. If cURL connection failed to all ports
+if ($curlErrno || !$response) {
+    if (strpos($path, '/incoming') !== false) {
+        sendJsonResponse([], 200);
+    }
     sendJsonResponse([
         'detail' => "Can't reach the central server."
     ], 503);
