@@ -5,25 +5,31 @@
 // Handles: GET /incoming, PATCH /{referral_id}/respond, etc.
 // ========================================================
 
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/../vendor/autoload.php';
-
-// safeLoad() prevents crashes if the .env file is missing in production
-$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
-$dotenv->safeLoad();
-
-// Handle CORS preflight
+// 1. Send CORS Headers IMMEDIATELY before loading dependencies
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
+header("Access-Control-Allow-Origin: {$origin}");
+header('Access-Control-Allow-Credentials: true');
+header('Access-Control-Allow-Methods: GET, POST, PATCH, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, X-API-Key, Authorization, X-Requested-With');
+
 if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    header("Access-Control-Allow-Origin: {$origin}");
-    header('Access-Control-Allow-Credentials: true');
-    header('Access-Control-Allow-Methods: GET, POST, PATCH, PUT, DELETE, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, X-API-Key, Authorization');
     http_response_code(200);
     exit;
 }
 
-// 1. Extract X-API-Key header or logged-in hospital session key
+require_once __DIR__ . '/config.php';
+
+// Safe load for composer vendor autoload if present
+$vendorAutoload = __DIR__ . '/../vendor/autoload.php';
+if (file_exists($vendorAutoload)) {
+    require_once $vendorAutoload;
+    if (class_exists('Dotenv\Dotenv')) {
+        $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
+        $dotenv->safeLoad();
+    }
+}
+
+// 2. Extract X-API-Key header or logged-in hospital session key
 $headers = function_exists('getallheaders') ? getallheaders() : [];
 $apiKey = '';
 
@@ -46,7 +52,7 @@ if (empty($apiKey)) {
     ], 401);
 }
 
-// 2. Query target URI path on central FastAPI backend
+// 3. Query target URI path on central FastAPI backend
 $requestUri = $_SERVER['REQUEST_URI'] ?? '';
 $path = '/api/v1/referral/incoming';
 
@@ -65,7 +71,7 @@ $response = false;
 $httpCode = 0;
 $curlErrno = 0;
 
-$iolHost = $_ENV['IOL_HOST'] ?? 'localhost';
+$iolHost = $_ENV['IOL_HOST'] ?? '127.0.0.1';
 
 foreach ($portsToTry as $port) {
     $centralUrl = "http://{$iolHost}:{$port}" . $path . $queryString;
@@ -87,7 +93,7 @@ foreach ($portsToTry as $port) {
 
     curl_setopt($ch, CURLOPT_HTTPHEADER, $requestHeaders);
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 2);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 3);
 
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -111,8 +117,6 @@ if ($curlErrno || !$response) {
 
 // 5. Output response and status code 100% directly from Central FastAPI Server
 http_response_code($httpCode);
-header("Access-Control-Allow-Origin: {$origin}");
-header('Access-Control-Allow-Credentials: true');
 header('Content-Type: application/json; charset=utf-8');
 echo $response;
 exit;

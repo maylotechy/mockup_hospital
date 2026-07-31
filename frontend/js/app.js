@@ -234,21 +234,43 @@ $(document).ready(function () {
      * Handle Logout Button Click
      */
     $(document).on('click', '#btnLogoutBtn', function () {
-        $.ajax({
-            url: `${API_BASE}/logout.php`,
-            type: 'POST',
-            dataType: 'json',
-            success: function () {
-                currentHospital = null;
-                showLoginView();
+        Swal.fire({
+            title: 'Log Out?',
+            text: 'Are you sure you want to sign out of your hospital portal session?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: '<i class="bi bi-box-arrow-right me-1"></i> Yes, Log Out',
+            cancelButtonText: 'Cancel',
+            reverseButtons: true
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: `${API_BASE}/logout.php`,
+                    type: 'POST',
+                    dataType: 'json',
+                    success: function () {
+                        currentHospital = null;
+                        window.activeInitiatedReferralId = null;
 
-                Swal.fire({
-                    toast: true,
-                    position: 'top-end',
-                    icon: 'info',
-                    title: 'Signed out successfully.',
-                    showConfirmButton: false,
-                    timer: 2500
+                        // Explicitly remove active referral key & wipe local storage
+                        try {
+                            localStorage.removeItem('active_initiated_referral');
+                            localStorage.clear();
+                        } catch(e) {}
+
+                        showLoginView();
+
+                        Swal.fire({
+                            toast: true,
+                            position: 'top-end',
+                            icon: 'info',
+                            title: 'Signed out successfully.',
+                            showConfirmButton: false,
+                            timer: 2500
+                        });
+                    }
                 });
             }
         });
@@ -782,7 +804,7 @@ $(document).ready(function () {
             error: function (xhr) {
                 const $list = $('#acceptedHospitalsList');
                 $list.html(`
-                    <div class="col-span-1 md:col-span-2 lg:col-span-3 text-center py-6 text-slate-400 font-normal bg-slate-50 rounded-xl border border-slate-200/60">
+                    <div class="col-span-full text-center py-6 px-4 text-slate-400 font-normal bg-slate-50/80 rounded-2xl border border-slate-200/60">
                         <span class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent me-2"></span>
                         Awaiting acceptances from receiving hospitals...
                     </div>
@@ -885,7 +907,7 @@ $(document).ready(function () {
                 .text('Awaiting Acceptances...');
 
             $list.html(`
-                <div class="col-span-1 md:col-span-2 text-center py-8 text-slate-400 font-normal bg-slate-50 rounded-2xl border border-slate-200/60">
+                <div class="col-span-full text-center py-8 px-4 text-slate-400 font-normal bg-slate-50/80 rounded-2xl border border-slate-200/60">
                     <i class="bi bi-clock text-2xl block mb-2 text-slate-400"></i>
                     <span class="text-xs font-medium">No hospital has accepted this referral yet. We will update automatically when a facility responds.</span>
                 </div>

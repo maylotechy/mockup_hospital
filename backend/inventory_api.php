@@ -5,22 +5,28 @@
 // 100% Dynamic Data directly from FastAPI Backend (PostgreSQL)
 // ========================================================
 
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/../vendor/autoload.php';
+// Handle CORS preflight IMMEDIATELY before loading dependencies
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
+header("Access-Control-Allow-Origin: {$origin}");
+header('Access-Control-Allow-Credentials: true');
+header('Access-Control-Allow-Methods: GET, POST, PATCH, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, X-API-Key, Authorization, X-Requested-With');
 
-// safeLoad() prevents crashes if the .env file is missing in production
-$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
-$dotenv->safeLoad();
-
-// Handle CORS preflight
 if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    $origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
-    header("Access-Control-Allow-Origin: {$origin}");
-    header('Access-Control-Allow-Credentials: true');
-    header('Access-Control-Allow-Methods: GET, PATCH, POST, PUT, DELETE, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, X-API-Key, Authorization');
     http_response_code(200);
     exit;
+}
+
+require_once __DIR__ . '/config.php';
+
+// Safe load for composer vendor autoload if present
+$vendorAutoload = __DIR__ . '/../vendor/autoload.php';
+if (file_exists($vendorAutoload)) {
+    require_once $vendorAutoload;
+    if (class_exists('Dotenv\Dotenv')) {
+        $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
+        $dotenv->safeLoad();
+    }
 }
 
 // 1. Extract X-API-Key header or logged-in hospital session key
