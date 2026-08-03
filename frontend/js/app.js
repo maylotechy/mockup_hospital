@@ -11,8 +11,8 @@ $(document).ready(function () {
         }
     });
 
-    // API Base URL (auto-detect PhpStorm/IntelliJ built-in preview server on port 63343)
-    const isIdeServer = location.port === '63343';
+    // API Base URL (auto-detect PhpStorm/IntelliJ built-in preview server, ports 63342/63343)
+    const isIdeServer = location.port === '63342' || location.port === '63343';
     const API_BASE = isIdeServer ? 'http://localhost/mock_hospitals/backend' : '../backend';
     const API_V1_ME = isIdeServer ? 'http://localhost/mock_hospitals/api/v1/hospitals/me/inventory' : '../api/v1/hospitals/me/inventory';
     const API_V1_REFERRAL = isIdeServer ? 'http://localhost/mock_hospitals/api/v1/referral' : '../api/v1/referral';
@@ -106,10 +106,35 @@ $(document).ready(function () {
     });
 
     /**
+     * Skeleton Loading Toggle for Inventory & Hospital Profile Tab
+     */
+    const INVENTORY_SKELETON_IDS = [
+        'statAvailableBeds', 'statMedicalSpecs', 'statHospitalLevel', 'statHospitalEnv',
+        'displayHospitalId', 'displayHospitalName', 'displayHospitalLevel', 'displayHospitalEnv', 'displayGpsCoords',
+        'badgeEmergencyEquip', 'badgeMedicalEquip', 'badgeCommSystems'
+    ];
+
+    function showInventorySkeleton() {
+        INVENTORY_SKELETON_IDS.forEach(function (id) {
+            $(`#${id}Skeleton`).removeClass('hidden');
+            $(`#${id}`).addClass('hidden');
+        });
+    }
+
+    function hideInventorySkeleton() {
+        INVENTORY_SKELETON_IDS.forEach(function (id) {
+            $(`#${id}Skeleton`).addClass('hidden');
+            $(`#${id}`).removeClass('hidden');
+        });
+    }
+
+    /**
      * Load Hospital Inventory via GET /api/v1/hospitals/me/inventory
      */
     function loadInventory() {
         if (!currentHospital) return;
+
+        showInventorySkeleton();
 
         const apiKey = currentHospital.api_key || '';
         const cacheKey = `cached_hospital_profile_${currentHospital.id}`;
@@ -122,11 +147,13 @@ $(document).ready(function () {
             },
             dataType: 'json',
             success: function (data) {
-                // Online mode: hide offline alert banner & enable submit button
+                // Online mode: hide offline/connection alert banners & enable submit button
                 $('#serverOfflineAlert').slideUp(200);
+                $('#serverConnectionAlert').slideUp(200);
                 $('#btnSubmitInventory').prop('disabled', false).html('<i class="bi bi-cloud-arrow-up me-2"></i> Update Inventory');
 
                 populateHospitalProfile(data);
+                hideInventorySkeleton();
             },
             error: function (xhr) {
                 const cachedRaw = localStorage.getItem(cacheKey);
@@ -136,8 +163,10 @@ $(document).ready(function () {
                     try {
                         const cachedData = JSON.parse(cachedRaw);
                         populateHospitalProfile(cachedData, true);
+                        hideInventorySkeleton();
 
                         // Show offline alert banner & disable submit button
+                        $('#serverConnectionAlert').slideUp(200);
                         $('#serverOfflineAlert').slideDown(200);
                         $('#btnSubmitInventory').prop('disabled', true).html('<i class="bi bi-wifi-off me-2"></i> Server Offline (Updates Disabled)');
 
@@ -153,18 +182,23 @@ $(document).ready(function () {
                     } catch (e) {}
                 }
 
-                // If no cached data exists, display server connection notice
+                // If no cached data exists, keep the skeleton pulsing — there's nothing real to show yet
                 const errData = xhr.responseJSON || {};
                 const isConnectionErr = xhr.status === 503 || xhr.status === 0 || (errData.detail && errData.detail.includes("reach the server"));
-                const errorTitle = isConnectionErr ? "Can't Reach Server" : "API Authorization Notice";
-                const errorMsg = isConnectionErr 
-                    ? "Can't reach the server, contact devs @ irdss.devs@up.edu.ph"
-                    : (errData.detail || "Could not retrieve hospital profile from backend.");
 
+                if (isConnectionErr) {
+                    // Inline banner instead of a blocking alert — server being unreachable is common/expected
+                    $('#serverOfflineAlert').slideUp(200);
+                    $('#serverConnectionAlert').slideDown(200);
+                    $('#btnSubmitInventory').prop('disabled', true).html('<i class="bi bi-wifi-off me-2"></i> Server Offline (Updates Disabled)');
+                    return;
+                }
+
+                $('#serverConnectionAlert').slideUp(200);
                 Swal.fire({
                     icon: 'error',
-                    title: errorTitle,
-                    text: errorMsg,
+                    title: 'API Authorization Notice',
+                    text: errData.detail || 'Could not retrieve hospital profile from backend.',
                     confirmButtonColor: '#0d6efd'
                 });
             }
@@ -189,7 +223,7 @@ $(document).ready(function () {
             data: { username: username, password: password },
             dataType: 'json',
             success: function (response) {
-                $btn.html('<span>Sign In to System</span> <i class="bi bi-arrow-right"></i>').prop('disabled', false);
+                $btn.html('<span>Sign In</span> <i class="bi bi-arrow-right"></i>').prop('disabled', false);
 
                 if (response.success && response.hospital) {
                     currentHospital = response.hospital;
@@ -213,8 +247,8 @@ $(document).ready(function () {
                 }
             },
             error: function (xhr) {
-                $btn.html('<span>Sign In to System</span> <i class="bi bi-arrow-right"></i>').prop('disabled', false);
-                
+                $btn.html('<span>Sign In</span> <i class="bi bi-arrow-right"></i>').prop('disabled', false);
+
                 let errMsg = 'Failed to connect to authentication server.';
                 if (xhr.responseJSON && xhr.responseJSON.message) {
                     errMsg = xhr.responseJSON.message;
