@@ -141,38 +141,27 @@ try {
         $requestHeaders[] = 'X-API-Key: ' . $apiKey;
     }
 
-    // Send payload to IOL route /api/v1/referral/initiate across ports 8081, 8000, 8001
-    $portsToTry = [8081, 8000, 8001];
-    $iolResponse = false;
-    $httpCode = 0;
-    $curlErrno = 0;
-    $curlError = '';
+    // Send payload to IOL route /api/v1/referral/initiate using the configured endpoint
+    $ch = curl_init(IOL_ENDPOINT_URL);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $payloadJson);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $requestHeaders);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
 
-    foreach ($portsToTry as $port) {
-        $targetUrl = "http://127.0.0.1:{$port}/api/v1/referral/initiate";
-        $ch = curl_init($targetUrl);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $payloadJson);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $requestHeaders);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 4);
+    $iolResponse = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErrno = curl_errno($ch);
+    $curlError = curl_error($ch);
+    curl_close($ch);
 
-        $iolResponse = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlErrno = curl_errno($ch);
-        $curlError = curl_error($ch);
-        curl_close($ch);
-
-        if (!$curlErrno && $httpCode > 0) {
-            break;
-        }
-    }
+    $referralId = null;
 
     // Handle cURL connection failure gracefully
     if ($curlErrno || !$iolResponse) {
         $httpCode = 503;
-        $iolResponseData = "cURL Connection Error (#{$curlErrno}): {$curlError}. Please ensure the Interoperability Layer (IOL) service is listening on port 8001/8081/8000.";
+        $iolResponseData = "cURL Connection Error (#{$curlErrno}): {$curlError}. Please ensure the Interoperability Layer (IOL) service is reachable at " . IOL_ENDPOINT_URL . ".";
         $isSuccess = false;
         $errorMessage = "Can't reach the server, contact devs @ irdss.devs@upmin.edu.ph";
     } else {
