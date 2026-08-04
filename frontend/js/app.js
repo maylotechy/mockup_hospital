@@ -72,7 +72,7 @@ $(document).ready(function () {
      */
     function switchTab(tabName) {
         $('.sidebar-link')
-            .removeClass('bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20')
+            .removeClass('bg-yellow-600 text-white font-semibold shadow-md shadow-yellow-600/20')
             .addClass('text-slate-400 hover:text-white hover:bg-slate-900');
 
         const $allTabs = $('#tabPatientsContent, #tabInventoryContent, #tabProfileContent, #tabReferralsContent, #tabOutcomesContent');
@@ -80,14 +80,14 @@ $(document).ready(function () {
         if (tabName === 'patients') {
             $('#navTabPatients')
                 .removeClass('text-slate-400 hover:text-white hover:bg-slate-900')
-                .addClass('bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20');
+                .addClass('bg-yellow-600 text-white font-semibold shadow-md shadow-yellow-600/20');
             $('#mainHeaderTitle').text('Patient Records');
             $allTabs.hide();
             $('#tabPatientsContent').fadeIn(200);
         } else if (tabName === 'inventory') {
             $('#navTabInventory')
                 .removeClass('text-slate-400 hover:text-white hover:bg-slate-900')
-                .addClass('bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20');
+                .addClass('bg-yellow-600 text-white font-semibold shadow-md shadow-yellow-600/20');
             $('#mainHeaderTitle').text('Hospital Inventory');
             $allTabs.hide();
             $('#tabInventoryContent').fadeIn(200);
@@ -95,7 +95,7 @@ $(document).ready(function () {
         } else if (tabName === 'profile') {
             $('#navTabProfile')
                 .removeClass('text-slate-400 hover:text-white hover:bg-slate-900')
-                .addClass('bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20');
+                .addClass('bg-yellow-600 text-white font-semibold shadow-md shadow-yellow-600/20');
             $('#mainHeaderTitle').text('Facility Profile');
             $allTabs.hide();
             $('#tabProfileContent').fadeIn(200);
@@ -104,7 +104,7 @@ $(document).ready(function () {
         } else if (tabName === 'referrals') {
             $('#navTabReferrals')
                 .removeClass('text-slate-400 hover:text-white hover:bg-slate-900')
-                .addClass('bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20');
+                .addClass('bg-yellow-600 text-white font-semibold shadow-md shadow-yellow-600/20');
             $('#mainHeaderTitle').text('My Referrals');
             $allTabs.hide();
             $('#tabReferralsContent').fadeIn(200);
@@ -113,7 +113,7 @@ $(document).ready(function () {
         } else if (tabName === 'outcomes') {
             $('#navTabOutcomes')
                 .removeClass('text-slate-400 hover:text-white hover:bg-slate-900')
-                .addClass('bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20');
+                .addClass('bg-yellow-600 text-white font-semibold shadow-md shadow-yellow-600/20');
             $('#mainHeaderTitle').text('Referral Outcomes');
             $allTabs.hide();
             $('#tabOutcomesContent').fadeIn(200);
@@ -471,7 +471,7 @@ $(document).ready(function () {
                     <td class="py-3.5 px-6"><span class="px-2.5 py-1 rounded-full text-xs font-medium ${genderBadgeClass}">${escapeHtml(patient.gender)}</span></td>
                     <td class="py-3.5 px-6 text-slate-600 text-xs font-mono">${escapeHtml(patient.phone)}</td>
                     <td class="py-3.5 px-6 text-right">
-                        <button class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg shadow-sm hover:shadow active:scale-[0.98] transition-all btn-refer-patient flex items-center gap-1.5 ml-auto" data-id="${patient.id}">
+                        <button class="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-lg shadow-sm hover:shadow active:scale-[0.98] transition-all btn-refer-patient flex items-center gap-1.5 ml-auto" data-id="${patient.id}">
                             <i class="bi bi-send-plus"></i> Refer Patient
                         </button>
                     </td>
@@ -769,7 +769,7 @@ $(document).ready(function () {
                             <p class="mb-3 text-slate-600 text-sm font-medium">The referral payload has been successfully compiled and transmitted to the Interoperability Layer (IOL).</p>
                             <div class="p-4 rounded-2xl text-start shadow-sm border" style="background-color: #dbeafe; color: #1e3a8a; border-color: #bfdbfe;">
                                 <div class="flex items-start gap-2.5">
-                                    <i class="bi bi-info-circle-fill text-blue-600 text-lg leading-none mt-0.5 flex-shrink-0"></i>
+                                    <i class="bi bi-info-circle-fill text-red-600 text-lg leading-none mt-0.5 flex-shrink-0"></i>
                                     <span class="text-xs font-semibold leading-relaxed">Please wait for receiving hospitals to accept your referral. Accepting facilities will appear on the "My Referrals" page.</span>
                                 </div>
                             </div>
@@ -905,7 +905,7 @@ $(document).ready(function () {
                 const $list = $('#acceptedHospitalsList');
                 $list.html(`
                     <div class="col-span-full text-center py-6 px-4 text-slate-400 font-normal bg-slate-50/80 rounded-2xl border border-slate-200/60">
-                        <span class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent me-2"></span>
+                        <span class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-red-600 border-t-transparent me-2"></span>
                         Awaiting acceptances from receiving hospitals...
                     </div>
                 `);
@@ -981,7 +981,7 @@ $(document).ready(function () {
             });
         }, 30);
 
-        return `<span id="${elementId}" class="text-slate-500 font-normal italic flex items-center gap-1.5"><i class="bi bi-geo-alt text-blue-500 animate-pulse"></i> Resolving location address...</span>`;
+        return `<span id="${elementId}" class="text-slate-500 font-normal italic flex items-center gap-1.5"><i class="bi bi-geo-alt text-red-500 animate-pulse"></i> Resolving location address...</span>`;
     }
 
     function renderAcceptedHospitalsList(referralId, data) {
@@ -1051,9 +1051,9 @@ $(document).ready(function () {
             const locContent = resolveLocationAddressHtml(lat, lng, locId);
 
             const card = `
-                <div class="relative p-5 bg-slate-50/90 rounded-2xl border ${isBestMatch ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200'} shadow-xs space-y-4 hover:border-blue-300 hover:shadow-md transition-all flex flex-col justify-between">
+                <div class="relative p-5 bg-slate-50/90 rounded-2xl border ${isBestMatch ? 'border-red-400 ring-2 ring-red-100' : 'border-slate-200'} shadow-xs space-y-4 hover:border-red-300 hover:shadow-md transition-all flex flex-col justify-between">
                     ${isBestMatch ? `
-                        <span class="absolute -top-2.5 left-4 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-600 text-white shadow-sm flex items-center gap-1">
+                        <span class="absolute -top-2.5 left-4 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-yellow-600 text-white shadow-sm flex items-center gap-1">
                             <i class="bi bi-star-fill"></i> BEST MATCH
                         </span>
                     ` : ''}
@@ -1061,7 +1061,7 @@ $(document).ready(function () {
                         <div class="flex items-start justify-between gap-3 flex-wrap">
                             <div>
                                 <h4 class="font-bold text-slate-900 text-base leading-snug">${escapeHtml(hospName)}</h4>
-                                <span class="inline-block mt-1 px-2.5 py-0.5 rounded-md text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200/80">${escapeHtml(level)}</span>
+                                <span class="inline-block mt-1 px-2.5 py-0.5 rounded-md text-xs font-bold bg-red-100 text-red-800 border border-red-200/80">${escapeHtml(level)}</span>
                             </div>
                             <div class="flex items-center gap-1.5 flex-wrap">
                                 <span class="px-2.5 py-1 rounded-lg font-bold text-xs bg-emerald-100 text-emerald-800 flex items-center gap-1 border border-emerald-200">
@@ -1079,7 +1079,7 @@ $(document).ready(function () {
                         </div>
                     </div>
 
-                    <button class="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 btn-select-hospital"
+                    <button class="w-full py-2.5 px-4 bg-yellow-600 hover:bg-red-700 active:scale-[0.99] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 btn-select-hospital"
                         data-hosp-name="${escapeHtml(hospName)}" data-ref-id="${escapeHtml(referralId)}">
                         <i class="bi bi-check2-circle text-base"></i>
                         <span>SELECT THIS HOSPITAL</span>
@@ -1304,7 +1304,7 @@ $(document).ready(function () {
 
     const REFERRAL_STATUS_BADGE_CLASS = {
         PENDING: 'bg-amber-100 text-amber-800',
-        SEEN: 'bg-blue-100 text-blue-800',
+        SEEN: 'bg-red-100 text-red-800',
         ACCEPTED: 'bg-emerald-100 text-emerald-800',
         REDIRECTED: 'bg-indigo-100 text-indigo-800',
         CANCELLED: 'bg-slate-200 text-slate-700'
@@ -1819,13 +1819,13 @@ $(document).ready(function () {
             const referringFacility = alert.referring_facility || alert.referring_hospital || (alert.serviceProvider && alert.serviceProvider.display) || 'Unknown Hospital';
             html += `
                 <div class="px-4 py-3 flex items-start gap-3 hover:bg-slate-50 transition-colors">
-                    <div class="w-9 h-9 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <div class="w-9 h-9 rounded-full bg-red-50 text-red-600 flex items-center justify-center shrink-0">
                         <i class="bi bi-hospital"></i>
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p class="text-xs font-semibold text-slate-800">New referral from <span class="text-blue-700">${escapeHtml(referringFacility)}</span></p>
+                        <p class="text-xs font-semibold text-slate-800">New referral from <span class="text-red-700">${escapeHtml(referringFacility)}</span></p>
                         <p class="text-[10px] text-slate-400 font-mono mt-0.5">${escapeHtml(String(referralId))}</p>
-                        <button type="button" class="btn-view-referral-form mt-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded-lg transition-all" data-ref-id="${escapeHtml(String(referralId))}">
+                        <button type="button" class="btn-view-referral-form mt-2 px-3 py-1 bg-yellow-600 hover:bg-red-700 text-white text-[11px] font-bold rounded-lg transition-all" data-ref-id="${escapeHtml(String(referralId))}">
                             <i class="bi bi-file-earmark-text-fill me-1"></i> View Form
                         </button>
                     </div>
@@ -1988,14 +1988,14 @@ $(document).ready(function () {
         $('#modal-reason').text(clinicalReason);
 
         Swal.fire({
-            title: '<div class="flex items-center justify-center gap-2 text-blue-600"><i class="bi bi-hospital text-2xl"></i> <span>Incoming Patient Referral</span></div>',
+            title: '<div class="flex items-center justify-center gap-2 text-red-600"><i class="bi bi-hospital text-2xl"></i> <span>Incoming Patient Referral</span></div>',
             html: `
                 <div class="text-start space-y-3 p-2 text-sm text-slate-700">
                     <p class="text-xs text-slate-500 uppercase font-semibold tracking-wider mb-2">Hospital Referral Notification</p>
                     
-                    <div class="p-3 bg-blue-50 rounded-xl border border-blue-100 space-y-1">
+                    <div class="p-3 bg-red-50 rounded-xl border border-red-100 space-y-1">
                         <div class="flex justify-between items-center">
-                            <span class="text-xs font-bold text-blue-900 font-mono">Referral ID: ${escapeHtml(referralId)}</span>
+                            <span class="text-xs font-bold text-red-900 font-mono">Referral ID: ${escapeHtml(referralId)}</span>
                             <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">Pending Decision</span>
                         </div>
                     </div>
@@ -2027,7 +2027,7 @@ $(document).ready(function () {
                         </div>
                         <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
                             <span class="text-slate-700 font-bold shrink-0">Transfer Distance & ETA:</span>
-                            <span class="font-bold text-blue-700 text-right" id="modal-transfer-eta">${escapeHtml(etaText)}</span>
+                            <span class="font-bold text-red-700 text-right" id="modal-transfer-eta">${escapeHtml(etaText)}</span>
                         </div>
                         <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
                             <span class="text-slate-700 font-bold shrink-0">Severity:</span>
