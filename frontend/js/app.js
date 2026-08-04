@@ -75,23 +75,49 @@ $(document).ready(function () {
             .removeClass('bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20')
             .addClass('text-slate-400 hover:text-white hover:bg-slate-900');
 
+        const $allTabs = $('#tabPatientsContent, #tabInventoryContent, #tabProfileContent, #tabReferralsContent, #tabOutcomesContent');
+
         if (tabName === 'patients') {
             $('#navTabPatients')
                 .removeClass('text-slate-400 hover:text-white hover:bg-slate-900')
                 .addClass('bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20');
             $('#mainHeaderTitle').text('Patient Records');
-            $('#tabInventoryContent').hide();
+            $allTabs.hide();
             $('#tabPatientsContent').fadeIn(200);
-            checkAndPollRecommendations();
         } else if (tabName === 'inventory') {
             $('#navTabInventory')
                 .removeClass('text-slate-400 hover:text-white hover:bg-slate-900')
                 .addClass('bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20');
-            $('#mainHeaderTitle').text('Inventory & Hospital Profile');
-            $('#tabPatientsContent').hide();
+            $('#mainHeaderTitle').text('Hospital Inventory');
+            $allTabs.hide();
             $('#tabInventoryContent').fadeIn(200);
             loadInventory();
+        } else if (tabName === 'profile') {
+            $('#navTabProfile')
+                .removeClass('text-slate-400 hover:text-white hover:bg-slate-900')
+                .addClass('bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20');
+            $('#mainHeaderTitle').text('Facility Profile');
+            $allTabs.hide();
+            $('#tabProfileContent').fadeIn(200);
+            loadInventory();
             initInventoryLocationDropdowns();
+        } else if (tabName === 'referrals') {
+            $('#navTabReferrals')
+                .removeClass('text-slate-400 hover:text-white hover:bg-slate-900')
+                .addClass('bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20');
+            $('#mainHeaderTitle').text('My Referrals');
+            $allTabs.hide();
+            $('#tabReferralsContent').fadeIn(200);
+            loadMyReferrals();
+            checkAndPollRecommendations();
+        } else if (tabName === 'outcomes') {
+            $('#navTabOutcomes')
+                .removeClass('text-slate-400 hover:text-white hover:bg-slate-900')
+                .addClass('bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20');
+            $('#mainHeaderTitle').text('Referral Outcomes');
+            $allTabs.hide();
+            $('#tabOutcomesContent').fadeIn(200);
+            loadReferralOutcomes();
         }
     }
 
@@ -103,6 +129,21 @@ $(document).ready(function () {
     $('#navTabInventory').on('click', function (e) {
         e.preventDefault();
         switchTab('inventory');
+    });
+
+    $('#navTabProfile').on('click', function (e) {
+        e.preventDefault();
+        switchTab('profile');
+    });
+
+    $('#navTabReferrals').on('click', function (e) {
+        e.preventDefault();
+        switchTab('referrals');
+    });
+
+    $('#navTabOutcomes').on('click', function (e) {
+        e.preventDefault();
+        switchTab('outcomes');
     });
 
     /**
@@ -129,6 +170,21 @@ $(document).ready(function () {
     }
 
     /**
+     * Enables/disables both the Inventory and Profile submit buttons together,
+     * since a single GET (loadInventory) backs both split-out tabs.
+     */
+    function setHospitalFormsDisabled(disabled) {
+        if (disabled) {
+            $('#btnSubmitInventory, #btnSubmitProfile')
+                .prop('disabled', true)
+                .html('<i class="bi bi-wifi-off me-2"></i> Server Offline (Updates Disabled)');
+        } else {
+            $('#btnSubmitInventory').prop('disabled', false).html('<i class="bi bi-cloud-arrow-up me-2"></i> Update Inventory');
+            $('#btnSubmitProfile').prop('disabled', false).html('<i class="bi bi-cloud-arrow-up me-2"></i> Update Facility Profile');
+        }
+    }
+
+    /**
      * Load Hospital Inventory via GET /api/v1/hospitals/me/inventory
      */
     function loadInventory() {
@@ -147,10 +203,10 @@ $(document).ready(function () {
             },
             dataType: 'json',
             success: function (data) {
-                // Online mode: hide offline/connection alert banners & enable submit button
+                // Online mode: hide offline/connection alert banners & enable submit buttons
                 $('#serverOfflineAlert').slideUp(200);
                 $('#serverConnectionAlert').slideUp(200);
-                $('#btnSubmitInventory').prop('disabled', false).html('<i class="bi bi-cloud-arrow-up me-2"></i> Update Inventory');
+                setHospitalFormsDisabled(false);
 
                 populateHospitalProfile(data);
                 hideInventorySkeleton();
@@ -165,10 +221,10 @@ $(document).ready(function () {
                         populateHospitalProfile(cachedData, true);
                         hideInventorySkeleton();
 
-                        // Show offline alert banner & disable submit button
+                        // Show offline alert banner & disable submit buttons
                         $('#serverConnectionAlert').slideUp(200);
                         $('#serverOfflineAlert').slideDown(200);
-                        $('#btnSubmitInventory').prop('disabled', true).html('<i class="bi bi-wifi-off me-2"></i> Server Offline (Updates Disabled)');
+                        setHospitalFormsDisabled(true);
 
                         Swal.fire({
                             toast: true,
@@ -190,7 +246,7 @@ $(document).ready(function () {
                     // Inline banner instead of a blocking alert — server being unreachable is common/expected
                     $('#serverOfflineAlert').slideUp(200);
                     $('#serverConnectionAlert').slideDown(200);
-                    $('#btnSubmitInventory').prop('disabled', true).html('<i class="bi bi-wifi-off me-2"></i> Server Offline (Updates Disabled)');
+                    setHospitalFormsDisabled(true);
                     return;
                 }
 
@@ -287,6 +343,11 @@ $(document).ready(function () {
                     success: function () {
                         currentHospital = null;
                         window.activeInitiatedReferralId = null;
+
+                        // Clear referral notification state so the next login starts fresh
+                        notifiedReferralIds.clear();
+                        incomingNotifications.clear();
+                        renderNotificationBell();
 
                         // Explicitly remove active referral key & wipe local storage
                         try {
@@ -461,14 +522,16 @@ $(document).ready(function () {
         $('#displayGpsCoords').text(`${data.latitude ?? 0}, ${data.longitude ?? 0}`);
 
         // Badges
+        const BADGE_BASE_CLASS = 'inline-flex items-center flex-shrink-0 whitespace-nowrap px-3 py-1 rounded-full text-xs font-semibold';
+
         $('#badgeEmergencyEquip').html(data.emergency_equipment ? '<i class="bi bi-check-circle me-1"></i> Available' : '<i class="bi bi-x-circle me-1"></i> Unavailable')
-            .attr('class', data.emergency_equipment ? 'px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700' : 'px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700');
+            .attr('class', `${BADGE_BASE_CLASS} ${data.emergency_equipment ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`);
 
         $('#badgeMedicalEquip').html(data.medical_equipment ? '<i class="bi bi-check-circle me-1"></i> Available' : '<i class="bi bi-x-circle me-1"></i> Unavailable')
-            .attr('class', data.medical_equipment ? 'px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700' : 'px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700');
+            .attr('class', `${BADGE_BASE_CLASS} ${data.medical_equipment ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`);
 
         $('#badgeCommSystems').html(data.communication_systems ? '<i class="bi bi-check-circle me-1"></i> Active' : '<i class="bi bi-x-circle me-1"></i> Inactive')
-            .attr('class', data.communication_systems ? 'px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700' : 'px-3 py-1 rounded-full text-xs font-semibold bg-slate-200 text-slate-700');
+            .attr('class', `${BADGE_BASE_CLASS} ${data.communication_systems ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'}`);
 
         // Form inputs
         $('#inputBeds').val(data.available_beds ?? 0);
@@ -493,34 +556,21 @@ $(document).ready(function () {
 
 
     /**
-     * Submit Inventory Update via PATCH /api/v1/hospitals/me/inventory
+     * Shared PATCH submitter for /api/v1/hospitals/me/inventory (partial payloads),
+     * with a fallback to inventory_api.php, used by both the Inventory and Profile forms.
      */
-    $('#updateInventoryForm').on('submit', function (e) {
-        e.preventDefault();
-
+    function submitHospitalPatch(fields, $btn, successTitle) {
         if (!currentHospital) return;
 
         const apiKey = currentHospital.api_key || '';
-        const $btn = $('#btnSubmitInventory');
         const originalText = $btn.html();
+        const payload = JSON.stringify(fields);
 
         $btn.html('<span class="spinner-border spinner-border-sm me-2"></span> Updating...').prop('disabled', true);
 
-        const payload = JSON.stringify({
-            available_beds: parseInt($('#inputBeds').val(), 10),
-            medical_specialists_count: parseInt($('#inputSpecs').val(), 10),
-            hospital_level: $('#inputLevel').val(),
-            hospital_environment: $('#inputEnv').val(),
-            latitude: parseFloat($('#inputLat').val()),
-            longitude: parseFloat($('#inputLng').val()),
-            emergency_equipment: $('#inputEmergencyEquip').is(':checked'),
-            medical_equipment: $('#inputMedicalEquip').is(':checked'),
-            communication_systems: $('#inputCommSystems').is(':checked')
-        });
-
-        function handlePatchSuccess(data) {
+        function handlePatchSuccess() {
             $btn.html(originalText).prop('disabled', false);
-            
+
             // Instantly trigger auto-refresh call to fetch fresh data from backend
             loadInventory();
 
@@ -528,7 +578,7 @@ $(document).ready(function () {
                 toast: true,
                 position: 'top-end',
                 icon: 'success',
-                title: 'Hospital Resource Profile Updated!',
+                title: successTitle,
                 showConfirmButton: false,
                 timer: 2000
             });
@@ -543,8 +593,8 @@ $(document).ready(function () {
             },
             data: payload,
             dataType: 'json',
-            success: function (data) {
-                handlePatchSuccess(data);
+            success: function () {
+                handlePatchSuccess();
             },
             error: function () {
                 $.ajax({
@@ -556,26 +606,53 @@ $(document).ready(function () {
                     },
                     data: payload,
                     dataType: 'json',
-                    success: function (data) {
-                        handlePatchSuccess(data);
+                    success: function () {
+                        handlePatchSuccess();
                     },
                     error: function (errXhr) {
                         $btn.html(originalText).prop('disabled', false);
                         const errObj = errXhr.responseJSON || {};
                         const isConnectionErr = errXhr.status === 503 || errXhr.status === 0 || (errObj.detail && errObj.detail.includes("reach the server"));
-                        
+
                         Swal.fire({
                             icon: 'error',
                             title: isConnectionErr ? "Can't Reach Server" : "Update Failed",
-                            text: isConnectionErr 
-                                ? "Can't reach the server, contact devs @ irdss.devs@up.edu.ph" 
-                                : (errObj.detail || "Could not update inventory records."),
+                            text: isConnectionErr
+                                ? "Can't reach the server, contact devs @ irdss.devs@up.edu.ph"
+                                : (errObj.detail || "Could not update hospital records."),
                             confirmButtonColor: '#0d6efd'
                         });
                     }
                 });
             }
         });
+    }
+
+    /**
+     * Submit Inventory Update (beds, specialists, equipment) via PATCH /api/v1/hospitals/me/inventory
+     */
+    $('#updateInventoryForm').on('submit', function (e) {
+        e.preventDefault();
+        submitHospitalPatch({
+            available_beds: parseInt($('#inputBeds').val(), 10),
+            medical_specialists_count: parseInt($('#inputSpecs').val(), 10),
+            emergency_equipment: $('#inputEmergencyEquip').is(':checked'),
+            medical_equipment: $('#inputMedicalEquip').is(':checked'),
+            communication_systems: $('#inputCommSystems').is(':checked')
+        }, $('#btnSubmitInventory'), 'Hospital Inventory Updated!');
+    });
+
+    /**
+     * Submit Facility Profile Update (level, environment, location) via PATCH /api/v1/hospitals/me/inventory
+     */
+    $('#updateProfileForm').on('submit', function (e) {
+        e.preventDefault();
+        submitHospitalPatch({
+            hospital_level: $('#inputLevel').val(),
+            hospital_environment: $('#inputEnv').val(),
+            latitude: parseFloat($('#inputLat').val()),
+            longitude: parseFloat($('#inputLng').val())
+        }, $('#btnSubmitProfile'), 'Facility Profile Updated!');
     });
 
     /**
@@ -693,7 +770,7 @@ $(document).ready(function () {
                             <div class="p-4 rounded-2xl text-start shadow-sm border" style="background-color: #dbeafe; color: #1e3a8a; border-color: #bfdbfe;">
                                 <div class="flex items-start gap-2.5">
                                     <i class="bi bi-info-circle-fill text-blue-600 text-lg leading-none mt-0.5 flex-shrink-0"></i>
-                                    <span class="text-xs font-semibold leading-relaxed">Please wait for receiving hospitals to accept your referral. Accepting facilities will appear in your dashboard tracker.</span>
+                                    <span class="text-xs font-semibold leading-relaxed">Please wait for receiving hospitals to accept your referral. Accepting facilities will appear on the "My Referrals" page.</span>
                                 </div>
                             </div>
                         `,
@@ -710,13 +787,8 @@ $(document).ready(function () {
                         icon: 'error',
                         title: errorTitle,
                         html: `
-                            <p class="mb-3 text-slate-600 text-sm font-medium">${errorMsg}</p>
-                            <div class="p-4 rounded-2xl text-start shadow-sm border" style="background-color: #fef2f2; color: #991b1b; border-color: #fecaca;">
-                                <div class="flex items-start gap-2.5">
-                                    <i class="bi bi-exclamation-triangle-fill text-red-600 text-lg leading-none mt-0.5 flex-shrink-0"></i>
-                                    <span class="text-xs font-semibold leading-relaxed">It seems like there is a problem with the server, contact developer at irdss.dev@upmin.edu.ph</span>
-                                </div>
-                            </div>
+                            <p class="mb-3 text-slate-600 text-sm font-medium">Unable to submit this referral.</p>
+                            ${buildErrorNoteHtml(errorMsg, status)}
                         `,
                         confirmButtonText: '<i class="bi bi-check-lg me-1"></i> OK',
                         confirmButtonColor: '#0d6efd',
@@ -738,13 +810,8 @@ $(document).ready(function () {
                     icon: 'error',
                     title: errorTitle,
                     html: `
-                        <p class="mb-3 text-slate-600 text-sm font-medium">${errorMsg}</p>
-                        <div class="p-4 rounded-2xl text-start shadow-sm border" style="background-color: #fef2f2; color: #991b1b; border-color: #fecaca;">
-                            <div class="flex items-start gap-2.5">
-                                <i class="bi bi-exclamation-triangle-fill text-red-600 text-lg leading-none mt-0.5 flex-shrink-0"></i>
-                                <span class="text-xs font-semibold leading-relaxed">It seems like there is a problem with the server, contact developer at irdss.dev@upmin.edu.ph</span>
-                            </div>
-                        </div>
+                        <p class="mb-3 text-slate-600 text-sm font-medium">Unable to submit this referral.</p>
+                        ${buildErrorNoteHtml(errorMsg, status)}
                     `,
                     confirmButtonText: '<i class="bi bi-check-lg me-1"></i> OK',
                     confirmButtonColor: '#0d6efd',
@@ -776,7 +843,6 @@ $(document).ready(function () {
      */
     $('#btnRefreshPatients').on('click', function () {
         loadPatients();
-        checkAndPollRecommendations();
     });
 
     $(document).on('click', '#btnRefreshRecommendations', function () {
@@ -953,7 +1019,7 @@ $(document).ready(function () {
             .attr('class', 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800')
             .text(`${items.length} Facility Accepted!`);
 
-        // Track new accepting hospitals per referral to trigger popup
+        // Track new accepting hospitals per referral to trigger the compact toast
         const newHospitals = [];
         items.forEach(hosp => {
             const hospId = hosp.hospital_id || hosp.id || hosp.hospital_name || 'h';
@@ -964,18 +1030,14 @@ $(document).ready(function () {
             }
         });
 
-        // Trigger or update popup modal if new accepting hospitals detected
+        // Surface a small, dismissible toast instead of a blocking full-screen popup —
+        // the full details are already visible in #acceptedHospitalsCard on the page.
         if (newHospitals.length > 0) {
-            showOrUpdateAcceptancePopup(referralId, items, newHospitals);
-        } else if (Swal.isVisible() && activeAcceptanceSwalRefId === referralId && $('#swal-acceptance-container').length > 0) {
-            const containerHtml = buildAcceptancePopupListHtml(referralId, items);
-            $('#swal-acceptance-container').html(containerHtml);
-            bindAcceptanceModalButtons();
+            showHospitalAcceptedToast(items, newHospitals);
         }
 
-        // Sort accepted hospitals by available_beds in descending order
-        items.sort((a, b) => (b.available_beds ?? 0) - (a.available_beds ?? 0));
-
+        // Hospitals arrive pre-ranked by the backend's FCM compatibility score
+        // (highest matching_degree first) — do not re-sort client-side.
         items.forEach((hosp, idx) => {
             const hospName = hosp.hospital_name || hosp.name || `Hospital #${hosp.hospital_id || hosp.id || idx+1}`;
             const level = hosp.hospital_level || hosp.level || 'Level 2';
@@ -983,12 +1045,18 @@ $(document).ready(function () {
             const matchDeg = hosp.matching_degree !== undefined ? Math.round(hosp.matching_degree * 100) : 100;
             const lat = hosp.latitude !== undefined ? parseFloat(hosp.latitude) : null;
             const lng = hosp.longitude !== undefined ? parseFloat(hosp.longitude) : null;
+            const isBestMatch = idx === 0;
 
             const locId = `hosp-rec-loc-${idx}-${(hosp.hospital_id || 'h').toString().replace(/[^a-zA-Z0-9]/g, '')}`;
             const locContent = resolveLocationAddressHtml(lat, lng, locId);
 
             const card = `
-                <div class="p-5 bg-slate-50/90 rounded-2xl border border-slate-200 shadow-xs space-y-4 hover:border-blue-300 hover:shadow-md transition-all flex flex-col justify-between">
+                <div class="relative p-5 bg-slate-50/90 rounded-2xl border ${isBestMatch ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200'} shadow-xs space-y-4 hover:border-blue-300 hover:shadow-md transition-all flex flex-col justify-between">
+                    ${isBestMatch ? `
+                        <span class="absolute -top-2.5 left-4 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-600 text-white shadow-sm flex items-center gap-1">
+                            <i class="bi bi-star-fill"></i> BEST MATCH
+                        </span>
+                    ` : ''}
                     <div class="space-y-3">
                         <div class="flex items-start justify-between gap-3 flex-wrap">
                             <div>
@@ -1026,19 +1094,46 @@ $(document).ready(function () {
         $('.btn-select-hospital').off('click').on('click', function() {
             const selectedHosp = $(this).attr('data-hosp-name');
             const targetRefId = $(this).attr('data-ref-id');
+            confirmAndFinalizeReferral(targetRefId, selectedHosp, $(this));
+        });
+    }
 
-            Swal.fire({
-                title: 'Confirm Hospital Selection',
-                text: `Are you sure you want to select "${selectedHosp}" as the target transfer destination for referral ${targetRefId}?`,
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonText: '<i class="bi bi-check-lg me-1"></i> Yes, Select Hospital',
-                cancelButtonText: 'Cancel',
-                confirmButtonColor: '#16a34a',
-                cancelButtonColor: '#64748b',
-                customClass: { popup: 'rounded-4 shadow-lg' }
-            }).then((result) => {
-                if (result.isConfirmed) {
+    /**
+     * Shared confirm + PATCH /api/v1/referral/{id}/finalize flow, used by both the
+     * main "Accepted Hospitals" card and the persistent acceptance popup — this is
+     * the doctor's "lock in the transfer" action, so both entry points must agree.
+     */
+    function confirmAndFinalizeReferral(targetRefId, selectedHosp, $btn) {
+        Swal.fire({
+            title: 'Confirm Hospital Selection',
+            text: `Are you sure you want to select "${selectedHosp}" as the target transfer destination for referral ${targetRefId}?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: '<i class="bi bi-check-lg me-1"></i> Yes, Select Hospital',
+            cancelButtonText: 'Cancel',
+            confirmButtonColor: '#16a34a',
+            cancelButtonColor: '#64748b',
+            customClass: { popup: 'rounded-4 shadow-lg' }
+        }).then((result) => {
+            if (!result.isConfirmed) return;
+            if (!currentHospital) return;
+
+            const apiKey = currentHospital.api_key || '';
+            const originalBtnHtml = $btn ? $btn.html() : null;
+            if ($btn) $btn.html('<span class="spinner-border spinner-border-sm me-2"></span> Finalizing...').prop('disabled', true);
+
+            $.ajax({
+                url: `${API_V1_REFERRAL}/${encodeURIComponent(targetRefId)}/finalize`,
+                type: 'PATCH',
+                headers: {
+                    'X-API-Key': apiKey,
+                    'Content-Type': 'application/json'
+                },
+                data: JSON.stringify({ hospital_name: selectedHosp }),
+                dataType: 'json',
+                success: function () {
+                    $('#hospitalAcceptedToast').addClass('hidden');
+
                     Swal.fire({
                         icon: 'success',
                         title: 'Destination Hospital Confirmed!',
@@ -1050,145 +1145,81 @@ $(document).ready(function () {
                     $('#activeReferralStatusBadge')
                         .attr('class', 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-600 text-white')
                         .text(`Finalized: ${selectedHosp}`);
-                }
-            });
-        });
-    }
 
-    // State tracking for accepted hospital popups
-    const knownAcceptedHospitalKeys = new Set();
-    let activeAcceptanceSwalRefId = null;
+                    // Close out this referral's session client-side so polling stops surfacing it
+                    window.activeInitiatedReferralId = null;
+                    try { localStorage.removeItem('active_initiated_referral'); } catch (e) {}
+                },
+                error: function (xhr) {
+                    if ($btn) $btn.html(originalBtnHtml).prop('disabled', false);
 
-    /**
-     * Show or update the persistent acceptance popup when a new hospital accepts
-     */
-    function showOrUpdateAcceptancePopup(referralId, allAcceptedHospitals, newHospitals) {
-        if (Swal.isVisible() && activeAcceptanceSwalRefId === referralId && $('#swal-acceptance-container').length > 0) {
-            const containerHtml = buildAcceptancePopupListHtml(referralId, allAcceptedHospitals);
-            $('#swal-acceptance-container').html(containerHtml);
-            bindAcceptanceModalButtons();
-            return;
-        }
+                    const httpStatus = xhr.status || 500;
+                    const errData = xhr.responseJSON || {};
+                    const rawMsg = errData.message || errData.detail || `HTTP ${httpStatus} Server Error`;
+                    const errorMsg = escapeHtml(cleanErrorMessage(rawMsg, httpStatus));
 
-        activeAcceptanceSwalRefId = referralId;
-        const newNames = newHospitals.map(h => h.hospital_name || h.name || 'Hospital').join(', ');
-        const popupHtml = `
-            <div class="text-start space-y-4 p-1 text-sm text-slate-700">
-                <div class="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200/80 flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-2.5 text-emerald-900 font-bold text-xs">
-                        <i class="bi bi-bell-fill text-emerald-600 text-lg"></i>
-                        <span>New Hospital Acceptance Received!</span>
-                    </div>
-                    <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-200 text-emerald-950 font-mono">${escapeHtml(referralId)}</span>
-                </div>
-
-                <p class="text-xs text-slate-600 font-medium leading-relaxed">
-                    Facility <strong class="text-emerald-700 font-bold">${escapeHtml(newNames)}</strong> has accepted your referral! Review available facilities below and select your preferred destination:
-                </p>
-
-                <div id="swal-acceptance-container" class="space-y-3.5 max-h-[380px] overflow-y-auto pr-1">
-                    ${buildAcceptancePopupListHtml(referralId, allAcceptedHospitals)}
-                </div>
-            </div>
-        `;
-
-        Swal.fire({
-            title: '<div class="flex items-center justify-center gap-2 text-emerald-600 font-bold"><i class="bi bi-hospital text-3xl"></i> <span>Referral Accepted!</span></div>',
-            html: popupHtml,
-            showConfirmButton: false,
-            showCancelButton: true,
-            cancelButtonText: '<i class="bi bi-x-lg me-1"></i> Close Tracker',
-            cancelButtonColor: '#64748b',
-            allowOutsideClick: false,
-            width: '680px',
-            customClass: { popup: 'rounded-3xl shadow-2xl border max-w-2xl w-full p-4 sm:p-6' },
-            didOpen: () => {
-                bindAcceptanceModalButtons();
-            },
-            willClose: () => {
-                activeAcceptanceSwalRefId = null;
-            }
-        });
-    }
-
-    function buildAcceptancePopupListHtml(referralId, hospitals) {
-        if (!hospitals || hospitals.length === 0) return '<p class="text-xs text-slate-400">No acceptances yet.</p>';
-
-        return hospitals.map((hosp, idx) => {
-            const hospName = hosp.hospital_name || hosp.name || `Hospital #${idx+1}`;
-            const level = hosp.hospital_level || hosp.level || 'Level 2';
-            const beds = hosp.available_beds !== undefined ? hosp.available_beds : 0;
-            const lat = hosp.latitude !== undefined ? parseFloat(hosp.latitude) : null;
-            const lng = hosp.longitude !== undefined ? parseFloat(hosp.longitude) : null;
-
-            const locId = `popup-loc-${idx}-${(hosp.hospital_id || 'h').toString().replace(/[^a-zA-Z0-9]/g, '')}`;
-            const locContent = resolveLocationAddressHtml(lat, lng, locId);
-
-            return `
-                <div class="p-4 bg-slate-50/90 rounded-2xl border border-slate-200/90 shadow-xs space-y-3 hover:border-emerald-300 transition-all">
-                    <!-- Top Row: Hospital Name + Level + Beds -->
-                    <div class="flex items-start justify-between gap-3 flex-wrap">
-                        <div>
-                            <h4 class="font-bold text-slate-900 text-sm sm:text-base leading-snug">${escapeHtml(hospName)}</h4>
-                            <span class="inline-block mt-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">${escapeHtml(level)}</span>
-                        </div>
-                        <span class="px-3 py-1 rounded-full font-bold text-xs bg-emerald-100 text-emerald-800 flex items-center gap-1 border border-emerald-200 shrink-0">
-                            <i class="bi bi-hospital text-xs"></i> ${beds} Beds Available
-                        </span>
-                    </div>
-
-                    <!-- Middle Row: Location (Full Address, No Truncation) -->
-                    <div class="text-xs text-slate-600 font-medium leading-relaxed pt-2 border-t border-slate-200/70 flex items-start gap-1.5">
-                        <i class="bi bi-geo-alt-fill text-red-500 text-xs shrink-0 mt-0.5"></i>
-                        <span id="${locId}" class="break-words font-medium text-slate-700">${locContent}</span>
-                    </div>
-
-                    <!-- Bottom Row: Action Button -->
-                    <div class="pt-1 flex justify-end">
-                        <button class="w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 btn-popup-select-hospital"
-                            data-hosp-name="${escapeHtml(hospName)}" data-ref-id="${escapeHtml(referralId)}">
-                            <i class="bi bi-check2-circle text-sm"></i>
-                            <span>ACCEPT & SELECT THIS HOSPITAL</span>
-                        </button>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
-
-    function bindAcceptanceModalButtons() {
-        $('.btn-popup-select-hospital').off('click').on('click', function() {
-            const selectedHosp = $(this).attr('data-hosp-name');
-            const targetRefId = $(this).attr('data-ref-id');
-
-            Swal.fire({
-                title: 'Confirm Final Selection',
-                text: `Are you sure you want to finalize patient transfer to "${selectedHosp}" for referral ${targetRefId}?`,
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonText: '<i class="bi bi-check-circle-fill me-1"></i> Yes, Finalize Selection',
-                cancelButtonText: 'Cancel',
-                confirmButtonColor: '#16a34a',
-                cancelButtonColor: '#64748b',
-                customClass: { popup: 'rounded-4 shadow-lg' }
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    activeAcceptanceSwalRefId = null;
                     Swal.fire({
-                        icon: 'success',
-                        title: 'Destination Finalized!',
-                        text: `Patient transfer to "${selectedHosp}" has been successfully confirmed and routed!`,
+                        icon: 'error',
+                        title: `HTTP ${httpStatus} Error`,
+                        html: `
+                            <p class="mb-3 text-slate-600 text-sm font-medium">Unable to finalize this referral.</p>
+                            ${buildErrorNoteHtml(errorMsg, httpStatus)}
+                        `,
+                        confirmButtonText: '<i class="bi bi-check-lg me-1"></i> OK',
                         confirmButtonColor: '#0d6efd',
                         customClass: { popup: 'rounded-4 shadow-lg' }
                     });
-
-                    $('#activeReferralStatusBadge')
-                        .attr('class', 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-600 text-white')
-                        .text(`Finalized: ${selectedHosp}`);
                 }
             });
         });
     }
+
+    // Tracks which hospital-acceptance events have already surfaced a toast, per referral
+    const knownAcceptedHospitalKeys = new Set();
+
+    let hospitalAcceptedToastTimeout = null;
+
+    /**
+     * Show a small, dismissible corner toast when a new hospital accepts, instead of
+     * a blocking full-screen popup — the full ranked list already lives in
+     * #acceptedHospitalsCard on the page, so the toast just points the doctor to it.
+     */
+    function showHospitalAcceptedToast(allAcceptedHospitals, newHospitals) {
+        const newNames = newHospitals.map(h => h.hospital_name || h.name || 'Hospital').join(', ');
+        const total = allAcceptedHospitals.length;
+
+        $('#hospitalAcceptedToastText').text(
+            `${newNames} accepted your referral. ${total} facilit${total === 1 ? 'y has' : 'ies have'} accepted so far.`
+        );
+
+        $('#hospitalAcceptedToast').removeClass('hidden');
+        clearTimeout(hospitalAcceptedToastTimeout);
+        hospitalAcceptedToastTimeout = setTimeout(() => {
+            $('#hospitalAcceptedToast').addClass('hidden');
+        }, 8000);
+
+        playNotificationSound();
+    }
+
+    $('#btnDismissAcceptedToast').on('click', function () {
+        $('#hospitalAcceptedToast').addClass('hidden');
+        clearTimeout(hospitalAcceptedToastTimeout);
+    });
+
+    $('#btnViewAcceptedHospitals').on('click', function () {
+        $('#hospitalAcceptedToast').addClass('hidden');
+        clearTimeout(hospitalAcceptedToastTimeout);
+
+        switchTab('referrals');
+
+        const $card = $('#acceptedHospitalsCard');
+        if ($card.length) {
+            $('html, body').animate({ scrollTop: $card.offset().top - 90 }, 300);
+            $card.removeClass('animate-highlight-pulse');
+            void $card[0].offsetWidth;
+            $card.addClass('animate-highlight-pulse');
+        }
+    });
 
     /**
      * Generic Alert Popup
@@ -1222,10 +1253,35 @@ $(document).ready(function () {
             clean = clean.split('DETAIL:')[0];
         }
         clean = clean.replace(/\s*\([^)]*psycopg2[^)]*\)/gi, '').trim();
-        if (clean.length > 180) {
-            clean = clean.substring(0, 177) + '...';
+        if (clean.length > 400) {
+            clean = clean.substring(0, 397) + '...';
         }
         return clean;
+    }
+
+    /**
+     * Build the colored note box for an error dialog: a "contact developer" notice for
+     * genuine 5xx server failures, or the actual business-rule detail message otherwise.
+     */
+    function buildErrorNoteHtml(errorMsg, statusCode) {
+        if (statusCode >= 500) {
+            return `
+                <div class="p-4 rounded-2xl text-start shadow-sm border" style="background-color: #fef2f2; color: #991b1b; border-color: #fecaca;">
+                    <div class="flex items-start gap-2.5">
+                        <i class="bi bi-exclamation-triangle-fill text-red-600 text-lg leading-none mt-0.5 flex-shrink-0"></i>
+                        <span class="text-xs font-semibold leading-relaxed">It seems like there is a problem with the server, contact developer at irdss.dev@upmin.edu.ph</span>
+                    </div>
+                </div>
+            `;
+        }
+        return `
+            <div class="p-4 rounded-2xl text-start shadow-sm border" style="background-color: #fffbeb; color: #92400e; border-color: #fde68a;">
+                <div class="flex items-start gap-2.5">
+                    <i class="bi bi-info-circle-fill text-amber-600 text-lg leading-none mt-0.5 flex-shrink-0"></i>
+                    <span class="text-xs font-semibold leading-relaxed">${errorMsg}</span>
+                </div>
+            </div>
+        `;
     }
 
     /**
@@ -1241,9 +1297,447 @@ $(document).ready(function () {
             .replace(/'/g, "&#039;");
     }
 
-    // Track prompted incoming referral IDs & polling state
-    const promptedReferralIds = new Set();
-    let isPromptActive = false;
+    // ============================================================
+    // MY REFERRALS PAGE (list, filter, cancel)
+    // ============================================================
+    let myReferralsCache = [];
+
+    const REFERRAL_STATUS_BADGE_CLASS = {
+        PENDING: 'bg-amber-100 text-amber-800',
+        SEEN: 'bg-blue-100 text-blue-800',
+        ACCEPTED: 'bg-emerald-100 text-emerald-800',
+        REDIRECTED: 'bg-indigo-100 text-indigo-800',
+        CANCELLED: 'bg-slate-200 text-slate-700'
+    };
+
+    function formatReferralTimestamp(value) {
+        if (!value) return '—';
+        const d = new Date(value);
+        if (isNaN(d.getTime())) return '—';
+        return d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+    }
+
+    /**
+     * Load referrals initiated by this hospital via GET /api/v1/referral/mine
+     */
+    function loadMyReferrals() {
+        if (!currentHospital) return;
+
+        const apiKey = currentHospital.api_key || '';
+        const $tableBody = $('#referralsTableBody');
+
+        $.ajax({
+            url: `${API_V1_REFERRAL}/mine`,
+            type: 'GET',
+            headers: { 'X-API-Key': apiKey },
+            dataType: 'json',
+            success: function (data) {
+                $('#referralsConnectionAlert').slideUp(200);
+                myReferralsCache = Array.isArray(data) ? data : [];
+                applyReferralFilters();
+            },
+            error: function (xhr) {
+                const errData = xhr.responseJSON || {};
+                const httpStatus = xhr.status || 500;
+                const isConnectionErr = httpStatus === 503 || httpStatus === 0 || (errData.detail && errData.detail.includes("reach the server"));
+
+                if (isConnectionErr) {
+                    $('#referralsConnectionAlert').slideDown(200);
+                    $tableBody.html(`
+                        <tr>
+                            <td colspan="8" class="text-center py-8 text-slate-400 font-normal text-xs">
+                                Can't reach the server — showing nothing to display.
+                            </td>
+                        </tr>
+                    `);
+                    return;
+                }
+
+                $('#referralsConnectionAlert').slideUp(200);
+                $tableBody.html(`
+                    <tr>
+                        <td colspan="8" class="text-center py-8 text-red-500 font-normal text-xs">
+                            ${escapeHtml(cleanErrorMessage(errData.detail || 'Could not load your referrals.', httpStatus))}
+                        </td>
+                    </tr>
+                `);
+            }
+        });
+    }
+
+    /**
+     * Filter the cached referral list by status/date range/search, then re-render
+     */
+    function applyReferralFilters() {
+        const statusFilter = $('#referralFilterStatus').val();
+        const fromVal = $('#referralFilterFrom').val();
+        const toVal = $('#referralFilterTo').val();
+        const search = ($('#referralFilterSearch').val() || '').trim().toLowerCase();
+
+        const fromDate = fromVal ? new Date(fromVal + 'T00:00:00') : null;
+        const toDate = toVal ? new Date(toVal + 'T23:59:59') : null;
+
+        const filtered = myReferralsCache.filter(function (ref) {
+            if (statusFilter && ref.status !== statusFilter) return false;
+
+            if (fromDate || toDate) {
+                const created = new Date(ref.created_at);
+                if (fromDate && created < fromDate) return false;
+                if (toDate && created > toDate) return false;
+            }
+
+            if (search) {
+                const haystack = `${ref.referral_id} ${ref.patient_id} ${ref.clinical_reason}`.toLowerCase();
+                if (!haystack.includes(search)) return false;
+            }
+
+            return true;
+        });
+
+        renderReferralsTable(filtered);
+    }
+
+    /**
+     * Render the "My Referrals" DataTable from a (pre-filtered) referral list
+     */
+    function renderReferralsTable(referrals) {
+        if ($.fn.DataTable.isDataTable('#referralsTable')) {
+            $('#referralsTable').DataTable().destroy();
+        }
+
+        const $tableBody = $('#referralsTableBody');
+        $tableBody.empty();
+
+        if (referrals.length === 0) {
+            $tableBody.html(`
+                <tr>
+                    <td colspan="8" class="text-center py-8 text-slate-400 font-normal">
+                        No referrals match the current filters.
+                    </td>
+                </tr>
+            `);
+            return;
+        }
+
+        referrals.forEach(function (ref) {
+            const badgeClass = REFERRAL_STATUS_BADGE_CLASS[ref.status] || 'bg-slate-100 text-slate-700';
+            const responses = Array.isArray(ref.responses) ? ref.responses : [];
+
+            const cancelBtn = ref.cancellable
+                ? `<button class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium rounded-lg border border-red-200 transition-all btn-cancel-referral" data-ref-id="${escapeHtml(ref.referral_id)}">
+                       <i class="bi bi-x-circle me-1"></i> Cancel
+                   </button>`
+                : '';
+
+            const row = `
+                <tr class="hover:bg-slate-50/80 transition-colors border-b border-slate-100">
+                    <td class="py-3.5 px-6 font-mono text-xs font-semibold text-slate-500">${escapeHtml(ref.referral_id)}</td>
+                    <td class="py-3.5 px-6 text-slate-700 text-xs font-mono">${escapeHtml(ref.patient_id)}</td>
+                    <td class="py-3.5 px-6 text-slate-600 text-xs">${escapeHtml(ref.disease_severity)}</td>
+                    <td class="py-3.5 px-6"><span class="px-2.5 py-1 rounded-full text-xs font-bold ${badgeClass}">${escapeHtml(ref.status)}</span></td>
+                    <td class="py-3.5 px-6 text-slate-600 text-xs">${formatReferralTimestamp(ref.created_at)}</td>
+                    <td class="py-3.5 px-6 text-slate-600 text-xs">${formatReferralTimestamp(ref.seen_at)}</td>
+                    <td class="py-3.5 px-6 text-xs">
+                        <button type="button" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium btn-view-referral-timeline" data-ref-id="${escapeHtml(ref.referral_id)}">
+                            <i class="bi bi-clock-history me-1"></i> ${responses.length} notified
+                        </button>
+                    </td>
+                    <td class="py-3.5 px-6 text-right">${cancelBtn}</td>
+                </tr>
+            `;
+            $tableBody.append(row);
+        });
+
+        // Stash the raw filtered list for the timeline popup lookup
+        $tableBody.data('referrals', referrals);
+
+        $('#referralsTable').DataTable({
+            paging: true,
+            searching: false,
+            ordering: true,
+            info: true,
+            responsive: true,
+            pageLength: 10,
+            lengthMenu: [5, 10, 25, 50],
+            language: {
+                lengthMenu: "Show _MENU_ records",
+                info: "Showing _START_ to _END_ of _TOTAL_ referrals",
+                paginate: {
+                    next: '<i class="bi bi-chevron-right"></i>',
+                    previous: '<i class="bi bi-chevron-left"></i>'
+                }
+            }
+        });
+    }
+
+    $('#btnRefreshReferrals').on('click', function () {
+        if (currentHospital) loadMyReferrals();
+    });
+
+    $('#referralFilterStatus, #referralFilterFrom, #referralFilterTo').on('change', applyReferralFilters);
+    $('#referralFilterSearch').on('input', applyReferralFilters);
+
+    $('#btnClearReferralFilters').on('click', function () {
+        $('#referralFilterStatus').val('');
+        $('#referralFilterFrom').val('');
+        $('#referralFilterTo').val('');
+        $('#referralFilterSearch').val('');
+        applyReferralFilters();
+    });
+
+    /**
+     * Show a small SweetAlert2 popup listing which hospitals saw/responded and when
+     */
+    $(document).on('click', '.btn-view-referral-timeline', function () {
+        const referralId = $(this).data('ref-id');
+        const referrals = $('#referralsTableBody').data('referrals') || [];
+        const ref = referrals.find(function (r) { return r.referral_id === referralId; });
+        const responses = (ref && Array.isArray(ref.responses)) ? ref.responses : [];
+
+        const rowsHtml = responses.length
+            ? responses.map(function (r) {
+                const statusBadge = REFERRAL_STATUS_BADGE_CLASS[r.response_status] || 'bg-slate-100 text-slate-700';
+                return `
+                    <div class="flex items-center justify-between gap-3 py-2.5 border-b border-slate-100 last:border-0 text-left">
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-semibold text-slate-800">${escapeHtml(r.hospital_name)}</p>
+                            <p class="text-xs text-slate-500">Seen: ${formatReferralTimestamp(r.seen_at)}${r.responded_at ? ` · Responded: ${formatReferralTimestamp(r.responded_at)}` : ''}</p>
+                        </div>
+                        <span class="px-2.5 py-1 rounded-full text-xs font-bold flex-shrink-0 whitespace-nowrap ${statusBadge}">${escapeHtml(r.response_status)}</span>
+                    </div>
+                `;
+            }).join('')
+            : '<p class="text-sm text-slate-400 text-center py-4">No hospitals have been notified yet.</p>';
+
+        Swal.fire({
+            title: 'Referral Timeline',
+            html: `<div class="text-left">${rowsHtml}</div>`,
+            confirmButtonText: '<i class="bi bi-check-lg me-1"></i> Close',
+            confirmButtonColor: '#0d6efd',
+            customClass: { popup: 'rounded-4 shadow-lg' }
+        });
+    });
+
+    /**
+     * Cancel a referral via PATCH /api/v1/referral/{id}/cancel — only shown while cancellable
+     */
+    $(document).on('click', '.btn-cancel-referral', function () {
+        const referralId = $(this).data('ref-id');
+        const apiKey = currentHospital ? (currentHospital.api_key || '') : '';
+
+        Swal.fire({
+            icon: 'warning',
+            title: 'Cancel this referral?',
+            text: `Referral ${referralId} will be withdrawn from every hospital it was broadcast to.`,
+            showCancelButton: true,
+            confirmButtonText: '<i class="bi bi-x-circle me-1"></i> Yes, Cancel It',
+            cancelButtonText: 'Keep Referral',
+            confirmButtonColor: '#dc2626',
+            cancelButtonColor: '#64748b',
+            customClass: { popup: 'rounded-4 shadow-lg' }
+        }).then(function (result) {
+            if (!result.isConfirmed) return;
+
+            $.ajax({
+                url: `${API_V1_REFERRAL}/${referralId}/cancel`,
+                type: 'PATCH',
+                headers: { 'X-API-Key': apiKey },
+                dataType: 'json',
+                success: function () {
+                    Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'success',
+                        title: 'Referral cancelled',
+                        showConfirmButton: false,
+                        timer: 2000
+                    });
+                    loadMyReferrals();
+                },
+                error: function (xhr) {
+                    const status = xhr.status || 500;
+                    const errData = xhr.responseJSON || {};
+                    const rawMsg = errData.message || errData.detail || `HTTP ${status} Server Error`;
+                    const errorMsg = escapeHtml(cleanErrorMessage(rawMsg, status));
+
+                    Swal.fire({
+                        icon: 'error',
+                        title: `HTTP ${status} Error`,
+                        html: `
+                            <p class="mb-3 text-slate-600 text-sm font-medium">Unable to cancel this referral.</p>
+                            ${buildErrorNoteHtml(errorMsg, status)}
+                        `,
+                        confirmButtonText: '<i class="bi bi-check-lg me-1"></i> OK',
+                        confirmButtonColor: '#0d6efd',
+                        customClass: { popup: 'rounded-4 shadow-lg' }
+                    });
+                }
+            });
+        });
+    });
+
+    // ============================================================
+    // REFERRAL OUTCOMES PAGE (who chose us vs who bypassed us)
+    // ============================================================
+    let referralOutcomesCache = [];
+
+    const OUTCOME_BADGE_CLASS = {
+        CHOSEN: 'bg-emerald-100 text-emerald-800',
+        BYPASSED: 'bg-amber-100 text-amber-800'
+    };
+    const OUTCOME_LABEL = {
+        CHOSEN: 'Confirmed Transfer',
+        BYPASSED: 'Bypassed Transfer'
+    };
+
+    /**
+     * Load this hospital's accept outcomes via GET /api/v1/referral/outcomes
+     */
+    function loadReferralOutcomes() {
+        if (!currentHospital) return;
+
+        const apiKey = currentHospital.api_key || '';
+        const $tableBody = $('#outcomesTableBody');
+
+        $.ajax({
+            url: `${API_V1_REFERRAL}/outcomes`,
+            type: 'GET',
+            headers: { 'X-API-Key': apiKey },
+            dataType: 'json',
+            success: function (data) {
+                $('#outcomesConnectionAlert').slideUp(200);
+                referralOutcomesCache = Array.isArray(data) ? data : [];
+
+                const chosenCount = referralOutcomesCache.filter(o => o.outcome === 'CHOSEN').length;
+                const bypassedCount = referralOutcomesCache.filter(o => o.outcome === 'BYPASSED').length;
+                $('#statChoseUsCount').text(chosenCount);
+                $('#statBypassedUsCount').text(bypassedCount);
+
+                applyOutcomeFilters();
+            },
+            error: function (xhr) {
+                const errData = xhr.responseJSON || {};
+                const httpStatus = xhr.status || 500;
+                const isConnectionErr = httpStatus === 503 || httpStatus === 0 || (errData.detail && errData.detail.includes("reach the server"));
+
+                if (isConnectionErr) {
+                    $('#outcomesConnectionAlert').slideDown(200);
+                    $tableBody.html(`
+                        <tr>
+                            <td colspan="7" class="text-center py-8 text-slate-400 font-normal text-xs">
+                                Can't reach the server — showing nothing to display.
+                            </td>
+                        </tr>
+                    `);
+                    return;
+                }
+
+                $('#outcomesConnectionAlert').slideUp(200);
+                $tableBody.html(`
+                    <tr>
+                        <td colspan="7" class="text-center py-8 text-red-500 font-normal text-xs">
+                            ${escapeHtml(cleanErrorMessage(errData.detail || 'Could not load referral outcomes.', httpStatus))}
+                        </td>
+                    </tr>
+                `);
+            }
+        });
+    }
+
+    /**
+     * Filter the cached outcomes list by type/search, then re-render
+     */
+    function applyOutcomeFilters() {
+        const typeFilter = $('#outcomeFilterType').val();
+        const search = ($('#outcomeFilterSearch').val() || '').trim().toLowerCase();
+
+        const filtered = referralOutcomesCache.filter(function (o) {
+            if (typeFilter && o.outcome !== typeFilter) return false;
+
+            if (search) {
+                const haystack = `${o.referral_id} ${o.patient_id} ${o.referring_facility}`.toLowerCase();
+                if (!haystack.includes(search)) return false;
+            }
+
+            return true;
+        });
+
+        renderOutcomesTable(filtered);
+    }
+
+    /**
+     * Render the "Referral Outcomes" DataTable from a (pre-filtered) list
+     */
+    function renderOutcomesTable(outcomes) {
+        if ($.fn.DataTable.isDataTable('#outcomesTable')) {
+            $('#outcomesTable').DataTable().destroy();
+        }
+
+        const $tableBody = $('#outcomesTableBody');
+        $tableBody.empty();
+
+        if (outcomes.length === 0) {
+            $tableBody.html(`
+                <tr>
+                    <td colspan="7" class="text-center py-8 text-slate-400 font-normal">
+                        No referral outcomes match the current filters.
+                    </td>
+                </tr>
+            `);
+            return;
+        }
+
+        outcomes.forEach(function (o) {
+            const badgeClass = OUTCOME_BADGE_CLASS[o.outcome] || 'bg-slate-100 text-slate-700';
+            const label = OUTCOME_LABEL[o.outcome] || o.outcome;
+            const patientInfo = `${escapeHtml(String(o.patient_id))}${o.patient_age !== undefined && o.patient_age !== null ? ` · ${escapeHtml(String(o.patient_age))}y` : ''}${o.patient_gender ? ` · ${escapeHtml(o.patient_gender)}` : ''}`;
+            const wentTo = o.outcome === 'BYPASSED'
+                ? escapeHtml(o.receiving_facility || 'Another facility')
+                : '<span class="text-slate-400">—</span>';
+
+            const row = `
+                <tr class="hover:bg-slate-50/80 transition-colors border-b border-slate-100">
+                    <td class="py-3.5 px-6 font-mono text-xs font-semibold text-slate-500">${escapeHtml(o.referral_id)}</td>
+                    <td class="py-3.5 px-6 text-slate-700 text-xs">${patientInfo}</td>
+                    <td class="py-3.5 px-6 text-slate-700 text-xs font-semibold">${escapeHtml(o.referring_facility)}</td>
+                    <td class="py-3.5 px-6 text-slate-600 text-xs">${escapeHtml(String(o.disease_severity))}</td>
+                    <td class="py-3.5 px-6"><span class="px-2.5 py-1 rounded-full text-xs font-bold ${badgeClass}">${escapeHtml(label)}</span></td>
+                    <td class="py-3.5 px-6 text-slate-600 text-xs">${formatReferralTimestamp(o.seen_at || o.responded_at)}</td>
+                    <td class="py-3.5 px-6 text-xs">${wentTo}</td>
+                </tr>
+            `;
+            $tableBody.append(row);
+        });
+
+        $('#outcomesTable').DataTable({
+            paging: true,
+            searching: false,
+            ordering: true,
+            info: true,
+            responsive: true,
+            pageLength: 10,
+            lengthMenu: [5, 10, 25, 50],
+            language: {
+                lengthMenu: "Show _MENU_ records",
+                info: "Showing _START_ to _END_ of _TOTAL_ outcomes",
+                paginate: {
+                    next: '<i class="bi bi-chevron-right"></i>',
+                    previous: '<i class="bi bi-chevron-left"></i>'
+                }
+            }
+        });
+    }
+
+    $('#btnRefreshOutcomes').on('click', function () {
+        if (currentHospital) loadReferralOutcomes();
+    });
+
+    $('#outcomeFilterType').on('change', applyOutcomeFilters);
+    $('#outcomeFilterSearch').on('input', applyOutcomeFilters);
+
+    // Track which referral IDs have already surfaced as a notification, and pending polling state
+    const notifiedReferralIds = new Set();
+    const incomingNotifications = new Map(); // referral_id -> alert payload, backs the bell dropdown
     let isPollingInProgress = false;
 
     /**
@@ -1277,15 +1771,22 @@ $(document).ready(function () {
                     items = [res];
                 }
 
-                // Filter for pending/unprompted items
-                const pendingItems = items.filter(item => {
+                let hasNewNotification = false;
+
+                items.forEach(item => {
                     const id = item.referral_id || item.id;
-                    const status = (item.status || '').toUpperCase();
-                    return id && !promptedReferralIds.has(id) && status !== 'ACCEPTED' && status !== 'REDIRECTED';
+                    const respStatus = (item.response_status || item.status || '').toUpperCase();
+                    if (!id || notifiedReferralIds.has(id) || respStatus === 'ACCEPTED' || respStatus === 'REDIRECTED') return;
+
+                    notifiedReferralIds.add(id);
+                    incomingNotifications.set(id, item);
+                    hasNewNotification = true;
                 });
 
-                if (pendingItems.length > 0 && !isPromptActive) {
-                    promptNextIncomingReferral(pendingItems[0]);
+                if (hasNewNotification) {
+                    renderNotificationBell();
+                    showNewReferralToast();
+                    playNotificationSound();
                 }
             },
             error: function () {
@@ -1295,13 +1796,149 @@ $(document).ready(function () {
     }
 
     /**
-     * Prompt user to Accept or Redirect an incoming referral
+     * Render the bell badge count and the dropdown list of pending referral notifications
      */
-    function promptNextIncomingReferral(incomingAlert) {
+    function renderNotificationBell() {
+        const $badge = $('#notificationBadge');
+        const $list = $('#notificationList');
+        const count = incomingNotifications.size;
+
+        if (count > 0) {
+            $badge.text(count > 9 ? '9+' : count).removeClass('hidden');
+        } else {
+            $badge.addClass('hidden');
+        }
+
+        if (count === 0) {
+            $list.html('<div class="px-4 py-6 text-center text-xs text-slate-400">No new referrals</div>');
+            return;
+        }
+
+        let html = '';
+        incomingNotifications.forEach((alert, referralId) => {
+            const referringFacility = alert.referring_facility || alert.referring_hospital || (alert.serviceProvider && alert.serviceProvider.display) || 'Unknown Hospital';
+            html += `
+                <div class="px-4 py-3 flex items-start gap-3 hover:bg-slate-50 transition-colors">
+                    <div class="w-9 h-9 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                        <i class="bi bi-hospital"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs font-semibold text-slate-800">New referral from <span class="text-blue-700">${escapeHtml(referringFacility)}</span></p>
+                        <p class="text-[10px] text-slate-400 font-mono mt-0.5">${escapeHtml(String(referralId))}</p>
+                        <button type="button" class="btn-view-referral-form mt-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded-lg transition-all" data-ref-id="${escapeHtml(String(referralId))}">
+                            <i class="bi bi-file-earmark-text-fill me-1"></i> View Form
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        $list.html(html);
+    }
+
+    let newReferralToastTimeout = null;
+
+    /**
+     * Briefly show a "New Referral" callout beside the bell and give it a shake
+     */
+    function showNewReferralToast() {
+        const $toast = $('#newReferralToast');
+        const $bell = $('#btnNotificationBell');
+
+        $toast.removeClass('hidden');
+        clearTimeout(newReferralToastTimeout);
+        newReferralToastTimeout = setTimeout(() => {
+            $toast.addClass('hidden');
+        }, 4000);
+
+        $bell.removeClass('animate-bell-shake');
+        // Force reflow so the animation can restart if it's already mid-run
+        void $bell[0].offsetWidth;
+        $bell.addClass('animate-bell-shake');
+    }
+
+    /**
+     * Play a short two-tone notification ring via the Web Audio API (no audio file needed)
+     */
+    function playNotificationSound() {
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+
+            if (!window._notificationAudioCtx) {
+                window._notificationAudioCtx = new AudioCtx();
+            }
+            const ctx = window._notificationAudioCtx;
+            if (ctx.state === 'suspended') ctx.resume();
+
+            const now = ctx.currentTime;
+            [880, 1108].forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+
+                const start = now + i * 0.15;
+                gain.gain.setValueAtTime(0, start);
+                gain.gain.linearRampToValueAtTime(0.3, start + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, start + 0.35);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(start);
+                osc.stop(start + 0.4);
+            });
+        } catch (e) {
+            // Autoplay restrictions or unsupported browser — fail silently
+        }
+    }
+
+    // Toggle the notification dropdown open/closed
+    $(document).on('click', '#btnNotificationBell', function (e) {
+        e.stopPropagation();
+        $('#notificationDropdown').toggleClass('hidden');
+    });
+    $(document).on('click', '#notificationDropdown', function (e) {
+        e.stopPropagation();
+    });
+    $(document).on('click', function () {
+        $('#notificationDropdown').addClass('hidden');
+    });
+
+    // "View Form" click inside the notification dropdown: mark seen, open the full detail modal
+    $(document).on('click', '.btn-view-referral-form', function () {
+        const referralId = $(this).data('ref-id');
+        const incomingAlert = incomingNotifications.get(referralId);
+        if (!incomingAlert) return;
+
+        incomingNotifications.delete(referralId);
+        renderNotificationBell();
+        $('#notificationDropdown').addClass('hidden');
+
+        markReferralSeen(referralId);
+        showIncomingReferralDetail(incomingAlert);
+    });
+
+    /**
+     * PATCH /api/v1/referral/{referral_id}/seen — stamps when the facility opened the form
+     */
+    function markReferralSeen(referralId) {
+        if (!currentHospital) return;
+        const apiKey = currentHospital.api_key || '';
+
+        $.ajax({
+            url: `${API_V1_REFERRAL}/${encodeURIComponent(referralId)}/seen`,
+            type: 'PATCH',
+            headers: { 'X-API-Key': apiKey },
+            dataType: 'json'
+        });
+    }
+
+    /**
+     * Show the full patient detail modal with Accept / Redirect decision buttons
+     */
+    function showIncomingReferralDetail(incomingAlert) {
         const referralId = incomingAlert.referral_id || incomingAlert.id || 'N/A';
         window.currentActiveReferralId = referralId;
-        promptedReferralIds.add(referralId);
-        isPromptActive = true;
 
         const referringFacility = incomingAlert.referring_facility || incomingAlert.referring_hospital || (incomingAlert.serviceProvider && incomingAlert.serviceProvider.display) || 'Unknown Hospital';
         const patientId = incomingAlert.patient_id || (incomingAlert.subject && incomingAlert.subject.reference) || 'N/A';
@@ -1405,17 +2042,21 @@ $(document).ready(function () {
                     <p class="text-xs text-slate-500 text-center mt-3">Please choose your decision for this incoming referral:</p>
                 </div>
             `,
-            showCancelButton: false,
+            showCancelButton: true,
             showDenyButton: true,
             confirmButtonText: '<i class="bi bi-check-circle-fill me-1"></i> ACCEPT',
             confirmButtonColor: '#16a34a',
             denyButtonText: '<i class="bi bi-arrow-right-circle-fill me-1"></i> REDIRECTED',
             denyButtonColor: '#dc2626',
+            cancelButtonText: '<i class="bi bi-x-lg me-1"></i> Close',
+            cancelButtonColor: '#64748b',
             allowOutsideClick: false,
+            allowEscapeKey: false,
             customClass: { popup: 'rounded-3xl shadow-2xl border' },
             didOpen: (popup) => {
                 const confirmBtn = Swal.getConfirmButton();
                 const denyBtn = Swal.getDenyButton();
+                const cancelBtn = Swal.getCancelButton();
 
                 if (confirmBtn) {
                     confirmBtn.addEventListener('click', (e) => {
@@ -1423,7 +2064,7 @@ $(document).ready(function () {
                         e.stopPropagation();
                         if (confirmBtn) confirmBtn.disabled = true;
                         if (denyBtn) denyBtn.disabled = true;
-                        isPromptActive = false;
+                        if (cancelBtn) cancelBtn.disabled = true;
                         const refId = window.currentActiveReferralId;
                         Swal.close();
                         submitReferralDecision(refId, 'ACCEPTED');
@@ -1436,10 +2077,26 @@ $(document).ready(function () {
                         e.stopPropagation();
                         if (confirmBtn) confirmBtn.disabled = true;
                         if (denyBtn) denyBtn.disabled = true;
-                        isPromptActive = false;
+                        if (cancelBtn) cancelBtn.disabled = true;
                         const refId = window.currentActiveReferralId;
                         Swal.close();
                         submitReferralDecision(refId, 'REDIRECTED');
+                    }, { capture: true });
+                }
+
+                if (cancelBtn) {
+                    cancelBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (confirmBtn) confirmBtn.disabled = true;
+                        if (denyBtn) denyBtn.disabled = true;
+                        cancelBtn.disabled = true;
+                        Swal.close();
+
+                        // Keep this referral available in the notification bell so the
+                        // hospital can reopen the form and decide later instead of losing it.
+                        incomingNotifications.set(referralId, incomingAlert);
+                        renderNotificationBell();
                     }, { capture: true });
                 }
 
