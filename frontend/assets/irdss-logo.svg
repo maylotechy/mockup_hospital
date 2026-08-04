@@ -1,0 +1,15 @@
+<svg width="240" height="240" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+  <!-- Pastel yellow badge -->
+  <circle cx="120" cy="120" r="112" fill="#FBE8A6"/>
+
+  <!-- Pastel red referral arc (routing / hand-off) -->
+  <path d="M120 30 A90 90 0 1 1 30 120" fill="none" stroke="#F3A6A2" stroke-width="16" stroke-linecap="round"/>
+  <path d="M6 112 L38 104 L38 140 Z" fill="#F3A6A2"/>
+
+  <!-- Pastel red medical cross (healthcare system) -->
+  <rect x="104" y="66" width="32" height="108" rx="10" fill="#F3A6A2"/>
+  <rect x="66" y="104" width="108" height="32" rx="10" fill="#F3A6A2"/>
+
+  <!-- Soft yellow highlight on cross for depth -->
+  <rect x="104" y="66" width="32" height="108" rx="10" fill="#F3A6A2" fill-opacity="0"/>
+</svg>
