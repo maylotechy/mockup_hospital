@@ -72,30 +72,42 @@ $(document).ready(function () {
      */
     function switchTab(tabName) {
         $('.sidebar-link')
-            .removeClass('bg-yellow-600 text-white font-semibold shadow-md shadow-yellow-600/20')
-            .addClass('text-slate-400 hover:text-white hover:bg-slate-900');
+            .removeClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60')
+            .addClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70');
+        $('.sidebar-link i')
+            .removeClass('text-red-600')
+            .addClass('text-slate-500');
 
         const $allTabs = $('#tabPatientsContent, #tabInventoryContent, #tabProfileContent, #tabReferralsContent, #tabOutcomesContent');
 
         if (tabName === 'patients') {
             $('#navTabPatients')
-                .removeClass('text-slate-400 hover:text-white hover:bg-slate-900')
-                .addClass('bg-yellow-600 text-white font-semibold shadow-md shadow-yellow-600/20');
+                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
+                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
+            $('#navIconPatients')
+                .removeClass('text-slate-500')
+                .addClass('text-red-600');
             $('#mainHeaderTitle').text('Patient Records');
             $allTabs.hide();
             $('#tabPatientsContent').fadeIn(200);
         } else if (tabName === 'inventory') {
             $('#navTabInventory')
-                .removeClass('text-slate-400 hover:text-white hover:bg-slate-900')
-                .addClass('bg-yellow-600 text-white font-semibold shadow-md shadow-yellow-600/20');
+                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
+                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
+            $('#navIconInventory')
+                .removeClass('text-slate-500')
+                .addClass('text-red-600');
             $('#mainHeaderTitle').text('Hospital Inventory');
             $allTabs.hide();
             $('#tabInventoryContent').fadeIn(200);
             loadInventory();
         } else if (tabName === 'profile') {
             $('#navTabProfile')
-                .removeClass('text-slate-400 hover:text-white hover:bg-slate-900')
-                .addClass('bg-yellow-600 text-white font-semibold shadow-md shadow-yellow-600/20');
+                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
+                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
+            $('#navIconProfile')
+                .removeClass('text-slate-500')
+                .addClass('text-red-600');
             $('#mainHeaderTitle').text('Facility Profile');
             $allTabs.hide();
             $('#tabProfileContent').fadeIn(200);
@@ -103,8 +115,11 @@ $(document).ready(function () {
             initInventoryLocationDropdowns();
         } else if (tabName === 'referrals') {
             $('#navTabReferrals')
-                .removeClass('text-slate-400 hover:text-white hover:bg-slate-900')
-                .addClass('bg-yellow-600 text-white font-semibold shadow-md shadow-yellow-600/20');
+                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
+                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
+            $('#navIconReferrals')
+                .removeClass('text-slate-500')
+                .addClass('text-red-600');
             $('#mainHeaderTitle').text('My Referrals');
             $allTabs.hide();
             $('#tabReferralsContent').fadeIn(200);
@@ -112,8 +127,11 @@ $(document).ready(function () {
             checkAndPollRecommendations();
         } else if (tabName === 'outcomes') {
             $('#navTabOutcomes')
-                .removeClass('text-slate-400 hover:text-white hover:bg-slate-900')
-                .addClass('bg-yellow-600 text-white font-semibold shadow-md shadow-yellow-600/20');
+                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
+                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
+            $('#navIconOutcomes')
+                .removeClass('text-slate-500')
+                .addClass('text-red-600');
             $('#mainHeaderTitle').text('Referral Outcomes');
             $allTabs.hide();
             $('#tabOutcomesContent').fadeIn(200);
@@ -326,14 +344,22 @@ $(document).ready(function () {
     $(document).on('click', '#btnLogoutBtn', function () {
         Swal.fire({
             title: 'Log Out?',
-            text: 'Are you sure you want to sign out of your hospital portal session?',
+            text: 'Are you sure you want to sign out?',
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#dc3545',
             cancelButtonColor: '#6c757d',
             confirmButtonText: '<i class="bi bi-box-arrow-right me-1"></i> Yes, Log Out',
             cancelButtonText: 'Cancel',
-            reverseButtons: true
+            reverseButtons: true,
+            buttonsStyling: false,
+            customClass: {
+                popup: 'logout-popup',
+                title: 'logout-title',
+                htmlContainer: 'logout-text',
+                confirmButton: 'logout-confirm',
+                cancelButton: 'logout-cancel'
+            }
         }).then((result) => {
             if (result.isConfirmed) {
                 $.ajax({
@@ -464,14 +490,14 @@ $(document).ready(function () {
             if (patient.gender === 'Male') genderBadgeClass = 'bg-blue-50 text-blue-700 border border-blue-200';
 
             const row = `
-                <tr class="hover:bg-slate-50/80 transition-colors border-b border-slate-100">
-                    <td class="py-3.5 px-6 font-mono text-xs font-semibold text-slate-500">#${patient.id}</td>
-                    <td class="py-3.5 px-6 font-semibold text-slate-900">${escapeHtml(patient.first_name)} ${escapeHtml(patient.last_name)}</td>
-                    <td class="py-3.5 px-6 text-slate-600 text-xs">${escapeHtml(patient.dob)}</td>
-                    <td class="py-3.5 px-6"><span class="px-2.5 py-1 rounded-full text-xs font-medium ${genderBadgeClass}">${escapeHtml(patient.gender)}</span></td>
-                    <td class="py-3.5 px-6 text-slate-600 text-xs font-mono">${escapeHtml(patient.phone)}</td>
-                    <td class="py-3.5 px-6 text-right">
-                        <button class="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-lg shadow-sm hover:shadow active:scale-[0.98] transition-all btn-refer-patient flex items-center gap-1.5 ml-auto" data-id="${patient.id}">
+                <tr class="!bg-slate-200/40 hover:!bg-slate-300/40 transition-colors">
+                    <td class="py-3.5 px-6 font-mono text-xs font-semibold text-slate-500 border-b border-slate-300/60">#${patient.id}</td>
+                    <td class="py-3.5 px-6 font-semibold text-slate-900 border-b border-slate-300/60">${escapeHtml(patient.first_name)} ${escapeHtml(patient.last_name)}</td>
+                    <td class="py-3.5 px-6 text-slate-600 text-xs border-b border-slate-300/60">${escapeHtml(patient.dob)}</td>
+                    <td class="py-3.5 px-6 border-b border-slate-300/60"><span class="px-2.5 py-1 rounded-full text-xs font-medium ${genderBadgeClass}">${escapeHtml(patient.gender)}</span></td>
+                    <td class="py-3.5 px-6 text-slate-600 text-xs font-mono border-b border-slate-300/60">${escapeHtml(patient.phone)}</td>
+                    <td class="py-3.5 px-6 text-right border-b border-slate-300/60">
+                        <button class="px-3.5 py-1.5 bg-white/50 hover:bg-white text-slate-600 border border-slate-600/50 text-xs font-medium rounded-lg shadow-sm hover:shadow-lg hover:border-slate-700/60 hover:text-slate-700  active:scale-[0.98] transition-all btn-refer-patient flex items-center gap-1.5 ml-auto" data-id="${patient.id}">
                             <i class="bi bi-send-plus"></i> Refer Patient
                         </button>
                     </td>

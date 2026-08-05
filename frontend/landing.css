@@ -1,5 +1,7 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap');
+
 body {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Outfit', 'Inter', sans-serif;
 }
 
 ::-webkit-scrollbar {
@@ -20,11 +22,11 @@ body {
 
 /* Subtle dot-grid backdrops */
 .dot-grid-red {
-    background-image: radial-gradient(#991B1B 1px, transparent 1px);
+    background-image: radial-gradient(#991B1B 0.8px, transparent 0.8px);
     background-size: 24px 24px;
 }
 
 .dot-grid-black {
-    background-image: radial-gradient(#000 1px, transparent 1px);
+    background-image: radial-gradient(#000 0.8px, transparent 0.8px);
     background-size: 24px 24px;
 }
