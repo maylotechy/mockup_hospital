@@ -500,7 +500,7 @@ $(document).ready(function () {
                     <td class="py-3.5 px-6 text-slate-600 text-xs font-mono border-b border-slate-300/60">${escapeHtml(patient.phone)}</td>
                     <td class="py-3.5 px-6 text-right border-b border-slate-300/60">
                         <button class="px-3.5 py-1.5 bg-white/50 hover:bg-white text-slate-600 border border-slate-600/50 text-xs font-medium rounded-lg shadow-sm hover:shadow-lg hover:border-slate-700/60 hover:text-slate-700  active:scale-[0.98] transition-all btn-refer-patient flex items-center gap-1.5 ml-auto" data-id="${patient.id}">
-                            <i class="bi bi-send-plus"></i> Refer Patient
+                            <i class="bi bi-send-plus"></i> Refer
                         </button>
                     </td>
                 </tr>
@@ -1914,6 +1914,7 @@ $(document).ready(function () {
 
     // Toggle the notification dropdown open/closed
     $(document).on('click', '#btnNotificationBell', function (e) {
+        console.log('clicked');
         e.stopPropagation();
         $('#notificationDropdown').toggleClass('hidden');
     });
