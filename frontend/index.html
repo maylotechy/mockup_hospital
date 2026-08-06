@@ -195,7 +195,7 @@
                     </div>
 
                     <!-- Notifications -->
-                    <div class="relative">
+                    <div class="relative z-50">
                         <!-- New Referral Toast -->
                         <div id="newReferralToast"
                             class="hidden absolute right-full top-1/2 -translate-y-1/2 mr-3 whitespace-nowrap px-3 py-1.5 bg-red-600 text-white text-xs font-bold rounded-lg shadow-lg z-50">
@@ -205,7 +205,7 @@
 
                         <!-- Notification Button -->
                         <button id="btnNotificationBell" type="button"
-                            class="relative flex z-50 items-center justify-center w-10 h-10 rounded-xl bg-slate-100 border border-slate-200/80 text-slate-600 hover:bg-slate-200 transition-all">
+                            class="relative flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100 border border-slate-200/80 text-slate-600 hover:bg-slate-200 transition-all">
                             <i class="bi bi-bell-fill text-lg"></i>
 
                             <span id="notificationBadge"
@@ -216,7 +216,7 @@
 
                         <!-- Notification Dropdown -->
                         <div id="notificationDropdown"
-                            class="hidden absolute right-0 mt-2 w-80 bg-white rounded-lg border border-slate-200 shadow-xl overflow-hidden">
+                            class="hidden absolute right-0 top-full mt-2 w-80 bg-white rounded-lg border border-slate-200 shadow-xl overflow-hidden z-[100]">
                             <div class="px-4 py-3 border-b border-slate-100">
                                 <span class="text-sm font-bold text-slate-800">
                                     Referral Notifications
@@ -462,7 +462,7 @@
                                     <!-- Submit Button (Rightmost Side) -->
                                     <div class="pt-4 border-t border-slate-100 flex justify-end">
                                         <button type="submit" id="btnSubmitInventory"
-                                            class="py-2.5 px-6 bg-gradient-to-r from-red-600 to-indigo-600 hover:from-red-700 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg shadow-red-600/25 active:scale-[0.99] transition-all text-xs flex items-center gap-2 ml-auto">
+                                            class="py-2.5 px-6 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl shadow-lg shadow-red-600/25 active:scale-[0.99] transition-all text-xs flex items-center gap-2 ml-auto">
                                             <i class="bi bi-cloud-arrow-up text-sm"></i>
                                             <span>Update Inventory</span>
                                         </button>
@@ -628,7 +628,7 @@
                                 <!-- Submit Button (Rightmost Side) -->
                                 <div class="pt-4 border-t border-slate-100 flex justify-end">
                                     <button type="submit" id="btnSubmitProfile"
-                                        class="py-2.5 px-6 bg-gradient-to-r from-red-600 to-indigo-600 hover:from-red-700 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg shadow-red-600/25 active:scale-[0.99] transition-all text-xs flex items-center gap-2 ml-auto">
+                                        class="py-2.5 px-6 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl shadow-lg shadow-red-600/25 active:scale-[0.99] transition-all text-xs flex items-center gap-2 ml-auto">
                                         <i class="bi bi-cloud-arrow-up text-sm"></i>
                                         <span>Update Facility Profile</span>
                                     </button>
