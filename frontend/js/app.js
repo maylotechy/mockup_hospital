@@ -44,6 +44,23 @@ $(document).ready(function () {
     }
 
     /**
+     * Update hospital logo based on hospital code
+     */
+    function updateHospitalLogo(hospitalCode) {
+        const logoMap = {
+            'HOSP-DRMC': 'assets/logos/hospitals/DRMC.png',
+            'HOSP-CVPHL': 'assets/logos/hospitals/CVPHL.png',
+            'HOSP-MMH': 'assets/logos/hospitals/MMH.png',
+            // add more hospitals
+        };
+
+        const logo = logoMap[hospitalCode] || 'assets/logos/hospitals/_default.png';
+
+        $('#hospitalLogo').attr('src', logo);
+        console.log(hospitalCode)
+    }
+
+    /**
      * Show Dashboard View (Authenticated State)
      */
     function showDashboardView(hospital) {
@@ -52,6 +69,9 @@ $(document).ready(function () {
 
         $('#sidebarHospitalName, #headerHospitalName').text(hospital.name);
         $('#sidebarHospitalCode').text(hospital.code);
+
+        // edit logo
+        updateHospitalLogo(hospital.code);
 
         // Default to Patients tab
         switchTab('patients');

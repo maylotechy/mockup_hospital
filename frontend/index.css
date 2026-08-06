@@ -236,3 +236,13 @@ div.dataTables_wrapper {
 .logout-cancel:hover {
     background: #e2e8f0;
 }
+
+/* hide scrollbar utility */
+.hide-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+    display: none;
+}

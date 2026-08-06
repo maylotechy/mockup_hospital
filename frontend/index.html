@@ -42,7 +42,7 @@
 
             <!-- Branding Header -->
             <div class="text-center mb-8">
-                <img src="assets/logos/IRDSS.PNG" alt="IRDSS" class="h-20 w-auto mx-auto mb-4">
+                <img src="assets/logos/IRDSS_long.png" alt="IRDSS" class="h-20 w-auto mx-auto mb-4">
             </div>
 
             <!-- Login Form Card -->
@@ -119,24 +119,19 @@
                 <!--
                 <div class="p-4 border-b border-slate-200/80 flex items-center justify-between">
                     <div class="flex items-center gap-3">
-                        <img src="assets/logos/IRDSS.PNG" alt="IRDSS" class="h-12 w-auto">
+                        <img src="assets/logos/IRDSS_long.png" alt="IRDSS" class="h-12 w-auto">
                     </div>
                 </div>
                 -->
 
                 <!-- Sidebar Header -->
-                <div class="p-4 border-b bg-white/80 border-slate-200/80 block items-center justify-between space-y-4">
-                    <div class="flex items-center">
-                        <img src="assets/logos/IRDSS.PNG" alt="IRDSS" class="h-12 w-auto">
-                    </div>
-                    <div class="block">
-                        <p class="font-semibold text-black truncate" id="sidebarHospitalName">Hospital Name</p>
-                        <p class="text-xs text-slate-600 font-mono" id="sidebarHospitalCode">HOSP-000</p>
-                    </div>
+                <div class="p-4 border-b bg-white/80 border-slate-200/80 flex justify-center items-center">
+                    <img id="sidebarHospitalLogo" src="assets/logos/IRDSS_long.png" alt="Hospital Logo" class="h-20 w-auto"
+                    >
                 </div>
 
                 <!-- Navigation Links -->
-                <nav class="p-2 space-y-2">
+                <nav class="p-2 !pt-4 space-y-2">
                     <a href="#" id="navTabPatients" class="sidebar-link group flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all text-slate-500">
                         <i id="navIconPatients" class="bi bi-person-lines-fill text-lg transition-colors"></i>
                         <span>Patient Records</span>
@@ -183,8 +178,15 @@
             
             <!-- TOP BAR HEADER -->
             <header class="bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
-                <div>
+                <div class="flex gap-3 items-center">
                     <!-- <h1 class="text-2xl font-bold text-slate-900" id="mainHeaderTitle">Patient Records</h1> -->
+                    <div>
+                        <img src="assets/logos/hospitals/_default.png" id="hospitalLogo" alt="hospital logo" class="h-12 w-auto">
+                    </div>
+                    <div class="block">
+                        <p class="font-semibold text-black leading-tight" id="sidebarHospitalName">Hospital Name</p>
+                        <p class="text-xs text-slate-600 font-mono" id="sidebarHospitalCode">HOSP-000</p>
+                    </div>
                 </div>
 
                 <div class="flex items-center gap-3">
