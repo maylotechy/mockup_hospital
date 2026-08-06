@@ -438,6 +438,9 @@ $(document).ready(function () {
             success: function (response) {
                 if (response.success && Array.isArray(response.data)) {
                     renderPatientsTable(response.data);
+                    $('#patientsLastUpdated').text(
+                        new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                    );
                 } else {
                     $tableBody.html(`
                         <tr>
@@ -567,7 +570,9 @@ $(document).ready(function () {
         $('#displayHospitalName').text(data.hospital_name || (currentHospital ? currentHospital.name : 'Hospital'));
         $('#displayHospitalLevel').text(data.hospital_level || 'Level 2');
         $('#displayHospitalEnv').text(data.hospital_environment || 'Urban');
-        $('#displayGpsCoords').text(`${data.latitude ?? 0}, ${data.longitude ?? 0}`);
+        $('#displayGpsCoords').html(
+            resolveLocationAddressHtml(parseFloat(data.latitude), parseFloat(data.longitude), 'displayGpsCoordsText', { admin3: true })
+        );
 
         // Badges
         const BADGE_BASE_CLASS = 'inline-flex items-center flex-shrink-0 whitespace-nowrap px-3 py-1 rounded-full text-xs font-semibold';
@@ -985,12 +990,15 @@ $(document).ready(function () {
         return "Davao Region, Philippines";
     }
 
-    function resolveLocationAddressHtml(lat, lng, elementId) {
+    function resolveLocationAddressHtml(lat, lng, elementId, opts) {
         if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) {
             return 'Location N/A';
         }
 
-        const cacheKey = `${lat.toFixed(4)}_${lng.toFixed(4)}`;
+        // admin3: "Barangay, Municipality, Province/District" instead of the default
+        // street-first address string — opt in per call site (see Facility Profile).
+        const wantAdmin3 = !!(opts && opts.admin3);
+        const cacheKey = `${lat.toFixed(4)}_${lng.toFixed(4)}_${wantAdmin3 ? 'admin3' : 'full'}`;
         if (locationGeoCache[cacheKey]) {
             return escapeHtml(locationGeoCache[cacheKey]);
         }
@@ -1001,7 +1009,7 @@ $(document).ready(function () {
         setTimeout(() => {
             $.ajax({
                 url: `${API_BASE}/reverse_geo.php`,
-                data: { lat: lat, lng: lng },
+                data: wantAdmin3 ? { lat: lat, lng: lng, format: 'admin3' } : { lat: lat, lng: lng },
                 dataType: 'json',
                 xhrFields: { withCredentials: true },
                 timeout: 6000,
@@ -1375,6 +1383,9 @@ $(document).ready(function () {
                 $('#referralsConnectionAlert').slideUp(200);
                 myReferralsCache = Array.isArray(data) ? data : [];
                 applyReferralFilters();
+                $('#myReferralsLastUpdated').text(
+                    new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                );
             },
             error: function (xhr) {
                 const errData = xhr.responseJSON || {};
