@@ -1,20 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ClaudeCodeEditorTabs">
-    <option name="activeSessionId" value="e8cb5646-7970-4e9c-8358-3fb2ef040b74" />
+    <option name="activeSessionId" value="d6ebc529-552b-4365-bbaf-8da14f22c0ba" />
     <option name="openSessionIds">
       <list>
-        <option value="e8cb5646-7970-4e9c-8358-3fb2ef040b74" />
+        <option value="f9d65ce8-c7f6-4390-a271-21826f1a8472" />
+        <option value="d6ebc529-552b-4365-bbaf-8da14f22c0ba" />
       </list>
     </option>
     <option name="sessionPaths">
       <map>
-        <entry key="e8cb5646-7970-4e9c-8358-3fb2ef040b74" value="/sessions/cb1f4ee9-f553-4784-a782-3abb747c0de3" />
+        <entry key="d6ebc529-552b-4365-bbaf-8da14f22c0ba" value="/sessions/cb1f4ee9-f553-4784-a782-3abb747c0de3" />
+        <entry key="f9d65ce8-c7f6-4390-a271-21826f1a8472" value="/sessions/cb1f4ee9-f553-4784-a782-3abb747c0de3" />
       </map>
     </option>
     <option name="sessionTitles">
       <map>
-        <entry key="e8cb5646-7970-4e9c-8358-3fb2ef040b74" value="/compact" />
+        <entry key="d6ebc529-552b-4365-bbaf-8da14f22c0ba" value="/compact" />
+        <entry key="f9d65ce8-c7f6-4390-a271-21826f1a8472" value="/compact" />
       </map>
     </option>
   </component>

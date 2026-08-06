@@ -60,6 +60,37 @@ function getLoggedInHospital() {
     return null;
 }
 
+/**
+ * Resolves the logged-in hospital's *current* API key with a live DB read, so a key
+ * rotated mid-session (e.g. by the IRDSS admin panel) takes effect on the very next
+ * request instead of only after the browser logs out and back in. The session's
+ * cached copy is refreshed too, so anything else reading it stays in sync.
+ *
+ * @return string|null
+ */
+function getFreshApiKeyForLoggedInHospital() {
+    $hospital = getLoggedInHospital();
+    if (!$hospital || empty($hospital['id'])) {
+        return null;
+    }
+
+    try {
+        $pdo = getDbConnection();
+        $stmt = $pdo->prepare('SELECT api_key FROM hospitals WHERE id = :id LIMIT 1');
+        $stmt->execute([':id' => $hospital['id']]);
+        $row = $stmt->fetch();
+    } catch (PDOException $e) {
+        return $hospital['api_key'] ?? null;
+    }
+
+    if (!$row || empty($row['api_key'])) {
+        return null;
+    }
+
+    $_SESSION['hospital']['api_key'] = $row['api_key'];
+    return $row['api_key'];
+}
+
 // Handle preflight CORS requests with credentials support
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
 
