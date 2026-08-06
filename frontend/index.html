@@ -20,6 +20,9 @@
     <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <!-- external CSS -->
     <link rel="stylesheet" href="index.css">
+
+    <!-- icon -->
+    <link rel="icon" type="image/x-icon" href="assets/logos/favicon.ico">
 </head>
 
 <body class="h-full text-slate-800 antialiased selection:bg-red-500 selection:text-white">
@@ -163,10 +166,10 @@
             <div class="p-4 border-t border-slate-200/80 bg-white/80">
                 <div class="flex items-center justify-between gap-2">
                     <div class="min-w-0 flex-1">
-                        <p class="text-sm font-semibold text-black truncate">Log Out</p>
+                        <p class="text-sm font-semibold text-slate-800 truncate">Log Out</p>
                     </div>
                     <button id="btnLogoutBtn" title="Log Out"
-                        class="px-2 py-1 rounded-xl bg-white/80 hover:bg-red-600/20 text-slate-400/80 hover:text-red-400 border border-slate-300/80 hover:border-red-400 transition-all flex-shrink-0">
+                        class="px-2 py-1 rounded-xl bg-white/80 hover:bg-red-600/20 text-slate-400/80 hover:text-red-400 border border-slate-400/80 hover:border-red-400 transition-all flex-shrink-0">
                         <i class="bi bi-box-arrow-right"></i>
                     </button>
                 </div>
@@ -477,35 +480,6 @@
                     <!-- TAB 3: FACILITY PROFILE CONTENT -->
                     <div id="tabProfileContent" class="space-y-6" style="display: none;">
 
-                        <!-- 2 QUICK STAT CARDS -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-
-                            <!-- Facility Level Stat -->
-                            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
-                                <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl flex-shrink-0">
-                                    <i class="bi bi-building"></i>
-                                </div>
-                                <div class="min-w-0">
-                                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Facility Level</p>
-                                    <div id="statHospitalLevelSkeleton" class="h-6 w-16 mt-1.5 rounded-md bg-slate-200 animate-pulse"></div>
-                                    <h3 class="text-xl font-bold text-slate-900 mt-0.5 hidden" id="statHospitalLevel">--</h3>
-                                </div>
-                            </div>
-
-                            <!-- Environment Stat -->
-                            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
-                                <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl flex-shrink-0">
-                                    <i class="bi bi-geo-alt"></i>
-                                </div>
-                                <div class="min-w-0">
-                                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Environment</p>
-                                    <div id="statHospitalEnvSkeleton" class="h-6 w-16 mt-1.5 rounded-md bg-slate-200 animate-pulse"></div>
-                                    <h3 class="text-xl font-bold text-slate-900 mt-0.5 hidden" id="statHospitalEnv">--</h3>
-                                </div>
-                            </div>
-
-                        </div>
-
                         <!-- Facility & Location Profile -->
                         <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-4">
                             <div class="flex items-center gap-3 pb-3 border-b border-slate-100">
@@ -638,6 +612,37 @@
                             </form>
                         </div>
 
+                        <comment class="hidden">
+                            <!-- 2 QUICK STAT CARDS -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+
+                                <!-- Facility Level Stat -->
+                                <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
+                                    <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl flex-shrink-0">
+                                        <i class="bi bi-building"></i>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Facility Level</p>
+                                        <div id="statHospitalLevelSkeleton" class="h-6 w-16 mt-1.5 rounded-md bg-slate-200 animate-pulse"></div>
+                                        <h3 class="text-xl font-bold text-slate-900 mt-0.5 hidden" id="statHospitalLevel">--</h3>
+                                    </div>
+                                </div>
+
+                                <!-- Environment Stat -->
+                                <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
+                                    <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl flex-shrink-0">
+                                        <i class="bi bi-geo-alt"></i>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Environment</p>
+                                        <div id="statHospitalEnvSkeleton" class="h-6 w-16 mt-1.5 rounded-md bg-slate-200 animate-pulse"></div>
+                                        <h3 class="text-xl font-bold text-slate-900 mt-0.5 hidden" id="statHospitalEnv">--</h3>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </comment>
+
                     </div>
 
                     <!-- TAB 4: MY REFERRALS CONTENT -->
@@ -657,41 +662,51 @@
                         </div>
 
                         <!-- ACCEPTED HOSPITALS & REFERRAL CHOICE CARD -->
-                        <div id="acceptedHospitalsCard" class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden space-y-4 p-6 mb-6">
-                            <div class="flex items-center justify-between border-b border-slate-100 pb-4 flex-wrap gap-3">
+                        <div id="acceptedHospitalsCard" class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden mb-6">
+                            
+                            <!-- Card Header -->
+                            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                                
+                                <!-- Let -->
                                 <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                                    <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-50 text-blue-600">
                                         <i class="bi bi-hospital text-lg"></i>
                                     </div>
                                     <div>
                                         <h3 class="font-bold text-slate-900 text-base">Accepted Hospitals & Referral Choice</h3>
-                                        <p class="text-xs text-slate-500 font-normal">Hospitals that accepted your patient referral, ranked by AI compatibility match. Choose your preferred destination.</p>
+                                        <p class="text-xs text-slate-500">Last updated <span id="hospitalsLastUpdated">--:--:--</span></p>
                                     </div>
                                 </div>
-                                <button id="btnRefreshRecommendations" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5">
+
+                                <!-- Right -->
+                                <button
+                                    id="btnRefreshRecommendations"
+                                    class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200 transition-all"
+                                >
                                     <i class="bi bi-arrow-clockwise"></i>
-                                    <span>Refresh List</span>
+                                    <span>Refresh</span>
                                 </button>
                             </div>
 
                             <!-- Active Referral Metadata Bar -->
-                            <div class="px-4 py-3 bg-red-50/70 border border-red-100 rounded-xl flex items-center justify-between flex-wrap gap-3 text-xs">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-slate-500 font-bold">Active Referral ID:</span>
-                                    <span class="font-mono font-bold text-red-900" id="activeReferralIdText">--</span>
+                            <div class="px-4 py-2 mt-4 mx-4 flex items-center justify-between flex-wrap gap-3 text-xs rounded-t-2xl border border-slate-200/60 bg-slate-50/80">
+                                <div class="block">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-slate-500 font-bold">Patient:</span>
+                                        <span class="font-bold text-slate-800" id="activeReferralPatientText">--</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-slate-500 font-bold">Active Referral ID:</span>
+                                        <span class="font-mono font-bold text-slate-900" id="activeReferralIdText">--</span>
+                                    </div>
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <span class="text-slate-500 font-bold">Patient:</span>
-                                    <span class="font-bold text-slate-800" id="activeReferralPatientText">--</span>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <span class="text-slate-500 font-bold">Status:</span>
-                                    <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800" id="activeReferralStatusBadge">Awaiting Acceptances...</span>
+                                    <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800" id="activeReferralStatusBadge">Awaiting Acceptances</span>
                                 </div>
                             </div>
 
                             <!-- Accepting Hospitals Container (Grid) -->
-                            <div id="acceptedHospitalsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div id="acceptedHospitalsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mx-4 mb-4 p-4 rounded-b-2xl border border-slate-200/60 bg-slate-100/90">
                                 <!-- Populated dynamically from GET /api/v1/referral/{referral_id}/recommendations -->
                             </div>
                         </div>
@@ -700,21 +715,26 @@
                             <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
 
                                 <!-- Card Header -->
-                                <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between flex-wrap gap-4">
+                                <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                                    
+                                    <!-- Left -->
                                     <div class="flex items-center gap-3">
-                                        <div class="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold">
+                                        <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-red-50 text-red-600">
                                             <i class="bi bi-send-check text-lg"></i>
                                         </div>
+
                                         <div>
                                             <h3 class="font-bold text-slate-900 text-base">My Referrals</h3>
-                                            <p class="text-xs text-slate-500 font-normal">Last updated <span id="myReferralsLastUpdated">--:--:--</span></p>
+                                            <p class="text-xs text-slate-500">Last updated <span id="myReferralsLastUpdated">--:--:--</span></p>
                                         </div>
                                     </div>
 
-                                    <button id="btnRefreshReferrals"
-                                        class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all flex items-center gap-2">
+                                    <!-- Right -->
+                                    <button
+                                        id="btnRefreshReferrals"
+                                        class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200 transition-all">
                                         <i class="bi bi-arrow-clockwise"></i>
-                                        <span>Refresh List</span>
+                                        <span>Refresh</span>
                                     </button>
                                 </div>
 
@@ -758,18 +778,18 @@
                                 </div>
 
                                 <!-- DataTables My Referrals Table -->
-                                <div class="overflow-x-auto">
+                                <div class="overflow-x-auto bg-slate-50/50">
                                     <table id="referralsTable" class="w-full text-left border-collapse">
                                         <thead>
-                                            <tr class="bg-slate-50/80 text-xs uppercase tracking-wider font-bold text-slate-600 border-b border-slate-200/80">
-                                                <th class="py-4 px-6">Referral ID</th>
-                                                <th class="py-4 px-6">Patient</th>
-                                                <th class="py-4 px-6">Severity</th>
-                                                <th class="py-4 px-6">Status</th>
-                                                <th class="py-4 px-6">Created At</th>
-                                                <th class="py-4 px-6">Seen At</th>
-                                                <th class="py-4 px-6">Notified Hospitals</th>
-                                                <th class="py-4 px-6 text-right">Action</th>
+                                            <tr class="bg-slate-300/60 text-xs uppercase tracking-wider font-bold text-slate-600 border-b border-slate-200/80">
+                                                <th class="w-[8%] py-4 px-6">Referral ID</th>
+                                                <th class="w-[20%] py-4 px-6">Patient</th>
+                                                <th class="w-[10%] py-4 px-6">Severity</th>
+                                                <th class="w-[12%] py-4 px-6">Status</th>
+                                                <th class="w-[15%] py-4 px-6">Created At</th>
+                                                <th class="w-[15%] py-4 px-6">Seen At</th>
+                                                <th class="w-[12%] py-4 px-6">Notified Hospitals</th>
+                                                <th class="w-[8%] py-4 px-6 text-right">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody id="referralsTableBody" class="divide-y divide-slate-100 text-sm">
@@ -842,9 +862,9 @@
                                     </div>
 
                                     <button id="btnRefreshOutcomes"
-                                        class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all flex items-center gap-2">
+                                        class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200 transition-all">
                                         <i class="bi bi-arrow-clockwise"></i>
-                                        <span>Refresh List</span>
+                                        <span>Refresh</span>
                                     </button>
                                 </div>
 

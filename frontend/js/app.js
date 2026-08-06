@@ -1052,12 +1052,12 @@ $(document).ready(function () {
         if (!items || items.length === 0) {
             $('#activeReferralStatusBadge')
                 .attr('class', 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800')
-                .text('Awaiting Acceptances...');
+                .text('Awaiting Acceptances');
 
             $list.html(`
-                <div class="col-span-full text-center py-8 px-4 text-slate-400 font-normal bg-slate-50/80 rounded-2xl border border-slate-200/60">
+                <div class="col-span-full text-center py-8 px-4 text-slate-400 font-normal bg-slate-100/90 rounded-b-2xl border border-slate-200/60">
                     <i class="bi bi-clock text-2xl block mb-2 text-slate-400"></i>
-                    <span class="text-xs font-medium">No hospital has accepted this referral yet. We will update automatically when a facility responds.</span>
+                    <span class="text-xs font-medium">Awaiting referrals...</span>
                 </div>
             `);
             return;
@@ -1099,7 +1099,7 @@ $(document).ready(function () {
             const locContent = resolveLocationAddressHtml(lat, lng, locId);
 
             const card = `
-                <div class="relative p-5 bg-slate-50/90 rounded-2xl border ${isBestMatch ? 'border-red-400 ring-2 ring-red-100' : 'border-slate-200'} shadow-xs space-y-4 hover:border-red-300 hover:shadow-md transition-all flex flex-col justify-between">
+                <div class="relative p-5 bg-slate-50/90 rounded-2xl border ${isBestMatch ? 'border-yellow-400 ring-2 ring-yellow-100' : 'border-slate-200'} shadow-xs space-y-4 hover:border-yellow-300 hover:shadow-md transition-all flex flex-col justify-between">
                     ${isBestMatch ? `
                         <span class="absolute -top-2.5 left-4 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-yellow-600 text-white shadow-sm flex items-center gap-1">
                             <i class="bi bi-star-fill"></i> BEST MATCH
@@ -1127,10 +1127,11 @@ $(document).ready(function () {
                         </div>
                     </div>
 
-                    <button class="w-full py-2.5 px-4 bg-yellow-600 hover:bg-red-700 active:scale-[0.99] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 btn-select-hospital"
-                        data-hosp-name="${escapeHtml(hospName)}" data-ref-id="${escapeHtml(referralId)}">
+                    <button class="w-full py-2.5 px-4 bg-white/50 hover:bg-yellow-50 text-slate-700 hover:text-yellow-700 border border-slate-300 hover:border-yellow-500 rounded-xl shadow-sm hover:shadow-lg active:scale-[0.98] transition-all font-semibold flex items-center justify-center gap-2 btn-select-hospital"
+                        data-hosp-name="${escapeHtml(hospName)}"
+                        data-ref-id="${escapeHtml(referralId)}">
                         <i class="bi bi-check2-circle text-base"></i>
-                        <span>SELECT THIS HOSPITAL</span>
+                        <span>Select This Hospital</span>
                     </button>
                 </div>
             `;
@@ -1192,7 +1193,7 @@ $(document).ready(function () {
 
                     $('#activeReferralStatusBadge')
                         .attr('class', 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-600 text-white')
-                        .text(`Finalized: ${selectedHosp}`);
+                        .text(`Finalized`);
 
                     // Close out this referral's session client-side so polling stops surfacing it
                     window.activeInitiatedReferralId = null;
@@ -1475,25 +1476,25 @@ $(document).ready(function () {
             const responses = Array.isArray(ref.responses) ? ref.responses : [];
 
             const cancelBtn = ref.cancellable
-                ? `<button class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium rounded-lg border border-red-200 transition-all btn-cancel-referral" data-ref-id="${escapeHtml(ref.referral_id)}">
-                       <i class="bi bi-x-circle me-1"></i> Cancel
-                   </button>`
+                ? `<button class="px-3.5 py-1.5 bg-white/50 hover:bg-red-50 text-red-600 border border-red-300/70 text-xs font-medium rounded-lg shadow-sm hover:shadow-lg hover:border-red-500 hover:text-red-700 active:scale-[0.98] transition-all btn-cancel-referral flex items-center gap-1.5 ml-auto" data-ref-id="${escapeHtml(ref.referral_id)}">
+                    <i class="bi bi-x-circle"></i> Cancel
+                </button>`
                 : '';
 
             const row = `
-                <tr class="hover:bg-slate-50/80 transition-colors border-b border-slate-100">
-                    <td class="py-3.5 px-6 font-mono text-xs font-semibold text-slate-500">${escapeHtml(ref.referral_id)}</td>
-                    <td class="py-3.5 px-6 text-slate-700 text-xs font-mono">${escapeHtml(ref.patient_id)}</td>
-                    <td class="py-3.5 px-6 text-slate-600 text-xs">${escapeHtml(ref.disease_severity)}</td>
-                    <td class="py-3.5 px-6"><span class="px-2.5 py-1 rounded-full text-xs font-bold ${badgeClass}">${escapeHtml(ref.status)}</span></td>
-                    <td class="py-3.5 px-6 text-slate-600 text-xs">${formatReferralTimestamp(ref.created_at)}</td>
-                    <td class="py-3.5 px-6 text-slate-600 text-xs">${formatReferralTimestamp(ref.seen_at)}</td>
-                    <td class="py-3.5 px-6 text-xs">
+                <tr class="!bg-slate-200/40 hover:!bg-slate-300/40 transition-colors">
+                    <td class="py-3.5 px-6 font-mono text-xs font-semibold text-slate-500 border-b border-slate-300/60">${escapeHtml(ref.referral_id)}</td>
+                    <td class="py-3.5 px-6 text-slate-700 text-xs font-mono border-b border-slate-300/60">${escapeHtml(ref.patient_id)}</td>
+                    <td class="py-3.5 px-6 text-slate-600 text-xs border-b border-slate-300/60">${escapeHtml(ref.disease_severity)}</td>
+                    <td class="py-3.5 px-6 border-b border-slate-300/60"><span class="px-2.5 py-1 rounded-full text-xs font-bold ${badgeClass}">${escapeHtml(ref.status)}</span></td>
+                    <td class="py-3.5 px-6 text-slate-600 text-xs border-b border-slate-300/60">${formatReferralTimestamp(ref.created_at)}</td>
+                    <td class="py-3.5 px-6 text-slate-600 text-xs border-b border-slate-300/60">${formatReferralTimestamp(ref.seen_at)}</td>
+                    <td class="py-3.5 px-6 text-xs border-b border-slate-300/60">
                         <button type="button" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium btn-view-referral-timeline" data-ref-id="${escapeHtml(ref.referral_id)}">
                             <i class="bi bi-clock-history me-1"></i> ${responses.length} notified
                         </button>
                     </td>
-                    <td class="py-3.5 px-6 text-right">${cancelBtn}</td>
+                    <td class="py-3.5 px-6 text-right border-b border-slate-300/60">${cancelBtn}</td>
                 </tr>
             `;
             $tableBody.append(row);

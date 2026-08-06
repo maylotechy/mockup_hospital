@@ -1,0 +1,1 @@
+only favicon.ico is good to use here. fix this next time
