@@ -443,23 +443,25 @@ $(document).ready(function () {
     }
 
     /**
-     * Live System Clock Ticker
+     * Live System Clock Ticker — renders into the header, left of the notification bell.
      */
     function updateSystemClock() {
         const now = new Date();
-        const options = {
-            weekday: 'short',
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
+        const timeText = now.toLocaleTimeString('en-US', {
             hour: '2-digit',
             minute: '2-digit',
-            second: '2-digit',
             hour12: true
-        };
-        $('#systemClock').text(now.toLocaleString('en-US', options));
+        });
+        const dateText = now.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        });
+        $('#headerTimeText').text(timeText);
+        $('#headerDateText').text(dateText);
     }
-    setInterval(updateSystemClock, 1000);
+    setInterval(updateSystemClock, 30000);
     updateSystemClock();
 
     /**
@@ -806,17 +808,13 @@ $(document).ready(function () {
                     });
                 } else {
                     const status = response.http_status || 500;
-                    const errorTitle = `HTTP ${status} Error`;
                     const errorMsg = escapeHtml(cleanErrorMessage(response.message || "Referral process failed.", status));
 
                     Swal.fire({
                         icon: 'error',
-                        title: errorTitle,
-                        html: `
-                            <p class="mb-3 text-slate-600 text-sm font-medium">Unable to submit this referral.</p>
-                            ${buildErrorNoteHtml(errorMsg, status)}
-                        `,
-                        confirmButtonText: '<i class="bi bi-check-lg me-1"></i> OK',
+                        title: 'Unable to submit this referral.',
+                        html: `${buildErrorNoteHtml(errorMsg, status)}`,
+                        confirmButtonText: 'OK',
                         confirmButtonColor: '#0d6efd',
                         customClass: { popup: 'rounded-4 shadow-lg' }
                     });
@@ -830,15 +828,11 @@ $(document).ready(function () {
                 const errData = xhr.responseJSON || {};
                 const rawMsg = errData.message || errData.detail || `HTTP ${status} Server Error`;
                 const errorMsg = escapeHtml(cleanErrorMessage(rawMsg, status));
-                const errorTitle = `HTTP ${status} Error`;
 
                 Swal.fire({
                     icon: 'error',
-                    title: errorTitle,
-                    html: `
-                        <p class="mb-3 text-slate-600 text-sm font-medium">Unable to submit this referral.</p>
-                        ${buildErrorNoteHtml(errorMsg, status)}
-                    `,
+                    title: 'Unable to submit this referral.',
+                    html: `${buildErrorNoteHtml(errorMsg, status)}`,
                     confirmButtonText: '<i class="bi bi-check-lg me-1"></i> OK',
                     confirmButtonColor: '#0d6efd',
                     customClass: { popup: 'rounded-4 shadow-lg' }
@@ -1978,24 +1972,31 @@ $(document).ready(function () {
         const patientLat = incomingAlert.patient_latitude !== undefined && incomingAlert.patient_latitude !== null ? parseFloat(incomingAlert.patient_latitude) : (incomingAlert.patient_lat !== undefined && incomingAlert.patient_lat !== null ? parseFloat(incomingAlert.patient_lat) : (incomingAlert.patient && incomingAlert.patient.latitude !== undefined && incomingAlert.patient.latitude !== null ? parseFloat(incomingAlert.patient.latitude) : null));
         const patientLng = incomingAlert.patient_longitude !== undefined && incomingAlert.patient_longitude !== null ? parseFloat(incomingAlert.patient_longitude) : (incomingAlert.patient_lng !== undefined && incomingAlert.patient_lng !== null ? parseFloat(incomingAlert.patient_lng) : (incomingAlert.patient && incomingAlert.patient.longitude !== undefined && incomingAlert.patient.longitude !== null ? parseFloat(incomingAlert.patient.longitude) : null));
 
-        // Extract hospital coordinates (destination)
+        // Extract hospital coordinates (destination) — this is OUR OWN hospital's location,
+        // used only for the transfer-distance calc below, never for display as "referring
+        // facility" (that's a different hospital entirely — see referring facility coords).
         const hospitalLat = incomingAlert.hospital_latitude !== undefined && incomingAlert.hospital_latitude !== null ? parseFloat(incomingAlert.hospital_latitude) : (incomingAlert.hospital_lat !== undefined && incomingAlert.hospital_lat !== null ? parseFloat(incomingAlert.hospital_lat) : (currentHospital && currentHospital.latitude !== undefined && currentHospital.latitude !== null ? parseFloat(currentHospital.latitude) : null));
         const hospitalLng = incomingAlert.hospital_longitude !== undefined && incomingAlert.hospital_longitude !== null ? parseFloat(incomingAlert.hospital_longitude) : (incomingAlert.hospital_lng !== undefined && incomingAlert.hospital_lng !== null ? parseFloat(incomingAlert.hospital_lng) : (currentHospital && currentHospital.longitude !== undefined && currentHospital.longitude !== null ? parseFloat(currentHospital.longitude) : null));
 
+        // Extract the actual referring (sending) hospital's own coordinates, for display.
+        const referringLat = incomingAlert.referring_facility_latitude !== undefined && incomingAlert.referring_facility_latitude !== null ? parseFloat(incomingAlert.referring_facility_latitude) : null;
+        const referringLng = incomingAlert.referring_facility_longitude !== undefined && incomingAlert.referring_facility_longitude !== null ? parseFloat(incomingAlert.referring_facility_longitude) : null;
+
         // Calculate Haversine distance and transfer ETA
         let etaText = 'N/A';
-        let initialLocText = 'Location N/A';
-        let initialHospLocText = (hospitalLat != null && hospitalLng != null && !isNaN(hospitalLat) && !isNaN(hospitalLng)) ? `${hospitalLat.toFixed(4)}, ${hospitalLng.toFixed(4)}` : 'Location N/A';
+        const hospLocationHtml = resolveLocationAddressHtml(referringLat, referringLng, 'modal-hospital-location');
+        const patientLocationHtml = resolveLocationAddressHtml(patientLat, patientLng, 'modal-patient-location');
 
-        if (patientLat != null && patientLng != null && !isNaN(patientLat) && !isNaN(patientLng)) {
-            initialLocText = `${patientLat.toFixed(4)}, ${patientLng.toFixed(4)}`;
-
+        // Transfer distance is referring hospital -> receiving hospital: that's the actual
+        // ambulance route for an inter-facility transfer, not the patient's registered
+        // origin barangay (which is a separate triage/routing field, unrelated to this trip).
+        if (referringLat != null && referringLng != null && !isNaN(referringLat) && !isNaN(referringLng)) {
             if (hospitalLat != null && hospitalLng != null && !isNaN(hospitalLat) && !isNaN(hospitalLng)) {
                 const R = 6371; // Earth radius in km
-                const dLat = (hospitalLat - patientLat) * Math.PI / 180;
-                const dLon = (hospitalLng - patientLng) * Math.PI / 180;
+                const dLat = (hospitalLat - referringLat) * Math.PI / 180;
+                const dLon = (hospitalLng - referringLng) * Math.PI / 180;
                 const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                          Math.cos(patientLat * Math.PI / 180) * Math.cos(hospitalLat * Math.PI / 180) *
+                          Math.cos(referringLat * Math.PI / 180) * Math.cos(hospitalLat * Math.PI / 180) *
                           Math.sin(dLon / 2) * Math.sin(dLon / 2);
                 const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
                 const distanceKm = R * c;
@@ -2033,7 +2034,7 @@ $(document).ready(function () {
                         </div>
                         <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
                             <span class="text-slate-700 font-bold shrink-0">Referring Facility Location:</span>
-                            <span class="font-normal text-slate-800 text-right leading-relaxed" id="modal-hospital-location">${escapeHtml(initialHospLocText)}</span>
+                            <span class="font-normal text-slate-800 text-right leading-relaxed">${hospLocationHtml}</span>
                         </div>
                         <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
                             <span class="text-slate-700 font-bold shrink-0">Patient ID:</span>
@@ -2049,7 +2050,7 @@ $(document).ready(function () {
                         </div>
                         <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
                             <span class="text-slate-700 font-bold shrink-0">Patient Location:</span>
-                            <span class="font-normal text-slate-800 text-right leading-relaxed" id="modal-patient-location">${escapeHtml(initialLocText)}</span>
+                            <span class="font-normal text-slate-800 text-right leading-relaxed">${patientLocationHtml}</span>
                         </div>
                         <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
                             <span class="text-slate-700 font-bold shrink-0">Transfer Distance & ETA:</span>
@@ -2126,49 +2127,11 @@ $(document).ready(function () {
                     }, { capture: true });
                 }
 
-                // Perform Reverse Geocoding for Referring Facility Location
-                if (hospitalLat != null && hospitalLng != null && !isNaN(hospitalLat) && !isNaN(hospitalLng)) {
-                    $.ajax({
-                        url: 'https://nominatim.openstreetmap.org/reverse',
-                        data: {
-                            format: 'json',
-                            lat: hospitalLat,
-                            lon: hospitalLng
-                        },
-                        dataType: 'json',
-                        xhrFields: { withCredentials: false },
-                        timeout: 4000,
-                        success: function(res) {
-                            if (res && res.display_name) {
-                                const parts = res.display_name.split(',').map(s => s.trim());
-                                const fullAddress = parts.slice(0, 4).join(', ');
-                                $('#modal-hospital-location').text(fullAddress || res.display_name);
-                            }
-                        }
-                    });
-                }
-
-                // Perform Reverse Geocoding for Patient Origin Location
-                if (patientLat != null && patientLng != null && !isNaN(patientLat) && !isNaN(patientLng)) {
-                    $.ajax({
-                        url: 'https://nominatim.openstreetmap.org/reverse',
-                        data: {
-                            format: 'json',
-                            lat: patientLat,
-                            lon: patientLng
-                        },
-                        dataType: 'json',
-                        xhrFields: { withCredentials: false },
-                        timeout: 4000,
-                        success: function(res) {
-                            if (res && res.display_name) {
-                                const parts = res.display_name.split(',').map(s => s.trim());
-                                const fullAddress = parts.slice(0, 4).join(', ');
-                                $('#modal-patient-location').text(fullAddress || res.display_name);
-                            }
-                        }
-                    });
-                }
+                // Referring Facility Location and Patient Location are already resolved
+                // via resolveLocationAddressHtml() above, through the backend's reverse_geo.php
+                // proxy (which has provider fallbacks) instead of calling Nominatim directly
+                // from the browser — direct calls can't set the User-Agent header Nominatim's
+                // usage policy requires, so they'd silently fail and leave raw coordinates shown.
             }
         });
     }
@@ -2299,6 +2262,20 @@ $(document).ready(function () {
                 fallbackRegions();
             }
         });
+    }
+
+    // psgc.cloud occasionally returns unrelated entries appended to a province/region's
+    // city list (observed: Sarangani's cities-municipalities response also includes every
+    // Metro Manila city/sub-municipality). PSGC codes are hierarchical — a real city under
+    // a given province always shares that province's code prefix — so filter out anything
+    // that doesn't, rather than trusting the third-party API's response as-is.
+    function filterCitiesToExpectedArea(cities, provinceCode, regionCode) {
+        const prefix = (provinceCode && provinceCode !== 'N/A')
+            ? provinceCode.substring(0, 4)
+            : (regionCode ? regionCode.substring(0, 2) : null);
+        if (!prefix) return cities;
+        const filtered = cities.filter(c => c.code && c.code.startsWith(prefix));
+        return filtered.length > 0 ? filtered : cities;
     }
 
     function populateRegionDropdown(regions) {
@@ -2445,8 +2422,9 @@ $(document).ready(function () {
             timeout: 5000,
             success: function(data) {
                 if (Array.isArray(data)) {
-                    psgcCache.cities[cacheKey] = data;
-                    populateCityDropdown(data);
+                    const cleanData = filterCitiesToExpectedArea(data, provinceCode, regionCode);
+                    psgcCache.cities[cacheKey] = cleanData;
+                    populateCityDropdown(cleanData);
                 } else {
                     fallbackCities();
                 }
@@ -2826,8 +2804,9 @@ $(document).ready(function () {
             timeout: 5000,
             success: function(data) {
                 if (Array.isArray(data)) {
-                    psgcCache.cities[cacheKey] = data;
-                    populateInventoryCityDropdown(data);
+                    const cleanData = filterCitiesToExpectedArea(data, provinceCode, regionCode);
+                    psgcCache.cities[cacheKey] = cleanData;
+                    populateInventoryCityDropdown(cleanData);
                 } else {
                     fallbackInventoryCities();
                 }

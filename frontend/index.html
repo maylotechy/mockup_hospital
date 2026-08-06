@@ -135,13 +135,6 @@
                     </div>
                 </div>
 
-                
-                <!-- System Clock -->
-                <div class="p-2 border-b bg-white/80 border-slate-200/80 text-slate-600 text-xs space-x-0.5">
-                    <i class="bi bi-clock-history text-red-600"></i>
-                    <span id="systemClock">--:--:-- --</span>
-                </div>
-
                 <!-- Navigation Links -->
                 <nav class="p-2 space-y-2">
                     <a href="#" id="navTabPatients" class="sidebar-link group flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all text-slate-500">
@@ -195,6 +188,12 @@
                 </div>
 
                 <div class="flex items-center gap-3">
+                    <!-- Live date/time -->
+                    <div id="headerDateTime" class="hidden sm:flex flex-col items-end leading-tight pr-3 border-r border-slate-200/80">
+                        <span id="headerTimeText" class="text-sm font-semibold text-slate-700">--:--</span>
+                        <span id="headerDateText" class="text-xs text-slate-400">-- --- ----</span>
+                    </div>
+
                     <!-- Notifications -->
                     <div class="relative">
                         <!-- New Referral Toast -->
