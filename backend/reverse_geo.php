@@ -22,6 +22,24 @@ if ($lat === null || $lng === null) {
 $latFloat = floatval($lat);
 $lngFloat = floatval($lng);
 
+// Opt-in via ?format=admin3: return "Barangay, Municipality, Province/District" built from
+// Nominatim's structured address fields, instead of the default street-first address string.
+// Highly urbanized cities (e.g. Davao City) have no province, so city_district/region are
+// used as the third tier's fallback in that case.
+$wantAdmin3 = ($_GET['format'] ?? '') === 'admin3';
+
+function buildAdmin3Address(array $addr): ?string {
+    $tier1 = $addr['village'] ?? $addr['suburb'] ?? $addr['neighbourhood'] ?? $addr['quarter'] ?? $addr['hamlet'] ?? null;
+    $tier2 = $addr['city'] ?? $addr['town'] ?? $addr['municipality'] ?? $addr['county'] ?? null;
+    $tier3 = $addr['state'] ?? $addr['province'] ?? $addr['city_district'] ?? $addr['state_district'] ?? $addr['region'] ?? null;
+
+    $parts = array_filter([$tier1, $tier2, $tier3], fn($v) => $v !== null && $v !== '');
+    if (count($parts) < 2) {
+        return null; // not enough structure to be useful — caller falls back to the default format
+    }
+    return implode(', ', $parts);
+}
+
 // Known fallback coordinates for Mindanao region
 function getKnownLocationFallback($lat, $lng) {
     if (abs($lat - 7.0620) < 0.02 && abs($lng - 125.6050) < 0.02) {
@@ -56,6 +74,19 @@ curl_close($ch);
 if ($httpCode >= 200 && $httpCode < 300 && !empty($response)) {
     $data = json_decode($response, true);
     if ($data && !empty($data['display_name'])) {
+        if ($wantAdmin3 && !empty($data['address'])) {
+            $admin3Address = buildAdmin3Address($data['address']);
+            if ($admin3Address) {
+                echo json_encode([
+                    'success' => true,
+                    'address' => $admin3Address,
+                    'full_display_name' => $data['display_name'],
+                    'provider' => 'nominatim'
+                ]);
+                exit;
+            }
+        }
+
         $parts = array_map('trim', explode(',', $data['display_name']));
         $formattedAddress = implode(', ', array_slice($parts, 0, 4));
 

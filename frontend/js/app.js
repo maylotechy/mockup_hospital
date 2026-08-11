@@ -44,6 +44,23 @@ $(document).ready(function () {
     }
 
     /**
+     * Update hospital logo based on hospital code
+     */
+    function updateHospitalLogo(hospitalCode) {
+        const logoMap = {
+            'HOSP-DRMC': 'assets/logos/hospitals/DRMC.png',
+            'HOSP-CVPHL': 'assets/logos/hospitals/CVPHL.png',
+            'HOSP-MMH': 'assets/logos/hospitals/MMH.png',
+            // add more hospitals
+        };
+
+        const logo = logoMap[hospitalCode] || 'assets/logos/hospitals/_default.png';
+
+        $('#hospitalLogo').attr('src', logo);
+        console.log(hospitalCode)
+    }
+
+    /**
      * Show Dashboard View (Authenticated State)
      */
     function showDashboardView(hospital) {
@@ -52,6 +69,9 @@ $(document).ready(function () {
 
         $('#sidebarHospitalName, #headerHospitalName').text(hospital.name);
         $('#sidebarHospitalCode').text(hospital.code);
+
+        // edit logo
+        updateHospitalLogo(hospital.code);
 
         // Default to Patients tab
         switchTab('patients');
@@ -72,30 +92,42 @@ $(document).ready(function () {
      */
     function switchTab(tabName) {
         $('.sidebar-link')
-            .removeClass('bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20')
-            .addClass('text-slate-400 hover:text-white hover:bg-slate-900');
+            .removeClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60')
+            .addClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70');
+        $('.sidebar-link i')
+            .removeClass('text-red-600')
+            .addClass('text-slate-500');
 
         const $allTabs = $('#tabPatientsContent, #tabInventoryContent, #tabProfileContent, #tabReferralsContent, #tabOutcomesContent');
 
         if (tabName === 'patients') {
             $('#navTabPatients')
-                .removeClass('text-slate-400 hover:text-white hover:bg-slate-900')
-                .addClass('bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20');
+                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
+                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
+            $('#navIconPatients')
+                .removeClass('text-slate-500')
+                .addClass('text-red-600');
             $('#mainHeaderTitle').text('Patient Records');
             $allTabs.hide();
             $('#tabPatientsContent').fadeIn(200);
         } else if (tabName === 'inventory') {
             $('#navTabInventory')
-                .removeClass('text-slate-400 hover:text-white hover:bg-slate-900')
-                .addClass('bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20');
+                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
+                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
+            $('#navIconInventory')
+                .removeClass('text-slate-500')
+                .addClass('text-red-600');
             $('#mainHeaderTitle').text('Hospital Inventory');
             $allTabs.hide();
             $('#tabInventoryContent').fadeIn(200);
             loadInventory();
         } else if (tabName === 'profile') {
             $('#navTabProfile')
-                .removeClass('text-slate-400 hover:text-white hover:bg-slate-900')
-                .addClass('bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20');
+                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
+                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
+            $('#navIconProfile')
+                .removeClass('text-slate-500')
+                .addClass('text-red-600');
             $('#mainHeaderTitle').text('Facility Profile');
             $allTabs.hide();
             $('#tabProfileContent').fadeIn(200);
@@ -103,8 +135,11 @@ $(document).ready(function () {
             initInventoryLocationDropdowns();
         } else if (tabName === 'referrals') {
             $('#navTabReferrals')
-                .removeClass('text-slate-400 hover:text-white hover:bg-slate-900')
-                .addClass('bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20');
+                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
+                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
+            $('#navIconReferrals')
+                .removeClass('text-slate-500')
+                .addClass('text-red-600');
             $('#mainHeaderTitle').text('My Referrals');
             $allTabs.hide();
             $('#tabReferralsContent').fadeIn(200);
@@ -112,8 +147,11 @@ $(document).ready(function () {
             checkAndPollRecommendations();
         } else if (tabName === 'outcomes') {
             $('#navTabOutcomes')
-                .removeClass('text-slate-400 hover:text-white hover:bg-slate-900')
-                .addClass('bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20');
+                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
+                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
+            $('#navIconOutcomes')
+                .removeClass('text-slate-500')
+                .addClass('text-red-600');
             $('#mainHeaderTitle').text('Referral Outcomes');
             $allTabs.hide();
             $('#tabOutcomesContent').fadeIn(200);
@@ -326,14 +364,22 @@ $(document).ready(function () {
     $(document).on('click', '#btnLogoutBtn', function () {
         Swal.fire({
             title: 'Log Out?',
-            text: 'Are you sure you want to sign out of your hospital portal session?',
+            text: 'Are you sure you want to sign out?',
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#dc3545',
             cancelButtonColor: '#6c757d',
             confirmButtonText: '<i class="bi bi-box-arrow-right me-1"></i> Yes, Log Out',
             cancelButtonText: 'Cancel',
-            reverseButtons: true
+            reverseButtons: true,
+            buttonsStyling: false,
+            customClass: {
+                popup: 'logout-popup',
+                title: 'logout-title',
+                htmlContainer: 'logout-text',
+                confirmButton: 'logout-confirm',
+                cancelButton: 'logout-cancel'
+            }
         }).then((result) => {
             if (result.isConfirmed) {
                 $.ajax({
@@ -392,6 +438,9 @@ $(document).ready(function () {
             success: function (response) {
                 if (response.success && Array.isArray(response.data)) {
                     renderPatientsTable(response.data);
+                    $('#patientsLastUpdated').text(
+                        new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                    );
                 } else {
                     $tableBody.html(`
                         <tr>
@@ -417,23 +466,25 @@ $(document).ready(function () {
     }
 
     /**
-     * Live System Clock Ticker
+     * Live System Clock Ticker — renders into the header, left of the notification bell.
      */
     function updateSystemClock() {
         const now = new Date();
-        const options = {
-            weekday: 'short',
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
+        const timeText = now.toLocaleTimeString('en-US', {
             hour: '2-digit',
             minute: '2-digit',
-            second: '2-digit',
             hour12: true
-        };
-        $('#systemClock').text(now.toLocaleString('en-US', options));
+        });
+        const dateText = now.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        });
+        $('#headerTimeText').text(timeText);
+        $('#headerDateText').text(dateText);
     }
-    setInterval(updateSystemClock, 1000);
+    setInterval(updateSystemClock, 30000);
     updateSystemClock();
 
     /**
@@ -464,15 +515,15 @@ $(document).ready(function () {
             if (patient.gender === 'Male') genderBadgeClass = 'bg-blue-50 text-blue-700 border border-blue-200';
 
             const row = `
-                <tr class="hover:bg-slate-50/80 transition-colors border-b border-slate-100">
-                    <td class="py-3.5 px-6 font-mono text-xs font-semibold text-slate-500">#${patient.id}</td>
-                    <td class="py-3.5 px-6 font-semibold text-slate-900">${escapeHtml(patient.first_name)} ${escapeHtml(patient.last_name)}</td>
-                    <td class="py-3.5 px-6 text-slate-600 text-xs">${escapeHtml(patient.dob)}</td>
-                    <td class="py-3.5 px-6"><span class="px-2.5 py-1 rounded-full text-xs font-medium ${genderBadgeClass}">${escapeHtml(patient.gender)}</span></td>
-                    <td class="py-3.5 px-6 text-slate-600 text-xs font-mono">${escapeHtml(patient.phone)}</td>
-                    <td class="py-3.5 px-6 text-right">
-                        <button class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg shadow-sm hover:shadow active:scale-[0.98] transition-all btn-refer-patient flex items-center gap-1.5 ml-auto" data-id="${patient.id}">
-                            <i class="bi bi-send-plus"></i> Refer Patient
+                <tr class="!bg-slate-200/40 hover:!bg-slate-300/40 transition-colors">
+                    <td class="py-3.5 px-6 font-mono text-xs font-semibold text-slate-500 border-b border-slate-300/60">#${patient.id}</td>
+                    <td class="py-3.5 px-6 font-semibold text-slate-900 border-b border-slate-300/60">${escapeHtml(patient.first_name)} ${escapeHtml(patient.last_name)}</td>
+                    <td class="py-3.5 px-6 text-slate-600 text-xs border-b border-slate-300/60">${escapeHtml(patient.dob)}</td>
+                    <td class="py-3.5 px-6 border-b border-slate-300/60"><span class="px-2.5 py-1 rounded-full text-xs font-medium ${genderBadgeClass}">${escapeHtml(patient.gender)}</span></td>
+                    <td class="py-3.5 px-6 text-slate-600 text-xs font-mono border-b border-slate-300/60">${escapeHtml(patient.phone)}</td>
+                    <td class="py-3.5 px-6 text-right border-b border-slate-300/60">
+                        <button class="px-3.5 py-1.5 bg-white/50 hover:bg-white text-slate-600 border border-slate-600/50 text-xs font-medium rounded-lg shadow-sm hover:shadow-lg hover:border-slate-700/60 hover:text-slate-700  active:scale-[0.98] transition-all btn-refer-patient flex items-center gap-1.5 ml-auto" data-id="${patient.id}">
+                            <i class="bi bi-send-plus"></i> Refer
                         </button>
                     </td>
                 </tr>
@@ -519,7 +570,9 @@ $(document).ready(function () {
         $('#displayHospitalName').text(data.hospital_name || (currentHospital ? currentHospital.name : 'Hospital'));
         $('#displayHospitalLevel').text(data.hospital_level || 'Level 2');
         $('#displayHospitalEnv').text(data.hospital_environment || 'Urban');
-        $('#displayGpsCoords').text(`${data.latitude ?? 0}, ${data.longitude ?? 0}`);
+        $('#displayGpsCoords').html(
+            resolveLocationAddressHtml(parseFloat(data.latitude), parseFloat(data.longitude), 'displayGpsCoordsText', { admin3: true })
+        );
 
         // Badges
         const BADGE_BASE_CLASS = 'inline-flex items-center flex-shrink-0 whitespace-nowrap px-3 py-1 rounded-full text-xs font-semibold';
@@ -769,7 +822,7 @@ $(document).ready(function () {
                             <p class="mb-3 text-slate-600 text-sm font-medium">The referral payload has been successfully compiled and transmitted to the Interoperability Layer (IOL).</p>
                             <div class="p-4 rounded-2xl text-start shadow-sm border" style="background-color: #dbeafe; color: #1e3a8a; border-color: #bfdbfe;">
                                 <div class="flex items-start gap-2.5">
-                                    <i class="bi bi-info-circle-fill text-blue-600 text-lg leading-none mt-0.5 flex-shrink-0"></i>
+                                    <i class="bi bi-info-circle-fill text-red-600 text-lg leading-none mt-0.5 flex-shrink-0"></i>
                                     <span class="text-xs font-semibold leading-relaxed">Please wait for receiving hospitals to accept your referral. Accepting facilities will appear on the "My Referrals" page.</span>
                                 </div>
                             </div>
@@ -780,17 +833,13 @@ $(document).ready(function () {
                     });
                 } else {
                     const status = response.http_status || 500;
-                    const errorTitle = `HTTP ${status} Error`;
                     const errorMsg = escapeHtml(cleanErrorMessage(response.message || "Referral process failed.", status));
 
                     Swal.fire({
                         icon: 'error',
-                        title: errorTitle,
-                        html: `
-                            <p class="mb-3 text-slate-600 text-sm font-medium">Unable to submit this referral.</p>
-                            ${buildErrorNoteHtml(errorMsg, status)}
-                        `,
-                        confirmButtonText: '<i class="bi bi-check-lg me-1"></i> OK',
+                        title: 'Unable to submit this referral.',
+                        html: `${buildErrorNoteHtml(errorMsg, status)}`,
+                        confirmButtonText: 'OK',
                         confirmButtonColor: '#0d6efd',
                         customClass: { popup: 'rounded-4 shadow-lg' }
                     });
@@ -804,15 +853,11 @@ $(document).ready(function () {
                 const errData = xhr.responseJSON || {};
                 const rawMsg = errData.message || errData.detail || `HTTP ${status} Server Error`;
                 const errorMsg = escapeHtml(cleanErrorMessage(rawMsg, status));
-                const errorTitle = `HTTP ${status} Error`;
 
                 Swal.fire({
                     icon: 'error',
-                    title: errorTitle,
-                    html: `
-                        <p class="mb-3 text-slate-600 text-sm font-medium">Unable to submit this referral.</p>
-                        ${buildErrorNoteHtml(errorMsg, status)}
-                    `,
+                    title: 'Unable to submit this referral.',
+                    html: `${buildErrorNoteHtml(errorMsg, status)}`,
                     confirmButtonText: '<i class="bi bi-check-lg me-1"></i> OK',
                     confirmButtonColor: '#0d6efd',
                     customClass: { popup: 'rounded-4 shadow-lg' }
@@ -905,7 +950,7 @@ $(document).ready(function () {
                 const $list = $('#acceptedHospitalsList');
                 $list.html(`
                     <div class="col-span-full text-center py-6 px-4 text-slate-400 font-normal bg-slate-50/80 rounded-2xl border border-slate-200/60">
-                        <span class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent me-2"></span>
+                        <span class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-red-600 border-t-transparent me-2"></span>
                         Awaiting acceptances from receiving hospitals...
                     </div>
                 `);
@@ -945,12 +990,15 @@ $(document).ready(function () {
         return "Davao Region, Philippines";
     }
 
-    function resolveLocationAddressHtml(lat, lng, elementId) {
+    function resolveLocationAddressHtml(lat, lng, elementId, opts) {
         if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) {
             return 'Location N/A';
         }
 
-        const cacheKey = `${lat.toFixed(4)}_${lng.toFixed(4)}`;
+        // admin3: "Barangay, Municipality, Province/District" instead of the default
+        // street-first address string — opt in per call site (see Facility Profile).
+        const wantAdmin3 = !!(opts && opts.admin3);
+        const cacheKey = `${lat.toFixed(4)}_${lng.toFixed(4)}_${wantAdmin3 ? 'admin3' : 'full'}`;
         if (locationGeoCache[cacheKey]) {
             return escapeHtml(locationGeoCache[cacheKey]);
         }
@@ -961,7 +1009,7 @@ $(document).ready(function () {
         setTimeout(() => {
             $.ajax({
                 url: `${API_BASE}/reverse_geo.php`,
-                data: { lat: lat, lng: lng },
+                data: wantAdmin3 ? { lat: lat, lng: lng, format: 'admin3' } : { lat: lat, lng: lng },
                 dataType: 'json',
                 xhrFields: { withCredentials: true },
                 timeout: 6000,
@@ -981,7 +1029,7 @@ $(document).ready(function () {
             });
         }, 30);
 
-        return `<span id="${elementId}" class="text-slate-500 font-normal italic flex items-center gap-1.5"><i class="bi bi-geo-alt text-blue-500 animate-pulse"></i> Resolving location address...</span>`;
+        return `<span id="${elementId}" class="text-slate-500 font-normal italic flex items-center gap-1.5"><i class="bi bi-geo-alt text-red-500 animate-pulse"></i> Resolving location address...</span>`;
     }
 
     function renderAcceptedHospitalsList(referralId, data) {
@@ -1004,12 +1052,12 @@ $(document).ready(function () {
         if (!items || items.length === 0) {
             $('#activeReferralStatusBadge')
                 .attr('class', 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800')
-                .text('Awaiting Acceptances...');
+                .text('Awaiting Acceptances');
 
             $list.html(`
-                <div class="col-span-full text-center py-8 px-4 text-slate-400 font-normal bg-slate-50/80 rounded-2xl border border-slate-200/60">
+                <div class="col-span-full text-center py-8 px-4 text-slate-400 font-normal bg-slate-100/90 rounded-b-2xl border border-slate-200/60">
                     <i class="bi bi-clock text-2xl block mb-2 text-slate-400"></i>
-                    <span class="text-xs font-medium">No hospital has accepted this referral yet. We will update automatically when a facility responds.</span>
+                    <span class="text-xs font-medium">Awaiting referrals...</span>
                 </div>
             `);
             return;
@@ -1051,9 +1099,9 @@ $(document).ready(function () {
             const locContent = resolveLocationAddressHtml(lat, lng, locId);
 
             const card = `
-                <div class="relative p-5 bg-slate-50/90 rounded-2xl border ${isBestMatch ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200'} shadow-xs space-y-4 hover:border-blue-300 hover:shadow-md transition-all flex flex-col justify-between">
+                <div class="relative p-5 bg-slate-50/90 rounded-2xl border ${isBestMatch ? 'border-yellow-400 ring-2 ring-yellow-100' : 'border-slate-200'} shadow-xs space-y-4 hover:border-yellow-300 hover:shadow-md transition-all flex flex-col justify-between">
                     ${isBestMatch ? `
-                        <span class="absolute -top-2.5 left-4 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-600 text-white shadow-sm flex items-center gap-1">
+                        <span class="absolute -top-2.5 left-4 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-yellow-600 text-white shadow-sm flex items-center gap-1">
                             <i class="bi bi-star-fill"></i> BEST MATCH
                         </span>
                     ` : ''}
@@ -1061,7 +1109,7 @@ $(document).ready(function () {
                         <div class="flex items-start justify-between gap-3 flex-wrap">
                             <div>
                                 <h4 class="font-bold text-slate-900 text-base leading-snug">${escapeHtml(hospName)}</h4>
-                                <span class="inline-block mt-1 px-2.5 py-0.5 rounded-md text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200/80">${escapeHtml(level)}</span>
+                                <span class="inline-block mt-1 px-2.5 py-0.5 rounded-md text-xs font-bold bg-red-100 text-red-800 border border-red-200/80">${escapeHtml(level)}</span>
                             </div>
                             <div class="flex items-center gap-1.5 flex-wrap">
                                 <span class="px-2.5 py-1 rounded-lg font-bold text-xs bg-emerald-100 text-emerald-800 flex items-center gap-1 border border-emerald-200">
@@ -1079,10 +1127,11 @@ $(document).ready(function () {
                         </div>
                     </div>
 
-                    <button class="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 btn-select-hospital"
-                        data-hosp-name="${escapeHtml(hospName)}" data-ref-id="${escapeHtml(referralId)}">
+                    <button class="w-full py-2.5 px-4 bg-white/50 hover:bg-yellow-50 text-slate-700 hover:text-yellow-700 border border-slate-300 hover:border-yellow-500 rounded-xl shadow-sm hover:shadow-lg active:scale-[0.98] transition-all font-semibold flex items-center justify-center gap-2 btn-select-hospital"
+                        data-hosp-name="${escapeHtml(hospName)}"
+                        data-ref-id="${escapeHtml(referralId)}">
                         <i class="bi bi-check2-circle text-base"></i>
-                        <span>SELECT THIS HOSPITAL</span>
+                        <span>Select This Hospital</span>
                     </button>
                 </div>
             `;
@@ -1144,7 +1193,7 @@ $(document).ready(function () {
 
                     $('#activeReferralStatusBadge')
                         .attr('class', 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-600 text-white')
-                        .text(`Finalized: ${selectedHosp}`);
+                        .text(`Finalized`);
 
                     // Close out this referral's session client-side so polling stops surfacing it
                     window.activeInitiatedReferralId = null;
@@ -1304,7 +1353,7 @@ $(document).ready(function () {
 
     const REFERRAL_STATUS_BADGE_CLASS = {
         PENDING: 'bg-amber-100 text-amber-800',
-        SEEN: 'bg-blue-100 text-blue-800',
+        SEEN: 'bg-red-100 text-red-800',
         ACCEPTED: 'bg-emerald-100 text-emerald-800',
         REDIRECTED: 'bg-indigo-100 text-indigo-800',
         CANCELLED: 'bg-slate-200 text-slate-700'
@@ -1335,6 +1384,9 @@ $(document).ready(function () {
                 $('#referralsConnectionAlert').slideUp(200);
                 myReferralsCache = Array.isArray(data) ? data : [];
                 applyReferralFilters();
+                $('#myReferralsLastUpdated').text(
+                    new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                );
             },
             error: function (xhr) {
                 const errData = xhr.responseJSON || {};
@@ -1424,25 +1476,25 @@ $(document).ready(function () {
             const responses = Array.isArray(ref.responses) ? ref.responses : [];
 
             const cancelBtn = ref.cancellable
-                ? `<button class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium rounded-lg border border-red-200 transition-all btn-cancel-referral" data-ref-id="${escapeHtml(ref.referral_id)}">
-                       <i class="bi bi-x-circle me-1"></i> Cancel
-                   </button>`
+                ? `<button class="px-3.5 py-1.5 bg-white/50 hover:bg-red-50 text-red-600 border border-red-300/70 text-xs font-medium rounded-lg shadow-sm hover:shadow-lg hover:border-red-500 hover:text-red-700 active:scale-[0.98] transition-all btn-cancel-referral flex items-center gap-1.5 ml-auto" data-ref-id="${escapeHtml(ref.referral_id)}">
+                    <i class="bi bi-x-circle"></i> Cancel
+                </button>`
                 : '';
 
             const row = `
-                <tr class="hover:bg-slate-50/80 transition-colors border-b border-slate-100">
-                    <td class="py-3.5 px-6 font-mono text-xs font-semibold text-slate-500">${escapeHtml(ref.referral_id)}</td>
-                    <td class="py-3.5 px-6 text-slate-700 text-xs font-mono">${escapeHtml(ref.patient_id)}</td>
-                    <td class="py-3.5 px-6 text-slate-600 text-xs">${escapeHtml(ref.disease_severity)}</td>
-                    <td class="py-3.5 px-6"><span class="px-2.5 py-1 rounded-full text-xs font-bold ${badgeClass}">${escapeHtml(ref.status)}</span></td>
-                    <td class="py-3.5 px-6 text-slate-600 text-xs">${formatReferralTimestamp(ref.created_at)}</td>
-                    <td class="py-3.5 px-6 text-slate-600 text-xs">${formatReferralTimestamp(ref.seen_at)}</td>
-                    <td class="py-3.5 px-6 text-xs">
+                <tr class="!bg-slate-200/40 hover:!bg-slate-300/40 transition-colors">
+                    <td class="py-3.5 px-6 font-mono text-xs font-semibold text-slate-500 border-b border-slate-300/60">${escapeHtml(ref.referral_id)}</td>
+                    <td class="py-3.5 px-6 text-slate-700 text-xs font-mono border-b border-slate-300/60">${escapeHtml(ref.patient_id)}</td>
+                    <td class="py-3.5 px-6 text-slate-600 text-xs border-b border-slate-300/60">${escapeHtml(ref.disease_severity)}</td>
+                    <td class="py-3.5 px-6 border-b border-slate-300/60"><span class="px-2.5 py-1 rounded-full text-xs font-bold ${badgeClass}">${escapeHtml(ref.status)}</span></td>
+                    <td class="py-3.5 px-6 text-slate-600 text-xs border-b border-slate-300/60">${formatReferralTimestamp(ref.created_at)}</td>
+                    <td class="py-3.5 px-6 text-slate-600 text-xs border-b border-slate-300/60">${formatReferralTimestamp(ref.seen_at)}</td>
+                    <td class="py-3.5 px-6 text-xs border-b border-slate-300/60">
                         <button type="button" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium btn-view-referral-timeline" data-ref-id="${escapeHtml(ref.referral_id)}">
                             <i class="bi bi-clock-history me-1"></i> ${responses.length} notified
                         </button>
                     </td>
-                    <td class="py-3.5 px-6 text-right">${cancelBtn}</td>
+                    <td class="py-3.5 px-6 text-right border-b border-slate-300/60">${cancelBtn}</td>
                 </tr>
             `;
             $tableBody.append(row);
@@ -1819,13 +1871,13 @@ $(document).ready(function () {
             const referringFacility = alert.referring_facility || alert.referring_hospital || (alert.serviceProvider && alert.serviceProvider.display) || 'Unknown Hospital';
             html += `
                 <div class="px-4 py-3 flex items-start gap-3 hover:bg-slate-50 transition-colors">
-                    <div class="w-9 h-9 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <div class="w-9 h-9 rounded-full bg-red-50 text-red-600 flex items-center justify-center shrink-0">
                         <i class="bi bi-hospital"></i>
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p class="text-xs font-semibold text-slate-800">New referral from <span class="text-blue-700">${escapeHtml(referringFacility)}</span></p>
+                        <p class="text-xs font-semibold text-slate-800">New referral from <span class="text-red-700">${escapeHtml(referringFacility)}</span></p>
                         <p class="text-[10px] text-slate-400 font-mono mt-0.5">${escapeHtml(String(referralId))}</p>
-                        <button type="button" class="btn-view-referral-form mt-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded-lg transition-all" data-ref-id="${escapeHtml(String(referralId))}">
+                        <button type="button" class="btn-view-referral-form mt-2 px-3 py-1 bg-yellow-600 hover:bg-red-700 text-white text-[11px] font-bold rounded-lg transition-all" data-ref-id="${escapeHtml(String(referralId))}">
                             <i class="bi bi-file-earmark-text-fill me-1"></i> View Form
                         </button>
                     </div>
@@ -1894,6 +1946,7 @@ $(document).ready(function () {
 
     // Toggle the notification dropdown open/closed
     $(document).on('click', '#btnNotificationBell', function (e) {
+        console.log('clicked');
         e.stopPropagation();
         $('#notificationDropdown').toggleClass('hidden');
     });
@@ -1952,24 +2005,31 @@ $(document).ready(function () {
         const patientLat = incomingAlert.patient_latitude !== undefined && incomingAlert.patient_latitude !== null ? parseFloat(incomingAlert.patient_latitude) : (incomingAlert.patient_lat !== undefined && incomingAlert.patient_lat !== null ? parseFloat(incomingAlert.patient_lat) : (incomingAlert.patient && incomingAlert.patient.latitude !== undefined && incomingAlert.patient.latitude !== null ? parseFloat(incomingAlert.patient.latitude) : null));
         const patientLng = incomingAlert.patient_longitude !== undefined && incomingAlert.patient_longitude !== null ? parseFloat(incomingAlert.patient_longitude) : (incomingAlert.patient_lng !== undefined && incomingAlert.patient_lng !== null ? parseFloat(incomingAlert.patient_lng) : (incomingAlert.patient && incomingAlert.patient.longitude !== undefined && incomingAlert.patient.longitude !== null ? parseFloat(incomingAlert.patient.longitude) : null));
 
-        // Extract hospital coordinates (destination)
+        // Extract hospital coordinates (destination) — this is OUR OWN hospital's location,
+        // used only for the transfer-distance calc below, never for display as "referring
+        // facility" (that's a different hospital entirely — see referring facility coords).
         const hospitalLat = incomingAlert.hospital_latitude !== undefined && incomingAlert.hospital_latitude !== null ? parseFloat(incomingAlert.hospital_latitude) : (incomingAlert.hospital_lat !== undefined && incomingAlert.hospital_lat !== null ? parseFloat(incomingAlert.hospital_lat) : (currentHospital && currentHospital.latitude !== undefined && currentHospital.latitude !== null ? parseFloat(currentHospital.latitude) : null));
         const hospitalLng = incomingAlert.hospital_longitude !== undefined && incomingAlert.hospital_longitude !== null ? parseFloat(incomingAlert.hospital_longitude) : (incomingAlert.hospital_lng !== undefined && incomingAlert.hospital_lng !== null ? parseFloat(incomingAlert.hospital_lng) : (currentHospital && currentHospital.longitude !== undefined && currentHospital.longitude !== null ? parseFloat(currentHospital.longitude) : null));
 
+        // Extract the actual referring (sending) hospital's own coordinates, for display.
+        const referringLat = incomingAlert.referring_facility_latitude !== undefined && incomingAlert.referring_facility_latitude !== null ? parseFloat(incomingAlert.referring_facility_latitude) : null;
+        const referringLng = incomingAlert.referring_facility_longitude !== undefined && incomingAlert.referring_facility_longitude !== null ? parseFloat(incomingAlert.referring_facility_longitude) : null;
+
         // Calculate Haversine distance and transfer ETA
         let etaText = 'N/A';
-        let initialLocText = 'Location N/A';
-        let initialHospLocText = (hospitalLat != null && hospitalLng != null && !isNaN(hospitalLat) && !isNaN(hospitalLng)) ? `${hospitalLat.toFixed(4)}, ${hospitalLng.toFixed(4)}` : 'Location N/A';
+        const hospLocationHtml = resolveLocationAddressHtml(referringLat, referringLng, 'modal-hospital-location');
+        const patientLocationHtml = resolveLocationAddressHtml(patientLat, patientLng, 'modal-patient-location');
 
-        if (patientLat != null && patientLng != null && !isNaN(patientLat) && !isNaN(patientLng)) {
-            initialLocText = `${patientLat.toFixed(4)}, ${patientLng.toFixed(4)}`;
-
+        // Transfer distance is referring hospital -> receiving hospital: that's the actual
+        // ambulance route for an inter-facility transfer, not the patient's registered
+        // origin barangay (which is a separate triage/routing field, unrelated to this trip).
+        if (referringLat != null && referringLng != null && !isNaN(referringLat) && !isNaN(referringLng)) {
             if (hospitalLat != null && hospitalLng != null && !isNaN(hospitalLat) && !isNaN(hospitalLng)) {
                 const R = 6371; // Earth radius in km
-                const dLat = (hospitalLat - patientLat) * Math.PI / 180;
-                const dLon = (hospitalLng - patientLng) * Math.PI / 180;
+                const dLat = (hospitalLat - referringLat) * Math.PI / 180;
+                const dLon = (hospitalLng - referringLng) * Math.PI / 180;
                 const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                          Math.cos(patientLat * Math.PI / 180) * Math.cos(hospitalLat * Math.PI / 180) *
+                          Math.cos(referringLat * Math.PI / 180) * Math.cos(hospitalLat * Math.PI / 180) *
                           Math.sin(dLon / 2) * Math.sin(dLon / 2);
                 const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
                 const distanceKm = R * c;
@@ -1988,14 +2048,14 @@ $(document).ready(function () {
         $('#modal-reason').text(clinicalReason);
 
         Swal.fire({
-            title: '<div class="flex items-center justify-center gap-2 text-blue-600"><i class="bi bi-hospital text-2xl"></i> <span>Incoming Patient Referral</span></div>',
+            title: '<div class="flex items-center justify-center gap-2 text-red-600"><i class="bi bi-hospital text-2xl"></i> <span>Incoming Patient Referral</span></div>',
             html: `
                 <div class="text-start space-y-3 p-2 text-sm text-slate-700">
                     <p class="text-xs text-slate-500 uppercase font-semibold tracking-wider mb-2">Hospital Referral Notification</p>
                     
-                    <div class="p-3 bg-blue-50 rounded-xl border border-blue-100 space-y-1">
+                    <div class="p-3 bg-red-50 rounded-xl border border-red-100 space-y-1">
                         <div class="flex justify-between items-center">
-                            <span class="text-xs font-bold text-blue-900 font-mono">Referral ID: ${escapeHtml(referralId)}</span>
+                            <span class="text-xs font-bold text-red-900 font-mono">Referral ID: ${escapeHtml(referralId)}</span>
                             <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">Pending Decision</span>
                         </div>
                     </div>
@@ -2007,7 +2067,7 @@ $(document).ready(function () {
                         </div>
                         <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
                             <span class="text-slate-700 font-bold shrink-0">Referring Facility Location:</span>
-                            <span class="font-normal text-slate-800 text-right leading-relaxed" id="modal-hospital-location">${escapeHtml(initialHospLocText)}</span>
+                            <span class="font-normal text-slate-800 text-right leading-relaxed">${hospLocationHtml}</span>
                         </div>
                         <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
                             <span class="text-slate-700 font-bold shrink-0">Patient ID:</span>
@@ -2023,11 +2083,11 @@ $(document).ready(function () {
                         </div>
                         <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
                             <span class="text-slate-700 font-bold shrink-0">Patient Location:</span>
-                            <span class="font-normal text-slate-800 text-right leading-relaxed" id="modal-patient-location">${escapeHtml(initialLocText)}</span>
+                            <span class="font-normal text-slate-800 text-right leading-relaxed">${patientLocationHtml}</span>
                         </div>
                         <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
                             <span class="text-slate-700 font-bold shrink-0">Transfer Distance & ETA:</span>
-                            <span class="font-bold text-blue-700 text-right" id="modal-transfer-eta">${escapeHtml(etaText)}</span>
+                            <span class="font-bold text-red-700 text-right" id="modal-transfer-eta">${escapeHtml(etaText)}</span>
                         </div>
                         <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
                             <span class="text-slate-700 font-bold shrink-0">Severity:</span>
@@ -2100,49 +2160,11 @@ $(document).ready(function () {
                     }, { capture: true });
                 }
 
-                // Perform Reverse Geocoding for Referring Facility Location
-                if (hospitalLat != null && hospitalLng != null && !isNaN(hospitalLat) && !isNaN(hospitalLng)) {
-                    $.ajax({
-                        url: 'https://nominatim.openstreetmap.org/reverse',
-                        data: {
-                            format: 'json',
-                            lat: hospitalLat,
-                            lon: hospitalLng
-                        },
-                        dataType: 'json',
-                        xhrFields: { withCredentials: false },
-                        timeout: 4000,
-                        success: function(res) {
-                            if (res && res.display_name) {
-                                const parts = res.display_name.split(',').map(s => s.trim());
-                                const fullAddress = parts.slice(0, 4).join(', ');
-                                $('#modal-hospital-location').text(fullAddress || res.display_name);
-                            }
-                        }
-                    });
-                }
-
-                // Perform Reverse Geocoding for Patient Origin Location
-                if (patientLat != null && patientLng != null && !isNaN(patientLat) && !isNaN(patientLng)) {
-                    $.ajax({
-                        url: 'https://nominatim.openstreetmap.org/reverse',
-                        data: {
-                            format: 'json',
-                            lat: patientLat,
-                            lon: patientLng
-                        },
-                        dataType: 'json',
-                        xhrFields: { withCredentials: false },
-                        timeout: 4000,
-                        success: function(res) {
-                            if (res && res.display_name) {
-                                const parts = res.display_name.split(',').map(s => s.trim());
-                                const fullAddress = parts.slice(0, 4).join(', ');
-                                $('#modal-patient-location').text(fullAddress || res.display_name);
-                            }
-                        }
-                    });
-                }
+                // Referring Facility Location and Patient Location are already resolved
+                // via resolveLocationAddressHtml() above, through the backend's reverse_geo.php
+                // proxy (which has provider fallbacks) instead of calling Nominatim directly
+                // from the browser — direct calls can't set the User-Agent header Nominatim's
+                // usage policy requires, so they'd silently fail and leave raw coordinates shown.
             }
         });
     }
@@ -2273,6 +2295,20 @@ $(document).ready(function () {
                 fallbackRegions();
             }
         });
+    }
+
+    // psgc.cloud occasionally returns unrelated entries appended to a province/region's
+    // city list (observed: Sarangani's cities-municipalities response also includes every
+    // Metro Manila city/sub-municipality). PSGC codes are hierarchical — a real city under
+    // a given province always shares that province's code prefix — so filter out anything
+    // that doesn't, rather than trusting the third-party API's response as-is.
+    function filterCitiesToExpectedArea(cities, provinceCode, regionCode) {
+        const prefix = (provinceCode && provinceCode !== 'N/A')
+            ? provinceCode.substring(0, 4)
+            : (regionCode ? regionCode.substring(0, 2) : null);
+        if (!prefix) return cities;
+        const filtered = cities.filter(c => c.code && c.code.startsWith(prefix));
+        return filtered.length > 0 ? filtered : cities;
     }
 
     function populateRegionDropdown(regions) {
@@ -2419,8 +2455,9 @@ $(document).ready(function () {
             timeout: 5000,
             success: function(data) {
                 if (Array.isArray(data)) {
-                    psgcCache.cities[cacheKey] = data;
-                    populateCityDropdown(data);
+                    const cleanData = filterCitiesToExpectedArea(data, provinceCode, regionCode);
+                    psgcCache.cities[cacheKey] = cleanData;
+                    populateCityDropdown(cleanData);
                 } else {
                     fallbackCities();
                 }
@@ -2800,8 +2837,9 @@ $(document).ready(function () {
             timeout: 5000,
             success: function(data) {
                 if (Array.isArray(data)) {
-                    psgcCache.cities[cacheKey] = data;
-                    populateInventoryCityDropdown(data);
+                    const cleanData = filterCitiesToExpectedArea(data, provinceCode, regionCode);
+                    psgcCache.cities[cacheKey] = cleanData;
+                    populateInventoryCityDropdown(cleanData);
                 } else {
                     fallbackInventoryCities();
                 }

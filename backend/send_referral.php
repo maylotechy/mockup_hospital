@@ -127,10 +127,11 @@ try {
 
     $payloadJson = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
 
-    // Determine hospital API Key
+    // Determine hospital API Key (already fresh from the live join above; fall back
+    // to a fresh session lookup, never the raw cached $_SESSION value, if it's empty)
     $apiKey = !empty($patient['api_key']) ? $patient['api_key'] : '';
-    if (empty($apiKey) && !empty($_SESSION['hospital']['api_key'])) {
-        $apiKey = $_SESSION['hospital']['api_key'];
+    if (empty($apiKey)) {
+        $apiKey = getFreshApiKeyForLoggedInHospital() ?? '';
     }
 
     $requestHeaders = [

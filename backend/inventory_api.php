@@ -29,26 +29,16 @@ if (file_exists($vendorAutoload)) {
     }
 }
 
-// 1. Extract X-API-Key header or logged-in hospital session key
-$headers = function_exists('getallheaders') ? getallheaders() : [];
-$apiKey = '';
-
-if (!empty($_SERVER['HTTP_X_API_KEY'])) {
-    $apiKey = trim($_SERVER['HTTP_X_API_KEY']);
-} elseif (!empty($headers['X-API-Key'])) {
-    $apiKey = trim($headers['X-API-Key']);
-} elseif (!empty($headers['x-api-key'])) {
-    $apiKey = trim($headers['x-api-key']);
-}
-
-$loggedInHospital = getLoggedInHospital();
-if (empty($apiKey) && $loggedInHospital && !empty($loggedInHospital['api_key'])) {
-    $apiKey = $loggedInHospital['api_key'];
-}
+// 1. Always resolve the caller's API key with a live DB read for the logged-in
+// hospital — never trust a client-supplied X-API-Key header here. That header is
+// only ever a stale JS-memory snapshot taken at login, so trusting it means a key
+// rotated mid-session (e.g. via the IRDSS admin panel) wouldn't take effect until
+// the hospital logs out and back in.
+$apiKey = getFreshApiKeyForLoggedInHospital();
 
 if (empty($apiKey)) {
     sendJsonResponse([
-        'detail' => 'Unauthorized. Missing X-API-Key header.'
+        'detail' => 'Unauthorized. Please log in again.'
     ], 401);
 }
 
