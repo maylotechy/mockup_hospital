@@ -57,7 +57,7 @@
 
                 <form id="loginForm" onsubmit="return false;">
                     <div>
-                        <label for="loginUsername" class="block text-xs font-semibold text-slate-700 mb-1.5">Username</label>
+                        <label for="loginUsername" class="block text-xs font-medium text-slate-700 mb-1.5">Username</label>
 
                         <div class="relative group">
                             <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-red-600 transition-colors">
@@ -70,7 +70,7 @@
                     </div>
 
                     <div class="mt-4">
-                        <label for="loginPassword" class="block text-xs font-semibold text-slate-700 mb-1.5">
+                        <label for="loginPassword" class="block text-xs font-medium text-slate-700 mb-1.5">
                             Password
                         </label>
 
@@ -327,20 +327,20 @@
                             <div class="overflow-x-auto bg-slate-50/50">
                                 <table id="patientsTable" class="w-full text-left border-collapse">
                                     <thead>
-                                        <tr class="bg-slate-300/60 text-xs uppercase tracking-wider font-bold text-slate-600 border-b border-slate-200/80">
-                                            <th class="w-[12%] py-4 px-6">Patient ID</th>
-                                            <th class="w-[28%] py-4 px-6">Full Name</th>
-                                            <th class="w-[18%] py-4 px-6">Date of Birth</th>
-                                            <th class="w-[10%] py-4 px-6">Gender</th>
-                                            <th class="w-[20%] py-4 px-6">Phone Number</th>
-                                            <th class="w-[12%] py-4 px-6 text-right">Action</th>
+                                        <tr class="bg-slate-300/60 text-xs uppercase tracking-wider text-slate-600 border-b border-slate-200/80">
+                                            <th class="w-[8%] py-4 px-6 font-medium">ID</th>
+                                            <th class="w-[36%] py-4 px-6 font-medium">Full Name</th>
+                                            <th class="w-[14%] py-4 px-6 font-medium">Birthdate</th>
+                                            <th class="w-[10%] py-4 px-6 font-medium">Gender</th>
+                                            <th class="w-[20%] py-4 px-6 font-medium">Phone Number</th>
+                                            <th class="w-[12%] py-4 px-6 font-medium text-right">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody id="patientsTableBody" class="divide-y divide-slate-100 text-sm">
                                         <tr>
                                             <td colspan="6" class="text-center py-8 text-slate-400 font-normal">
                                                 <div class="inline-block animate-spin rounded-full h-5 w-5 border-2 border-red-600 border-t-transparent mr-2"></div>
-                                                Loading hospital patient records...
+                                                Loading patient records...
                                             </td>
                                         </tr>
                                     </tbody>
@@ -366,7 +366,7 @@
                                     </div>
                                     <button type="button" id="btnCancelAddPatient" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200 transition-all">
                                         <i class="bi bi-arrow-left"></i>
-                                        <span>Back to Patient Records</span>
+                                        <span>Back</span>
                                     </button>
                                 </div>
                             </div>
@@ -374,57 +374,61 @@
                             <!-- Demographics -->
                             <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm mb-6">
                                 <label class="block text-sm font-bold text-slate-900 mb-4">Demographics</label>
-                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                    <div>
-                                        <label for="patFirstName" class="block text-xs font-semibold text-slate-500 mb-1.5">First Name</label>
-                                        <input type="text" id="patFirstName" name="first_name" required placeholder="First Name"
-                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                <div class="flex flex-col gap-y-4">
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_0.5fr] gap-4">
+                                        <div>
+                                            <label for="patFirstName" class="block text-xs text-slate-500 mb-1.5">First Name</label>
+                                            <input type="text" id="patFirstName" name="first_name" required
+                                                class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                        </div>
+                                        <div>
+                                            <label for="patMiddleName" class="block text-xs text-slate-500 mb-1.5">Middle Name</label>
+                                            <input type="text" id="patMiddleName" name="middle_name"
+                                                class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                        </div>
+                                        <div>
+                                            <label for="patLastName" class="block text-xs text-slate-500 mb-1.5">Last Name</label>
+                                            <input type="text" id="patLastName" name="last_name" required
+                                                class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                        </div>
+                                        <div>
+                                            <label for="patSuffix" class="block text-xs text-slate-500 mb-1.5">Suffix</label>
+                                            <input type="text" id="patSuffix" name="suffix" placeholder="e.g. Jr., Sr., III"
+                                                class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label for="patMiddleName" class="block text-xs font-semibold text-slate-500 mb-1.5">Middle Name</label>
-                                        <input type="text" id="patMiddleName" name="middle_name" placeholder="Middle Name"
-                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
-                                    </div>
-                                    <div>
-                                        <label for="patLastName" class="block text-xs font-semibold text-slate-500 mb-1.5">Last Name</label>
-                                        <input type="text" id="patLastName" name="last_name" required placeholder="Last Name"
-                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
-                                    </div>
-                                    <div>
-                                        <label for="patSuffix" class="block text-xs font-semibold text-slate-500 mb-1.5">Suffix</label>
-                                        <input type="text" id="patSuffix" name="suffix" placeholder="Jr., III"
-                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
-                                    </div>
-                                    <div>
-                                        <label for="patDob" class="block text-xs font-semibold text-slate-500 mb-1.5">Date of Birth</label>
-                                        <input type="date" id="patDob" name="dob" required
-                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
-                                    </div>
-                                    <div>
-                                        <label for="patGender" class="block text-xs font-semibold text-slate-500 mb-1.5">Sex</label>
-                                        <select id="patGender" name="gender" required
-                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
-                                            <option value="">Select</option>
-                                            <option value="Male">Male</option>
-                                            <option value="Female">Female</option>
-                                            <option value="Other">Other</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label for="patCivilStatus" class="block text-xs font-semibold text-slate-500 mb-1.5">Civil Status</label>
-                                        <select id="patCivilStatus" name="civil_status"
-                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
-                                            <option value="">Select</option>
-                                            <option value="Single">Single</option>
-                                            <option value="Married">Married</option>
-                                            <option value="Widow/er">Widow/er</option>
-                                            <option value="Separated">Separated</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label for="patPhone" class="block text-xs font-semibold text-slate-500 mb-1.5">Contact Number</label>
-                                        <input type="text" id="patPhone" name="phone" required placeholder="+639..."
-                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[0.5fr_0.5fr_0.5fr_1fr] gap-4">
+                                        <div>
+                                            <label for="patDob" class="block text-xs text-slate-500 mb-1.5">Date of Birth</label>
+                                            <input type="date" id="patDob" name="dob" required
+                                                class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                        </div>
+                                        <div>
+                                            <label for="patGender" class="block text-xs text-slate-500 mb-1.5">Sex</label>
+                                            <select id="patGender" name="gender" required
+                                                class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
+                                                <option value="" selected hidden></option>
+                                                <option value="Male">Male</option>
+                                                <option value="Female">Female</option>
+                                                <option value="Other">Other</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label for="patCivilStatus" class="block text-xs text-slate-500 mb-1.5">Civil Status</label>
+                                            <select id="patCivilStatus" name="civil_status"
+                                                class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
+                                                <option value="" selected hidden></option>
+                                                <option value="Single">Single</option>
+                                                <option value="Married">Married</option>
+                                                <option value="Widow/er">Widow/er</option>
+                                                <option value="Separated">Separated</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label for="patPhone" class="block text-xs text-slate-500 mb-1.5">Contact Number</label>
+                                            <input type="text" id="patPhone" name="phone" required placeholder="+639..."
+                                                class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -432,38 +436,38 @@
                             <!-- Residential Address -->
                             <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm mb-6">
                                 <label class="block text-sm font-bold text-slate-900 mb-4">Residential Address</label>
-                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr_0.5fr] gap-4">
                                     <div>
-                                        <label class="block text-xs font-semibold text-slate-500 mb-1.5">Region</label>
+                                        <label class="block text-xs text-slate-500 mb-1.5">Region</label>
                                         <select id="patRegion" name="region"
                                             class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
                                             <option value="">Loading regions...</option>
                                         </select>
                                     </div>
                                     <div>
-                                        <label class="block text-xs font-semibold text-slate-500 mb-1.5">Province</label>
+                                        <label class="block text-xs text-slate-500 mb-1.5">Province</label>
                                         <select id="patProvince" name="province"
                                             class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
                                             <!-- Populated dynamically -->
                                         </select>
                                     </div>
                                     <div>
-                                        <label class="block text-xs font-semibold text-slate-500 mb-1.5">City / Municipality</label>
+                                        <label class="block text-xs text-slate-500 mb-1.5">City / Municipality</label>
                                         <select id="patCity" name="city_municipality"
                                             class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
                                             <!-- Populated dynamically -->
                                         </select>
                                     </div>
                                     <div>
-                                        <label class="block text-xs font-semibold text-slate-500 mb-1.5">Barangay</label>
+                                        <label class="block text-xs text-slate-500 mb-1.5">Barangay</label>
                                         <select id="patBarangay" name="barangay"
                                             class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
                                             <!-- Populated dynamically -->
                                         </select>
                                     </div>
                                     <div>
-                                        <label for="patZip" class="block text-xs font-semibold text-slate-500 mb-1.5">Zip Code</label>
-                                        <input type="text" id="patZip" name="zip_code" placeholder="Zip Code"
+                                        <label for="patZip" class="block text-xs text-slate-500 mb-1.5">Zip Code</label>
+                                        <input type="text" id="patZip" name="zip_code"
                                             class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
                                     </div>
                                 </div>
@@ -474,7 +478,7 @@
                                 <label class="block text-sm font-bold text-slate-900 mb-4">Socio-Economic &amp; Health Insurance</label>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                                     <div>
-                                        <label for="patPhilhealthMember" class="block text-xs font-semibold text-slate-500 mb-1.5">PhilHealth Member?</label>
+                                        <label for="patPhilhealthMember" class="block text-xs text-slate-500 mb-1.5">PhilHealth Member?</label>
                                         <select id="patPhilhealthMember" name="philhealth_member"
                                             class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
                                             <option value="No" selected>No</option>
@@ -482,7 +486,7 @@
                                         </select>
                                     </div>
                                     <div>
-                                        <label for="patPhilhealthStatus" class="block text-xs font-semibold text-slate-500 mb-1.5">Status Type</label>
+                                        <label for="patPhilhealthStatus" class="block text-xs text-slate-500 mb-1.5">Status Type</label>
                                         <select id="patPhilhealthStatus" name="philhealth_status_type" disabled
                                             class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed">
                                             <option value="">--</option>
@@ -491,12 +495,12 @@
                                         </select>
                                     </div>
                                     <div>
-                                        <label for="patPhilhealthNumber" class="block text-xs font-semibold text-slate-500 mb-1.5">PhilHealth Number</label>
-                                        <input type="text" id="patPhilhealthNumber" name="philhealth_number" placeholder="PhilHealth Number" disabled
+                                        <label for="patPhilhealthNumber" class="block text-xs text-slate-500 mb-1.5">PhilHealth Number</label>
+                                        <input type="text" id="patPhilhealthNumber" name="philhealth_number" disabled
                                             class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed">
                                     </div>
                                     <div>
-                                        <label for="pat4psMember" class="block text-xs font-semibold text-slate-500 mb-1.5">DSWD NHTS / 4Ps Member?</label>
+                                        <label for="pat4psMember" class="block text-xs text-slate-500 mb-1.5">DSWD NHTS / 4Ps Member?</label>
                                         <select id="pat4psMember" name="is_4ps_member"
                                             class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
                                             <option value="No" selected>No</option>
@@ -540,7 +544,7 @@
                                     </div>
                                     <button type="button" id="btnCancelReferral" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200 transition-all">
                                         <i class="bi bi-arrow-left"></i>
-                                        <span>Back to Patient Records</span>
+                                        <span>Back</span>
                                     </button>
                                 </div>
                             </div>
@@ -574,25 +578,25 @@
                                 <p class="text-xs text-slate-500 mb-4">Pre-filled from this patient's registered address -- adjust if the referral origin is different.</p>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                                     <div>
-                                        <label for="selectRegion" class="block text-xs font-semibold text-slate-500 mb-1.5">Region</label>
+                                        <label for="selectRegion" class="block text-xs text-slate-500 mb-1.5">Region</label>
                                         <select id="selectRegion" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
                                             <option value="">Loading regions...</option>
                                         </select>
                                     </div>
                                     <div>
-                                        <label for="selectProvince" class="block text-xs font-semibold text-slate-500 mb-1.5">Province</label>
+                                        <label for="selectProvince" class="block text-xs text-slate-500 mb-1.5">Province</label>
                                         <select id="selectProvince" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
                                             <!-- Populated dynamically -->
                                         </select>
                                     </div>
                                     <div>
-                                        <label for="selectCity" class="block text-xs font-semibold text-slate-500 mb-1.5">City / Municipality</label>
+                                        <label for="selectCity" class="block text-xs text-slate-500 mb-1.5">City / Municipality</label>
                                         <select id="selectCity" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
                                             <!-- Populated dynamically -->
                                         </select>
                                     </div>
                                     <div>
-                                        <label for="selectBarangay" class="block text-xs font-semibold text-slate-500 mb-1.5">Barangay</label>
+                                        <label for="selectBarangay" class="block text-xs text-slate-500 mb-1.5">Barangay</label>
                                         <select id="selectBarangay" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
                                             <!-- Populated dynamically -->
                                         </select>
@@ -611,14 +615,14 @@
 
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
-                                        <label for="modalChiefComplaint" class="block text-xs font-semibold text-slate-500 mb-1.5">Chief Complaint <span class="text-red-600">*</span></label>
+                                        <label for="modalChiefComplaint" class="block text-xs text-slate-500 mb-1.5">Chief Complaint <span class="text-red-600">*</span></label>
                                         <input type="text" id="modalChiefComplaint" name="chief_complaint" required
                                             class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all"
                                             placeholder="e.g. Difficulty of breathing">
                                     </div>
 
                                     <div>
-                                        <label for="modalSeverity" class="block text-xs font-semibold text-slate-500 mb-1.5">Severity Level <span class="text-red-600">*</span></label>
+                                        <label for="modalSeverity" class="block text-xs text-slate-500 mb-1.5">Severity Level <span class="text-red-600">*</span></label>
                                         <select id="modalSeverity" name="severity" required
                                             class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
                                             <option value="1">1 - Mild</option>
@@ -630,14 +634,14 @@
                                     </div>
 
                                     <div>
-                                        <label for="modalDiagnosis" class="block text-xs font-semibold text-slate-500 mb-1.5">Diagnosis <span class="text-slate-400 font-normal">(optional)</span></label>
+                                        <label for="modalDiagnosis" class="block text-xs text-slate-500 mb-1.5">Diagnosis <span class="text-slate-400 font-normal">(optional)</span></label>
                                         <input type="text" id="modalDiagnosis" name="diagnosis"
                                             class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all"
                                             placeholder="e.g. Pneumonia">
                                     </div>
 
                                     <div class="sm:col-span-2">
-                                        <label for="modalReasonSelect" class="block text-xs font-semibold text-slate-500 mb-1.5">Referral Reason <span class="text-red-600">*</span></label>
+                                        <label for="modalReasonSelect" class="block text-xs text-slate-500 mb-1.5">Referral Reason <span class="text-red-600">*</span></label>
                                         <select id="modalReasonSelect"
                                             class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
                                             <option value="No Specialist Available">No Specialist Available</option>
@@ -655,7 +659,7 @@
                                     </div>
                                 </div>
 
-                                <label class="block text-xs font-semibold text-slate-500 mt-5 mb-1.5">Patient Status</label>
+                                <label class="block text-xs text-slate-500 mt-5 mb-1.5">Patient Status</label>
                                 <div class="flex flex-wrap gap-x-6 gap-y-2.5">
                                     <label class="inline-flex items-center gap-2 text-sm text-slate-800 cursor-pointer">
                                         <input type="checkbox" id="modalIsPwd" name="is_pwd" class="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer">
@@ -678,7 +682,7 @@
                                     class="mt-2.5 w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all hidden"
                                     placeholder="Specify known allergies (e.g. Penicillin, Seafood)">
 
-                                <label class="block text-xs font-semibold text-slate-500 mt-5 mb-1.5">Vital Signs</label>
+                                <label class="block text-xs text-slate-500 mt-5 mb-1.5">Vital Signs</label>
                                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
                                     <div>
                                         <label for="modalVitalBp" class="block text-[11px] text-slate-400 mb-1">BP (mmHg)</label>
@@ -919,15 +923,15 @@
                                 <div class="overflow-x-auto bg-slate-50/50">
                                     <table id="referralsTable" class="w-full text-left border-collapse">
                                         <thead>
-                                            <tr class="bg-slate-300/60 text-xs uppercase tracking-wider font-bold text-slate-600 border-b border-slate-200/80">
-                                                <th class="w-[8%] py-4 px-6">Referral ID</th>
-                                                <th class="w-[20%] py-4 px-6">Patient</th>
-                                                <th class="w-[10%] py-4 px-6">Severity</th>
-                                                <th class="w-[12%] py-4 px-6">Status</th>
-                                                <th class="w-[15%] py-4 px-6">Created At</th>
-                                                <th class="w-[15%] py-4 px-6">Seen At</th>
-                                                <th class="w-[12%] py-4 px-6">Notified Hospitals</th>
-                                                <th class="w-[8%] py-4 px-6 text-right">Action</th>
+                                            <tr class="bg-slate-300/60 text-xs uppercase tracking-wider font-medium text-slate-600 border-b border-slate-200/80">
+                                                <th class="w-[8%] py-4 px-6 font-medium">ID</th>
+                                                <th class="w-[20%] py-4 px-6 font-medium">Patient</th>
+                                                <th class="w-[10%] py-4 px-6 font-medium">Severity</th>
+                                                <th class="w-[12%] py-4 px-6 font-medium">Status</th>
+                                                <th class="w-[15%] py-4 px-6 font-medium">Created At</th>
+                                                <th class="w-[15%] py-4 px-6 font-medium">Seen At</th>
+                                                <th class="w-[12%] py-4 px-6 font-medium">Notified Hospitals</th>
+                                                <th class="w-[8%] py-4 px-6 font-medium text-right">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody id="referralsTableBody" class="divide-y divide-slate-100 text-sm">
@@ -1076,14 +1080,14 @@
                                 <div class="overflow-x-auto bg-slate-50/50">
                                     <table class="w-full text-left border-collapse">
                                         <thead>
-                                            <tr class="bg-slate-300/60 text-xs uppercase tracking-wider font-bold text-slate-600 border-b border-slate-200/80">
-                                                <th class="py-4 px-6">Full Name</th>
-                                                <th class="py-4 px-6">Username</th>
-                                                <th class="py-4 px-6">Role</th>
-                                                <th class="py-4 px-6">License No.</th>
-                                                <th class="py-4 px-6">Trainings</th>
-                                                <th class="py-4 px-6">Status</th>
-                                                <th class="py-4 px-6 text-right">Action</th>
+                                            <tr class="bg-slate-300/60 text-xs uppercase tracking-wider font-medium text-slate-600 border-b border-slate-200/80">
+                                                <th class="py-4 px-6 font-medium">Full Name</th>
+                                                <th class="py-4 px-6 font-medium">Username</th>
+                                                <th class="py-4 px-6 font-medium">Role</th>
+                                                <th class="py-4 px-6 font-medium">License No.</th>
+                                                <th class="py-4 px-6 font-medium">Trainings</th>
+                                                <th class="py-4 px-6 font-medium">Status</th>
+                                                <th class="py-4 px-6 font-medium text-right">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody id="usersTableBody" class="divide-y divide-slate-100 text-sm">

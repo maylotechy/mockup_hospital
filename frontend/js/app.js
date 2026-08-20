@@ -427,8 +427,8 @@ $(document).ready(function () {
         $tableBody.html(`
             <tr>
                 <td colspan="6" class="text-center py-4 text-muted">
-                    <div class="spinner-border spinner-border-sm me-2 text-primary" role="status"></div>
-                    Loading hospital patient records...
+                    <div class="inline-block animate-spin rounded-full h-5 w-5 border-2 border-red-600 border-t-transparent mr-2"></div>
+                    Loading patient records...
                 </td>
             </tr>
         `);
@@ -518,9 +518,15 @@ $(document).ready(function () {
 
             const row = `
                 <tr class="!bg-slate-200/40 hover:!bg-slate-300/40 transition-colors">
-                    <td class="py-3.5 px-6 font-mono text-xs font-semibold text-slate-500 border-b border-slate-300/60">#${patient.id}</td>
+                    <td class="py-3.5 px-6 font-mono text-xs font-semibold text-slate-500 border-b border-slate-300/60">#${String(patient.id).padStart(5, '0')}</td>
                     <td class="py-3.5 px-6 font-semibold text-slate-900 border-b border-slate-300/60">${escapeHtml(patient.first_name)} ${escapeHtml(patient.last_name)}</td>
-                    <td class="py-3.5 px-6 text-slate-600 text-xs border-b border-slate-300/60">${escapeHtml(patient.dob)}</td>
+                    <td class="py-3.5 px-6 text-slate-600 text-xs whitespace-nowrap border-b border-slate-300/60">
+                        ${new Date(patient.dob + 'T00:00:00').toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                        })}
+                    </td>
                     <td class="py-3.5 px-6 border-b border-slate-300/60"><span class="px-2.5 py-1 rounded-full text-xs font-medium ${genderBadgeClass}">${escapeHtml(patient.gender)}</span></td>
                     <td class="py-3.5 px-6 text-slate-600 text-xs font-mono border-b border-slate-300/60">${escapeHtml(patient.phone)}</td>
                     <td class="py-3.5 px-6 text-right border-b border-slate-300/60">
@@ -551,7 +557,13 @@ $(document).ready(function () {
                     next: '<i class="bi bi-chevron-right"></i>',
                     previous: '<i class="bi bi-chevron-left"></i>'
                 }
-            }
+            },
+            columnDefs: [
+                {
+                    targets: [4, 5],
+                    orderable: false
+                }
+            ]
         });
     }
 
