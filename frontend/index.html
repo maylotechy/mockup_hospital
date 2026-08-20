@@ -50,9 +50,15 @@
 
             <!-- Login Form Card -->
             <div class="bg-white rounded-md p-7 shadow-sm border border-slate-200/80">
+                <div class="mb-5 p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-center">
+                    <p class="text-xs font-semibold text-slate-700">Health Facility Staff Portal</p>
+                    <p class="text-[11px] text-slate-500 mt-0.5">Facility Admins authenticate via IRDSS • Doctors/Nurses authenticate locally</p>
+                </div>
+
                 <form id="loginForm" onsubmit="return false;">
                     <div>
-                        <label for="loginUsername" class="block text-xs font-semibold text-slate-700 mb-1.5">Hospital Username</label>
+                        <label for="loginUsername" class="block text-xs font-semibold text-slate-700 mb-1.5">Username</label>
+
                         <div class="relative group">
                             <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-red-600 transition-colors">
                                 <i class="bi bi-person text-sm"></i>
@@ -115,8 +121,11 @@
     <!-- ======================================================== -->
     <div id="dashboardView" class="min-h-screen bg-slate-50" style="display: none;">
         
+        <!-- Mobile sidebar backdrop -->
+        <div id="sidebarBackdrop" class="hidden fixed inset-0 bg-slate-950/50 z-40 lg:hidden"></div>
+
         <!-- SIDEBAR NAVIGATION -->
-        <aside class="fixed top-0 left-0 w-64 h-screen flex flex-col bg-slate-100/50 border-r border-slate-200/80">
+        <aside id="sidebar" class="fixed top-0 left-0 w-64 h-screen flex flex-col bg-slate-100/50 border-r border-slate-200/80 z-50 -translate-x-full transition-transform duration-200 lg:translate-x-0">
             <div class="flex-1 overflow-y-auto">
                 <!-- Sidebar Header -->
                 <!--
@@ -135,29 +144,35 @@
 
                 <!-- Navigation Links -->
                 <nav class="p-2 !pt-4 space-y-2">
-                    <a href="#" id="navTabPatients" class="sidebar-link group flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all text-slate-500">
+                    <a href="#" id="navTabPatients" data-nav-role="staff" class="sidebar-link group flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all text-slate-500">
                         <i id="navIconPatients" class="bi bi-person-lines-fill text-lg transition-colors"></i>
                         <span>Patient Records</span>
                     </a>
 
-                    <a href="#" id="navTabInventory" class="sidebar-link group flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all text-slate-500">
-                        <i id="navIconInventory" class="bi bi-boxes text-lg transition-colors"></i>
-                        <span>Inventory</span>
-                    </a>
-
-                    <a href="#" id="navTabProfile" class="sidebar-link group flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all text-slate-500">
-                        <i id="navIconProfile" class="bi bi-hospital text-lg transition-colors"></i>
-                        <span>Facility Profile</span>
-                    </a>
-
-                    <a href="#" id="navTabReferrals" class="sidebar-link group flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all text-slate-500">
+                    <a href="#" id="navTabReferrals" data-nav-role="staff" class="sidebar-link group flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all text-slate-500">
                         <i id="navIconReferrals" class="bi bi-send-check text-lg transition-colors"></i>
                         <span>My Referrals</span>
                     </a>
 
-                    <a href="#" id="navTabOutcomes" class="sidebar-link group flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all text-slate-500">
-                        <i id="navIconOutcomes" class="bi bi-signpost-split text-lg transition-colors"></i>
-                        <span>Referral Outcomes</span>
+                    <a href="#" id="navTabPending" data-nav-role="staff" class="sidebar-link group flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all text-slate-500">
+                        <i id="navIconPending" class="bi bi-hourglass-split text-lg transition-colors"></i>
+                        <span>Pending Referrals</span>
+                        <span id="navPendingBadge" class="hidden ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center">0</span>
+                    </a>
+
+                    <a href="#" id="navTabIncoming" data-nav-role="staff" class="sidebar-link group flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all text-slate-500">
+                        <i id="navIconIncoming" class="bi bi-person-check text-lg transition-colors"></i>
+                        <span>Incoming Patients</span>
+                    </a>
+
+                    <a href="#" id="navTabUsers" data-nav-role="admin" class="sidebar-link group flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all text-slate-500">
+                        <i id="navIconUsers" class="bi bi-people-fill text-lg transition-colors"></i>
+                        <span>Manage Users</span>
+                    </a>
+
+                    <a href="#" id="navTabAssessment" data-nav-role="admin" class="sidebar-link group flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all text-slate-500">
+                        <i id="navIconAssessment" class="bi bi-clipboard2-pulse-fill text-lg transition-colors"></i>
+                        <span>Service Assessment</span>
                     </a>
                 </nav>
             </div>
@@ -177,18 +192,24 @@
         </aside>
 
         <!-- MAIN CONTENT CONTAINER -->
-        <main class="ml-64 flex-1 flex flex-col min-w-0 min-h-screen">
-            
+        <main class="lg:ml-64 flex-1 flex flex-col min-w-0 min-h-screen">
+
             <!-- TOP BAR HEADER -->
-            <header class="bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
-                <div class="flex gap-3 items-center">
+            <header class="bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 py-4 flex items-center justify-between gap-3 sticky top-0 z-30">
+                <div class="flex gap-3 items-center min-w-0">
                     <!-- <h1 class="text-2xl font-bold text-slate-900" id="mainHeaderTitle">Patient Records</h1> -->
-                    <div>
+                    <button id="btnSidebarToggle" type="button" class="lg:hidden flex-shrink-0 w-10 h-10 rounded-xl bg-slate-100 border border-slate-200/80 text-slate-600 hover:bg-slate-200 transition-all flex items-center justify-center">
+                        <i class="bi bi-list text-xl"></i>
+                    </button>
+                    <div class="flex-shrink-0">
                         <img src="assets/logos/hospitals/_default.png" id="hospitalLogo" alt="hospital logo" class="h-12 w-auto">
                     </div>
-                    <div class="block">
-                        <p class="font-semibold text-black leading-tight" id="sidebarHospitalName">Hospital Name</p>
-                        <p class="text-xs text-slate-600 font-mono" id="sidebarHospitalCode">HOSP-000</p>
+                    <div class="block min-w-0">
+                        <p class="font-semibold text-black leading-tight truncate" id="sidebarHospitalName">Hospital Name</p>
+                        <div class="flex items-center gap-2">
+                            <p class="text-xs text-slate-600 font-mono truncate" id="sidebarHospitalCode">HOSP-000</p>
+                            <span id="sidebarFacilityTier" class="hidden px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 flex-shrink-0">--</span>
+                        </div>
                     </div>
                 </div>
 
@@ -209,7 +230,7 @@
                         </div>
 
                         <!-- Notification Button -->
-                        <button id="btnNotificationBell" type="button"
+                        <button id="btnNotificationBell" type="button" data-nav-role="staff"
                             class="relative flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100 border border-slate-200/80 text-slate-600 hover:bg-slate-200 transition-all">
                             <i class="bi bi-bell-fill text-lg"></i>
 
@@ -245,7 +266,21 @@
 
                 <!-- content -->
                 <div class="relative z-10">
-                
+
+                    <!-- ASSESSMENT LOCK BANNER (Facility Admin, pre-completion) -->
+                    <div id="assessmentLockBanner" class="hidden bg-amber-50 border border-amber-200 rounded-2xl p-4 shadow-sm flex items-center justify-between gap-4 mb-6">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
+                                <i class="bi bi-exclamation-triangle-fill text-xl"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-amber-900 text-sm">Complete Your Facility's Service Assessment</h4>
+                                <p class="text-xs text-amber-700 mt-0.5">The system stays locked for your staff until this facility's service capabilities are submitted.</p>
+                            </div>
+                        </div>
+                        <span class="px-3 py-1 bg-amber-200/80 text-amber-900 text-xs font-semibold rounded-lg flex-shrink-0">Setup Required</span>
+                    </div>
+
                     <!-- TAB 1: PATIENT RECORDS CONTENT -->
                     <div id="tabPatientsContent" class="space-y-6">
 
@@ -271,12 +306,20 @@
                                 </div>
 
                                 <!-- Right -->
-                                <button
-                                    id="btnRefreshPatients"
-                                    class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200 transition-all">
-                                    <i class="bi bi-arrow-clockwise"></i>
-                                    <span>Refresh</span>
-                                </button>
+                                <div class="flex items-center gap-2">
+                                    <button
+                                        id="btnAddPatient"
+                                        class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-all">
+                                        <i class="bi bi-person-plus"></i>
+                                        <span>Add Patient</span>
+                                    </button>
+                                    <button
+                                        id="btnRefreshPatients"
+                                        class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200 transition-all">
+                                        <i class="bi bi-arrow-clockwise"></i>
+                                        <span>Refresh</span>
+                                    </button>
+                                </div>
 
                             </div>
 
@@ -307,342 +350,437 @@
                         </div>
                     </div>
 
-                    <!-- TAB 2: INVENTORY CONTENT -->
-                    <div id="tabInventoryContent" style="display: none;">
-
-                        <!-- Server Offline Banner -->
-                        <div id="serverOfflineAlert" class="bg-red-50 border border-red-200 rounded-2xl p-4 shadow-sm flex items-center mb-6 justify-between gap-4" style="display: none;">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-xl bg-red-100 text-red-700 flex items-center justify-center flex-shrink-0">
-                                    <i class="bi bi-wifi-off text-xl"></i>
-                                </div>
-                                <div>
-                                    <h4 class="font-bold text-red-900 text-sm">Central Backend Server Offline</h4>
-                                    <p class="text-xs text-red-700 mt-0.5">Displaying last cached hospital profile data. Contact devs @ <a href="mailto:irdss.devs@up.edu.ph" class="underline hover:text-red-800">irdss.devs@up.edu.ph</a></p>
-                                </div>
-                            </div>
-                            <span class="px-3 py-1 bg-red-200/80 text-red-900 text-xs font-semibold rounded-lg flex-shrink-0">Offline (Cached)</span>
-                        </div>
-
-                        <!-- Server Connection Error Banner -->
-                        <div id="serverConnectionAlert" class="bg-red-50 border border-red-200 rounded-2xl p-4 shadow-sm flex items-center mb-6 justify-between gap-4" style="display: none;">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
-                                    <i class="bi bi-wifi-off text-xl"></i>
-                                </div>
-                                <div>
-                                    <h4 class="font-bold text-red-600 text-sm">Can't Reach Server</h4>
-                                    <p class="text-xs text-red-600 mt-0.5">Contact devs @ <a href="mailto:irdss.devs@up.edu.ph" class="underline hover:text-red-700">irdss.devs@up.edu.ph</a></p>
-                                </div>
-                            </div>
-                            <span class="px-3 py-1 bg-red-100 text-red-600 text-xs font-semibold rounded-lg flex-shrink-0">Offline</span>
-                        </div>
-
-                        <div class="space-y-6">
-                            <!-- 2 QUICK STAT CARDS -->
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-
-                                <!-- Available Beds Stat -->
-                                <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
-                                    <div class="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center text-xl flex-shrink-0">
-                                        <i class="bi bi-hospital"></i>
-                                    </div>
-                                    <div class="min-w-0">
-                                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Available Beds</p>
-                                        <div id="statAvailableBedsSkeleton" class="h-7 w-12 mt-1.5 rounded-md bg-slate-200 animate-pulse"></div>
-                                        <h3 class="text-2xl font-bold text-slate-900 mt-0.5 hidden" id="statAvailableBeds">0</h3>
-                                    </div>
-                                </div>
-
-                                <!-- Specialists Stat -->
-                                <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
-                                    <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl flex-shrink-0">
-                                        <i class="bi bi-person-badge"></i>
-                                    </div>
-                                    <div class="min-w-0">
-                                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Specialists</p>
-                                        <div id="statMedicalSpecsSkeleton" class="h-7 w-12 mt-1.5 rounded-md bg-slate-200 animate-pulse"></div>
-                                        <h3 class="text-2xl font-bold text-slate-900 mt-0.5 hidden" id="statMedicalSpecs">0</h3>
-                                    </div>
-                                </div>
-
-                            </div>
-
-                            <!-- Equipment & Infrastructure Status -->
-                            <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-4">
-                                <div class="flex items-center gap-3 pb-3 border-b border-slate-100">
-                                    <div class="w-9 h-9 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold">
-                                        <i class="bi bi-gear-wide-connected text-base"></i>
-                                    </div>
-                                    <h3 class="font-bold text-slate-900 text-base">Equipment & Infrastructure Status</h3>
-                                </div>
-
-                                <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
-                                    <!-- Emergency Equipment -->
-                                    <div class="p-4 bg-slate-50 rounded-xl flex items-center gap-3 border border-slate-100">
-                                        <i class="bi bi-bandaid-fill text-2xl text-red-500 flex-shrink-0"></i>
-                                        <div class="min-w-0 flex-1">
-                                            <h4 class="font-semibold text-slate-800 text-sm">Emergency Equipment</h4>
-                                            <p class="text-xs text-slate-500">Life support & emergency response kits</p>
+                    <!-- TAB: REGISTER PATIENT CONTENT (full-page form, not a popup) -->
+                    <div id="tabAddPatientContent" style="display: none;">
+                        <form id="patientForm">
+                            <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden mb-6">
+                                <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                                    <div class="flex items-center gap-3">
+                                        <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-red-50 text-red-600">
+                                            <i class="bi bi-person-plus-fill text-lg"></i>
                                         </div>
-                                        <span id="badgeEmergencyEquipSkeleton" class="h-5 w-20 rounded-full bg-slate-200 animate-pulse flex-shrink-0"></span>
-                                        <span id="badgeEmergencyEquip" class="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 hidden flex-shrink-0 whitespace-nowrap">Available</span>
-                                    </div>
-
-                                    <!-- Medical Equipment -->
-                                    <div class="p-4 bg-slate-50 rounded-xl flex items-center gap-3 border border-slate-100">
-                                        <i class="bi bi-heart-pulse text-2xl text-red-500 flex-shrink-0"></i>
-                                        <div class="min-w-0 flex-1">
-                                            <h4 class="font-semibold text-slate-800 text-sm">Medical Equipment</h4>
-                                            <p class="text-xs text-slate-500">Diagnostic & ICU monitors</p>
-                                        </div>
-                                        <span id="badgeMedicalEquipSkeleton" class="h-5 w-20 rounded-full bg-slate-200 animate-pulse flex-shrink-0"></span>
-                                        <span id="badgeMedicalEquip" class="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 hidden flex-shrink-0 whitespace-nowrap">Available</span>
-                                    </div>
-
-                                    <!-- Communication Systems -->
-                                    <div class="p-4 bg-slate-50 rounded-xl flex items-center gap-3 border border-slate-100">
-                                        <i class="bi bi-broadcast text-2xl text-indigo-500 flex-shrink-0"></i>
-                                        <div class="min-w-0 flex-1">
-                                            <h4 class="font-semibold text-slate-800 text-sm">Communication Systems</h4>
-                                            <p class="text-xs text-slate-500">Inter-hospital network & telemetry</p>
-                                        </div>
-                                        <span id="badgeCommSystemsSkeleton" class="h-5 w-20 rounded-full bg-slate-200 animate-pulse flex-shrink-0"></span>
-                                        <span id="badgeCommSystems" class="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 hidden flex-shrink-0 whitespace-nowrap">Active</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- UPDATE INVENTORY FORM CARD -->
-                            <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-6">
-                                <div class="flex items-center gap-3 pb-4 border-b border-slate-100">
-                                    <div class="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold">
-                                        <i class="bi bi-pencil-square text-lg"></i>
-                                    </div>
-                                    <div>
-                                        <h3 class="font-bold text-slate-900 text-base">Update Hospital Inventory</h3>
-                                        <p class="text-xs text-slate-500 font-normal">Transmits real-time resource updates directly to Central Server</p>
-                                    </div>
-                                </div>
-
-                                <form id="updateInventoryForm" class="space-y-5">
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
                                         <div>
-                                            <label for="inputBeds" class="block text-xs font-bold text-slate-700 mb-1.5">Available Beds</label>
-                                            <input type="number" id="inputBeds" name="available_beds" min="0" required
-                                                class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
-                                        </div>
-
-                                        <div>
-                                            <label for="inputSpecs" class="block text-xs font-bold text-slate-700 mb-1.5">Specialists Count</label>
-                                            <input type="number" id="inputSpecs" name="medical_specialists_count" min="0" required
-                                                class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
-                                        </div>
-
-                                    </div>
-
-                                    <!-- Equipment Checkboxes (Identical size and height) -->
-                                    <div class="pt-4 border-t border-slate-100 space-y-2">
-                                        <label class="block text-xs font-bold text-slate-900">Hospital Equipment & Resources</label>
-
-                                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                            <label class="flex items-center gap-3 h-10 px-3.5 bg-slate-50 rounded-xl border border-slate-200/80 cursor-pointer hover:bg-slate-100 transition-colors">
-                                                <input type="checkbox" id="inputEmergencyEquip" name="emergency_equipment" class="w-4 h-4 text-red-600 rounded border-slate-300 focus:ring-red-500">
-                                                <span class="text-xs font-bold text-slate-700">Emergency Equipment</span>
-                                            </label>
-
-                                            <label class="flex items-center gap-3 h-10 px-3.5 bg-slate-50 rounded-xl border border-slate-200/80 cursor-pointer hover:bg-slate-100 transition-colors">
-                                                <input type="checkbox" id="inputMedicalEquip" name="medical_equipment" class="w-4 h-4 text-red-600 rounded border-slate-300 focus:ring-red-500">
-                                                <span class="text-xs font-bold text-slate-700">Medical Equipment</span>
-                                            </label>
-
-                                            <label class="flex items-center gap-3 h-10 px-3.5 bg-slate-50 rounded-xl border border-slate-200/80 cursor-pointer hover:bg-slate-100 transition-colors">
-                                                <input type="checkbox" id="inputCommSystems" name="communication_systems" class="w-4 h-4 text-red-600 rounded border-slate-300 focus:ring-red-500">
-                                                <span class="text-xs font-bold text-slate-700">Communication Systems</span>
-                                            </label>
+                                            <h3 class="font-bold text-slate-900 text-base">Register Patient</h3>
+                                            <p class="text-xs text-slate-500">DOH iClinicSys-style patient enrollment record</p>
                                         </div>
                                     </div>
-
-                                    <!-- Submit Button (Rightmost Side) -->
-                                    <div class="pt-4 border-t border-slate-100 flex justify-end">
-                                        <button type="submit" id="btnSubmitInventory"
-                                            class="py-2.5 px-6 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl shadow-lg shadow-red-600/25 active:scale-[0.99] transition-all text-xs flex items-center gap-2 ml-auto">
-                                            <i class="bi bi-cloud-arrow-up text-sm"></i>
-                                            <span>Update Inventory</span>
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- TAB 3: FACILITY PROFILE CONTENT -->
-                    <div id="tabProfileContent" class="space-y-6" style="display: none;">
-
-                        <!-- Facility & Location Profile -->
-                        <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-4">
-                            <div class="flex items-center gap-3 pb-3 border-b border-slate-100">
-                                <div class="w-9 h-9 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold">
-                                    <i class="bi bi-info-circle text-base"></i>
-                                </div>
-                                <h3 class="font-bold text-slate-900 text-base">Facility & Location Profile</h3>
-                            </div>
-
-                            <div class="divide-y divide-slate-100 text-sm">
-                                <div class="py-3 flex justify-between items-center">
-                                    <span class="text-slate-500 font-medium">Hospital ID</span>
-                                    <span id="displayHospitalIdSkeleton" class="h-4 w-10 rounded bg-slate-200 animate-pulse"></span>
-                                    <span class="font-bold text-slate-900 hidden" id="displayHospitalId">#--</span>
-                                </div>
-                                <div class="py-3 flex justify-between items-center">
-                                    <span class="text-slate-500 font-medium">Hospital Name</span>
-                                    <span id="displayHospitalNameSkeleton" class="h-4 w-28 rounded bg-slate-200 animate-pulse"></span>
-                                    <span class="font-bold text-red-600 hidden" id="displayHospitalName">Hospital Name</span>
-                                </div>
-                                <div class="py-3 flex justify-between items-center">
-                                    <span class="text-slate-500 font-medium">Hospital Level</span>
-                                    <span id="displayHospitalLevelSkeleton" class="h-5 w-16 rounded-lg bg-slate-200 animate-pulse"></span>
-                                    <span class="px-3 py-1 bg-red-50 text-red-700 font-semibold rounded-lg text-xs hidden" id="displayHospitalLevel">--</span>
-                                </div>
-                                <div class="py-3 flex justify-between items-center">
-                                    <span class="text-slate-500 font-medium">Environment</span>
-                                    <span id="displayHospitalEnvSkeleton" class="h-5 w-16 rounded-lg bg-slate-200 animate-pulse"></span>
-                                    <span class="px-3 py-1 bg-slate-100 text-slate-700 font-semibold rounded-lg text-xs hidden" id="displayHospitalEnv">--</span>
-                                </div>
-                                <div class="py-3 flex justify-between items-center gap-3">
-                                    <span class="text-slate-500 font-medium shrink-0">Hospital Location</span>
-                                    <span id="displayGpsCoordsSkeleton" class="h-5 w-32 rounded-md bg-slate-200 animate-pulse"></span>
-                                    <span class="text-slate-700 text-xs text-right hidden" id="displayGpsCoords">--</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- UPDATE PROFILE FORM CARD -->
-                        <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-6">
-                            <div class="flex items-center gap-3 pb-4 border-b border-slate-100">
-                                <div class="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold">
-                                    <i class="bi bi-pencil-square text-lg"></i>
-                                </div>
-                                <div>
-                                    <h3 class="font-bold text-slate-900 text-base">Update Facility Profile</h3>
-                                    <p class="text-xs text-slate-500 font-normal">Transmits real-time facility & location updates directly to Central Server</p>
-                                </div>
-                            </div>
-
-                            <form id="updateProfileForm" class="space-y-5">
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-                                    <div>
-                                        <label for="inputLevel" class="block text-xs font-bold text-slate-700 mb-1.5">Hospital Level</label>
-                                        <select id="inputLevel" name="hospital_level" required
-                                            class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
-                                            <option value="Level 1">Level 1</option>
-                                            <option value="Level 2">Level 2</option>
-                                            <option value="Level 3">Level 3</option>
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label for="inputEnv" class="block text-xs font-bold text-slate-700 mb-1.5">Environment</label>
-                                        <select id="inputEnv" name="hospital_environment" required
-                                            class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
-                                            <option value="Urban">Urban</option>
-                                            <option value="Suburban">Suburban</option>
-                                            <option value="Rural">Rural</option>
-                                        </select>
-                                    </div>
-
-                                </div>
-
-                                <input type="hidden" id="inputLat" name="latitude" value="7.1907">
-                                <input type="hidden" id="inputLng" name="longitude" value="125.4553">
-
-                                <!-- HOSPITAL LOCATION SELECTOR (Identical 4-column grid & sizing) -->
-                                <div class="space-y-2 pt-4 border-t border-slate-100">
-                                    <label class="block text-xs font-bold text-slate-900">Hospital Location Selector</label>
-
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                        <div>
-                                            <label for="invSelectRegion" class="block text-xs font-bold text-slate-700 mb-1.5">Region</label>
-                                            <select id="invSelectRegion" class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
-                                                <option value="Mindanao" selected>Mindanao</option>
-                                                <option value="Luzon">Luzon</option>
-                                                <option value="Visayas">Visayas</option>
-                                            </select>
-                                        </div>
-
-                                        <div>
-                                            <label for="invSelectProvince" class="block text-xs font-bold text-slate-700 mb-1.5">Province</label>
-                                            <select id="invSelectProvince" class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
-                                                <!-- Populated dynamically -->
-                                            </select>
-                                        </div>
-
-                                        <div>
-                                            <label for="invSelectCity" class="block text-xs font-bold text-slate-700 mb-1.5">City / Municipality</label>
-                                            <select id="invSelectCity" class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
-                                                <!-- Populated dynamically -->
-                                            </select>
-                                        </div>
-
-                                        <div>
-                                            <label for="invSelectBarangay" class="block text-xs font-bold text-slate-700 mb-1.5">Barangay</label>
-                                            <select id="invSelectBarangay" class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
-                                                <!-- Populated dynamically -->
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <!-- Geocoded Location Text Badge -->
-                                    <div class="px-3.5 py-2.5 bg-slate-50 rounded-xl border border-slate-200/60 flex items-center justify-between text-xs">
-                                        <span class="text-slate-600 truncate max-w-[280px] font-normal" id="invDisplayResolvedAddress">Davao City, Davao del Sur, Mindanao</span>
-                                        <span class="font-mono text-slate-500 font-normal" id="invDisplayLatLongText">7.190700, 125.455300</span>
-                                    </div>
-                                </div>
-
-                                <!-- Submit Button (Rightmost Side) -->
-                                <div class="pt-4 border-t border-slate-100 flex justify-end">
-                                    <button type="submit" id="btnSubmitProfile"
-                                        class="py-2.5 px-6 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl shadow-lg shadow-red-600/25 active:scale-[0.99] transition-all text-xs flex items-center gap-2 ml-auto">
-                                        <i class="bi bi-cloud-arrow-up text-sm"></i>
-                                        <span>Update Facility Profile</span>
+                                    <button type="button" id="btnCancelAddPatient" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200 transition-all">
+                                        <i class="bi bi-arrow-left"></i>
+                                        <span>Back to Patient Records</span>
                                     </button>
                                 </div>
-                            </form>
+                            </div>
+
+                            <!-- Demographics -->
+                            <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm mb-6">
+                                <label class="block text-sm font-bold text-slate-900 mb-4">Demographics</label>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div>
+                                        <label for="patFirstName" class="block text-xs font-semibold text-slate-500 mb-1.5">First Name</label>
+                                        <input type="text" id="patFirstName" name="first_name" required placeholder="First Name"
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                    </div>
+                                    <div>
+                                        <label for="patMiddleName" class="block text-xs font-semibold text-slate-500 mb-1.5">Middle Name</label>
+                                        <input type="text" id="patMiddleName" name="middle_name" placeholder="Middle Name"
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                    </div>
+                                    <div>
+                                        <label for="patLastName" class="block text-xs font-semibold text-slate-500 mb-1.5">Last Name</label>
+                                        <input type="text" id="patLastName" name="last_name" required placeholder="Last Name"
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                    </div>
+                                    <div>
+                                        <label for="patSuffix" class="block text-xs font-semibold text-slate-500 mb-1.5">Suffix</label>
+                                        <input type="text" id="patSuffix" name="suffix" placeholder="Jr., III"
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                    </div>
+                                    <div>
+                                        <label for="patDob" class="block text-xs font-semibold text-slate-500 mb-1.5">Date of Birth</label>
+                                        <input type="date" id="patDob" name="dob" required
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                    </div>
+                                    <div>
+                                        <label for="patGender" class="block text-xs font-semibold text-slate-500 mb-1.5">Sex</label>
+                                        <select id="patGender" name="gender" required
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
+                                            <option value="">Select</option>
+                                            <option value="Male">Male</option>
+                                            <option value="Female">Female</option>
+                                            <option value="Other">Other</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="patCivilStatus" class="block text-xs font-semibold text-slate-500 mb-1.5">Civil Status</label>
+                                        <select id="patCivilStatus" name="civil_status"
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
+                                            <option value="">Select</option>
+                                            <option value="Single">Single</option>
+                                            <option value="Married">Married</option>
+                                            <option value="Widow/er">Widow/er</option>
+                                            <option value="Separated">Separated</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="patPhone" class="block text-xs font-semibold text-slate-500 mb-1.5">Contact Number</label>
+                                        <input type="text" id="patPhone" name="phone" required placeholder="+639..."
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Residential Address -->
+                            <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm mb-6">
+                                <label class="block text-sm font-bold text-slate-900 mb-4">Residential Address</label>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-500 mb-1.5">Region</label>
+                                        <select id="patRegion" name="region"
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
+                                            <option value="">Loading regions...</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-500 mb-1.5">Province</label>
+                                        <select id="patProvince" name="province"
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
+                                            <!-- Populated dynamically -->
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-500 mb-1.5">City / Municipality</label>
+                                        <select id="patCity" name="city_municipality"
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
+                                            <!-- Populated dynamically -->
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-500 mb-1.5">Barangay</label>
+                                        <select id="patBarangay" name="barangay"
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
+                                            <!-- Populated dynamically -->
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="patZip" class="block text-xs font-semibold text-slate-500 mb-1.5">Zip Code</label>
+                                        <input type="text" id="patZip" name="zip_code" placeholder="Zip Code"
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Socio-Economic & Health Insurance -->
+                            <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm mb-6">
+                                <label class="block text-sm font-bold text-slate-900 mb-4">Socio-Economic &amp; Health Insurance</label>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div>
+                                        <label for="patPhilhealthMember" class="block text-xs font-semibold text-slate-500 mb-1.5">PhilHealth Member?</label>
+                                        <select id="patPhilhealthMember" name="philhealth_member"
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
+                                            <option value="No" selected>No</option>
+                                            <option value="Yes">Yes</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="patPhilhealthStatus" class="block text-xs font-semibold text-slate-500 mb-1.5">Status Type</label>
+                                        <select id="patPhilhealthStatus" name="philhealth_status_type" disabled
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed">
+                                            <option value="">--</option>
+                                            <option value="Member">Member</option>
+                                            <option value="Dependent">Dependent</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="patPhilhealthNumber" class="block text-xs font-semibold text-slate-500 mb-1.5">PhilHealth Number</label>
+                                        <input type="text" id="patPhilhealthNumber" name="philhealth_number" placeholder="PhilHealth Number" disabled
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed">
+                                    </div>
+                                    <div>
+                                        <label for="pat4psMember" class="block text-xs font-semibold text-slate-500 mb-1.5">DSWD NHTS / 4Ps Member?</label>
+                                        <select id="pat4psMember" name="is_4ps_member"
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
+                                            <option value="No" selected>No</option>
+                                            <option value="Yes">Yes</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Actions -->
+                            <div class="flex items-center justify-end gap-3 pb-6">
+                                <button type="button" id="btnCancelAddPatient2" class="h-11 px-5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold transition-colors bg-white">
+                                    Cancel
+                                </button>
+                                <button type="submit" id="btnSubmitPatient"
+                                    class="h-11 px-6 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl shadow-sm active:scale-[0.99] transition-all flex items-center gap-2">
+                                    <i class="bi bi-person-check"></i>
+                                    <span>Register Patient</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- TAB: REFER PATIENT CONTENT (full-page form, not a popup) -->
+                    <div id="tabReferPatientContent" style="display: none;">
+                        <form id="referralForm">
+                            <input type="hidden" id="modalPatientId" name="patient_id">
+                            <input type="hidden" id="modalLatitude" name="latitude" value="7.1907">
+                            <input type="hidden" id="modalLongitude" name="longitude" value="125.4553">
+
+                            <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden mb-6">
+                                <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                                    <div class="flex items-center gap-3">
+                                        <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-red-50 text-red-600">
+                                            <i class="bi bi-send-check text-lg"></i>
+                                        </div>
+                                        <div>
+                                            <h3 class="font-bold text-slate-900 text-base">Refer Patient</h3>
+                                            <p class="text-xs text-slate-500">Confirm patient location and enter clinical severity</p>
+                                        </div>
+                                    </div>
+                                    <button type="button" id="btnCancelReferral" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200 transition-all">
+                                        <i class="bi bi-arrow-left"></i>
+                                        <span>Back to Patient Records</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Patient Summary -->
+                            <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm mb-6">
+                                <label class="block text-sm font-bold text-slate-900 mb-4">Patient</label>
+                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-5">
+                                    <div>
+                                        <p class="text-xs font-semibold text-slate-500 mb-1">Full Name</p>
+                                        <p class="text-sm font-bold text-slate-900" id="modalPatientName">--</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs font-semibold text-slate-500 mb-1">Date of Birth</p>
+                                        <p class="text-sm text-slate-800" id="modalPatientDob">--</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs font-semibold text-slate-500 mb-1">Gender</p>
+                                        <p class="text-sm text-slate-800" id="modalPatientGender">--</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs font-semibold text-slate-500 mb-1">Phone</p>
+                                        <p class="text-sm text-slate-800" id="modalPatientPhone">--</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Location Selector -->
+                            <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm mb-6">
+                                <label class="block text-sm font-bold text-slate-900 mb-1">Location Selector</label>
+                                <p class="text-xs text-slate-500 mb-4">Pre-filled from this patient's registered address -- adjust if the referral origin is different.</p>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div>
+                                        <label for="selectRegion" class="block text-xs font-semibold text-slate-500 mb-1.5">Region</label>
+                                        <select id="selectRegion" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
+                                            <option value="">Loading regions...</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="selectProvince" class="block text-xs font-semibold text-slate-500 mb-1.5">Province</label>
+                                        <select id="selectProvince" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
+                                            <!-- Populated dynamically -->
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="selectCity" class="block text-xs font-semibold text-slate-500 mb-1.5">City / Municipality</label>
+                                        <select id="selectCity" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
+                                            <!-- Populated dynamically -->
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="selectBarangay" class="block text-xs font-semibold text-slate-500 mb-1.5">Barangay</label>
+                                        <select id="selectBarangay" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
+                                            <!-- Populated dynamically -->
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="mt-4 px-4 py-3 bg-slate-50 rounded-xl border border-slate-200/60 flex items-center justify-between text-xs">
+                                    <span class="text-slate-600 truncate max-w-[210px] font-normal" id="displayResolvedAddress">Davao City, Davao del Sur, Mindanao</span>
+                                    <span class="font-mono text-slate-500 font-normal" id="displayLatLongText">7.190700, 125.455300</span>
+                                </div>
+                            </div>
+
+                            <!-- Clinical Information -->
+                            <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm mb-6">
+                                <label class="block text-sm font-bold text-slate-900 mb-4">Clinical Information</label>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label for="modalChiefComplaint" class="block text-xs font-semibold text-slate-500 mb-1.5">Chief Complaint <span class="text-red-600">*</span></label>
+                                        <input type="text" id="modalChiefComplaint" name="chief_complaint" required
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all"
+                                            placeholder="e.g. Difficulty of breathing">
+                                    </div>
+
+                                    <div>
+                                        <label for="modalSeverity" class="block text-xs font-semibold text-slate-500 mb-1.5">Severity Level <span class="text-red-600">*</span></label>
+                                        <select id="modalSeverity" name="severity" required
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
+                                            <option value="1">1 - Mild</option>
+                                            <option value="2">2 - Moderate</option>
+                                            <option value="3" selected>3 - Severe</option>
+                                            <option value="4">4 - Critical</option>
+                                            <option value="5">5 - Extreme</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label for="modalDiagnosis" class="block text-xs font-semibold text-slate-500 mb-1.5">Diagnosis <span class="text-slate-400 font-normal">(optional)</span></label>
+                                        <input type="text" id="modalDiagnosis" name="diagnosis"
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all"
+                                            placeholder="e.g. Pneumonia">
+                                    </div>
+
+                                    <div class="sm:col-span-2">
+                                        <label for="modalReasonSelect" class="block text-xs font-semibold text-slate-500 mb-1.5">Referral Reason <span class="text-red-600">*</span></label>
+                                        <select id="modalReasonSelect"
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
+                                            <option value="No Specialist Available">No Specialist Available</option>
+                                            <option value="No Available Facility/Equipment">No Available Facility/Equipment</option>
+                                            <option value="No Available Bed / Bed Capacity Full">No Available Bed / Bed Capacity Full</option>
+                                            <option value="Higher Level of Care Required" selected>Higher Level of Care Required</option>
+                                            <option value="Diagnostic Services Not Available">Diagnostic Services Not Available</option>
+                                            <option value="Surgical Intervention Required">Surgical Intervention Required</option>
+                                            <option value="Patient/Family Request">Patient/Family Request</option>
+                                            <option value="Others">Others (please specify)</option>
+                                        </select>
+                                        <input type="text" id="modalReasonText" name="reason_text" required
+                                            class="mt-2 w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all disabled:bg-slate-100 disabled:text-slate-400 hidden"
+                                            placeholder="Please specify the referral reason">
+                                    </div>
+                                </div>
+
+                                <label class="block text-xs font-semibold text-slate-500 mt-5 mb-1.5">Patient Status</label>
+                                <div class="flex flex-wrap gap-x-6 gap-y-2.5">
+                                    <label class="inline-flex items-center gap-2 text-sm text-slate-800 cursor-pointer">
+                                        <input type="checkbox" id="modalIsPwd" name="is_pwd" class="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer">
+                                        PWD
+                                    </label>
+                                    <label class="inline-flex items-center gap-2 text-sm text-slate-800 cursor-pointer">
+                                        <input type="checkbox" id="modalIsPregnant" name="is_pregnant" class="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer">
+                                        Pregnant
+                                    </label>
+                                    <label class="inline-flex items-center gap-2 text-sm text-slate-800 cursor-pointer">
+                                        <input type="checkbox" id="modalIsSeniorCitizen" name="is_senior_citizen" class="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer">
+                                        Senior Citizen
+                                    </label>
+                                    <label class="inline-flex items-center gap-2 text-sm text-slate-800 cursor-pointer">
+                                        <input type="checkbox" id="modalHasAllergy" name="has_allergy" class="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer">
+                                        Has Allergy
+                                    </label>
+                                </div>
+                                <input type="text" id="modalAllergyDetails" name="allergy_details"
+                                    class="mt-2.5 w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all hidden"
+                                    placeholder="Specify known allergies (e.g. Penicillin, Seafood)">
+
+                                <label class="block text-xs font-semibold text-slate-500 mt-5 mb-1.5">Vital Signs</label>
+                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                    <div>
+                                        <label for="modalVitalBp" class="block text-[11px] text-slate-400 mb-1">BP (mmHg)</label>
+                                        <input type="text" id="modalVitalBp" name="vital_bp" placeholder="120/80"
+                                            class="w-full h-12 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                    </div>
+                                    <div>
+                                        <label for="modalVitalHr" class="block text-[11px] text-slate-400 mb-1">HR (bpm)</label>
+                                        <input type="number" min="0" id="modalVitalHr" name="vital_hr" placeholder="80"
+                                            class="w-full h-12 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                    </div>
+                                    <div>
+                                        <label for="modalVitalRr" class="block text-[11px] text-slate-400 mb-1">RR (br/min)</label>
+                                        <input type="number" min="0" id="modalVitalRr" name="vital_rr" placeholder="18"
+                                            class="w-full h-12 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                    </div>
+                                    <div>
+                                        <label for="modalVitalTemp" class="block text-[11px] text-slate-400 mb-1">Temp (°C)</label>
+                                        <input type="number" step="0.1" min="0" id="modalVitalTemp" name="vital_temp_c" placeholder="36.5"
+                                            class="w-full h-12 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                    </div>
+                                    <div>
+                                        <label for="modalVitalO2sat" class="block text-[11px] text-slate-400 mb-1">O2 Sat (%)</label>
+                                        <input type="number" min="0" max="100" id="modalVitalO2sat" name="vital_o2sat" placeholder="98"
+                                            class="w-full h-12 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                    </div>
+                                    <div>
+                                        <label for="modalVitalHeight" class="block text-[11px] text-slate-400 mb-1">Height (cm)</label>
+                                        <input type="number" step="0.1" min="0" id="modalVitalHeight" name="vital_height_cm" placeholder="165"
+                                            class="w-full h-12 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                    </div>
+                                    <div>
+                                        <label for="modalVitalWeight" class="block text-[11px] text-slate-400 mb-1">Weight (kg)</label>
+                                        <input type="number" step="0.1" min="0" id="modalVitalWeight" name="vital_weight_kg" placeholder="60"
+                                            class="w-full h-12 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Actions -->
+                            <div class="flex items-center justify-end gap-3 pb-6">
+                                <button type="button" id="btnCancelReferral2" class="h-11 px-5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold transition-colors bg-white">
+                                    Cancel
+                                </button>
+                                <button type="submit" id="btnSubmitReferral"
+                                    class="h-11 px-6 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl shadow-sm active:scale-[0.99] transition-all flex items-center gap-2">
+                                    <i class="bi bi-send"></i>
+                                    <span>Transmit Referral</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- TAB: PENDING REFERRALS CONTENT (awaiting my decision) -->
+                    <div id="tabPendingContent" style="display: none;">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                            <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
+                                    <i class="bi bi-hourglass-split text-xl"></i>
+                                </div>
+                                <div>
+                                    <p id="statPendingCount" class="text-2xl font-bold text-slate-900">0</p>
+                                    <p class="text-xs text-slate-500">Awaiting Your Decision</p>
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0">
+                                    <i class="bi bi-exclamation-triangle-fill text-xl"></i>
+                                </div>
+                                <div>
+                                    <p id="statCriticalPendingCount" class="text-2xl font-bold text-slate-900">0</p>
+                                    <p class="text-xs text-slate-500">Critical / Extreme (Severity 4-5)</p>
+                                </div>
+                            </div>
                         </div>
 
-                        <comment class="hidden">
-                            <!-- 2 QUICK STAT CARDS -->
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-
-                                <!-- Facility Level Stat -->
-                                <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
-                                    <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl flex-shrink-0">
-                                        <i class="bi bi-building"></i>
+                        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden mb-6">
+                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-4 border-b border-slate-100">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex-shrink-0">
+                                        <i class="bi bi-hourglass-split text-lg"></i>
                                     </div>
-                                    <div class="min-w-0">
-                                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Facility Level</p>
-                                        <div id="statHospitalLevelSkeleton" class="h-6 w-16 mt-1.5 rounded-md bg-slate-200 animate-pulse"></div>
-                                        <h3 class="text-xl font-bold text-slate-900 mt-0.5 hidden" id="statHospitalLevel">--</h3>
+                                    <div>
+                                        <h3 class="font-bold text-slate-900 text-base">Pending Referrals</h3>
+                                        <p class="text-xs text-slate-500">Sorted by severity, most critical first -- click one to review and decide.</p>
                                     </div>
                                 </div>
-
-                                <!-- Environment Stat -->
-                                <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
-                                    <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl flex-shrink-0">
-                                        <i class="bi bi-geo-alt"></i>
-                                    </div>
-                                    <div class="min-w-0">
-                                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Environment</p>
-                                        <div id="statHospitalEnvSkeleton" class="h-6 w-16 mt-1.5 rounded-md bg-slate-200 animate-pulse"></div>
-                                        <h3 class="text-xl font-bold text-slate-900 mt-0.5 hidden" id="statHospitalEnv">--</h3>
-                                    </div>
+                                <div class="flex items-center gap-2 flex-shrink-0">
+                                    <button id="btnTestAlarm" title="Play the incoming-referral alarm once, without waiting for a real referral" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200 transition-all">
+                                        <i class="bi bi-volume-up"></i>
+                                        <span>Test Alarm</span>
+                                    </button>
+                                    <button id="btnRefreshPending" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200 transition-all">
+                                        <i class="bi bi-arrow-clockwise"></i>
+                                        <span>Refresh</span>
+                                    </button>
                                 </div>
-
                             </div>
-                        </comment>
-
+                            <div id="pendingReferralsList" class="p-4 space-y-3 bg-slate-50/60">
+                                <div class="px-6 py-6 text-center text-xs text-slate-400">No pending referrals right now.</div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- TAB 4: MY REFERRALS CONTENT -->
@@ -807,105 +945,152 @@
 
                     </div>
 
-                    <!-- TAB 5: REFERRAL OUTCOMES CONTENT -->
-                    <div id="tabOutcomesContent" style="display: none;">
-
-                        <!-- Server Connection Error Banner -->
-                        <div id="outcomesConnectionAlert" class="bg-red-50 border border-red-200 rounded-2xl p-4 shadow-sm flex items-center mb-6 justify-between gap-4" style="display: none;">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
-                                    <i class="bi bi-wifi-off text-xl"></i>
+                    <!-- TAB 5: INCOMING PATIENTS CONTENT -->
+                    <div id="tabIncomingContent" style="display: none;">
+                        <!-- Stat Tiles -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                            <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                                    <i class="bi bi-person-check text-xl"></i>
                                 </div>
                                 <div>
-                                    <h4 class="font-bold text-red-600 text-sm">Can't Reach Server</h4>
-                                    <p class="text-xs text-red-600 mt-0.5">Contact devs @ <a href="mailto:irdss.devs@up.edu.ph" class="underline hover:text-red-700">irdss.devs@up.edu.ph</a></p>
+                                    <p id="statTransferredToUs" class="text-2xl font-bold text-slate-900">0</p>
+                                    <p class="text-xs text-slate-500">Transferred To Us</p>
                                 </div>
                             </div>
-                            <span class="px-3 py-1 bg-red-100 text-red-600 text-xs font-semibold rounded-lg flex-shrink-0">Offline</span>
+                            <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
+                                    <i class="bi bi-arrow-left-right text-xl"></i>
+                                </div>
+                                <div>
+                                    <p id="statRedirectedElsewhere" class="text-2xl font-bold text-slate-900">0</p>
+                                    <p class="text-xs text-slate-500">Accepted, But Sent Elsewhere</p>
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="space-y-6">
-                            <!-- Summary Stat Cards -->
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                                <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center gap-4">
-                                    <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl flex-shrink-0">
-                                        <i class="bi bi-hospital"></i>
+                        <div id="myAcceptedPatientsCard" class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden mb-6">
+                            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600">
+                                        <i class="bi bi-person-check text-lg"></i>
                                     </div>
-                                    <div class="min-w-0">
-                                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Confirmed Transfers</p>
-                                        <h3 class="text-2xl font-bold text-slate-900 mt-0.5" id="statChoseUsCount">0</h3>
-                                    </div>
-                                </div>
-                                <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center gap-4">
-                                    <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl flex-shrink-0">
-                                        <i class="bi bi-signpost-split"></i>
-                                    </div>
-                                    <div class="min-w-0">
-                                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Bypassed Transfers</p>
-                                        <h3 class="text-2xl font-bold text-slate-900 mt-0.5" id="statBypassedUsCount">0</h3>
+                                    <div>
+                                        <h3 class="font-bold text-slate-900 text-base">Incoming Patients</h3>
+                                        <p class="text-xs text-slate-500">Full patient details unlock only once a referral is finalized to your facility</p>
                                     </div>
                                 </div>
+                                <button id="btnRefreshAcceptedPatients" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200 transition-all">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                    <span>Refresh</span>
+                                </button>
                             </div>
+                            <div id="acceptedPatientsList" class="divide-y divide-slate-100">
+                                <div class="px-6 py-6 text-center text-xs text-slate-400">No finalized referrals yet.</div>
+                            </div>
+                        </div>
+                    </div>
 
-                            <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                    <!-- TAB 6: MANAGE USERS CONTENT (Facility Admin only) -->
+                    <div id="tabUsersContent" style="display: none;">
+                        <div class="space-y-6">
+                            <!-- Add User Card -->
+                            <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-6">
+                                <div class="flex items-center gap-3 pb-4 border-b border-slate-100">
+                                    <div class="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold">
+                                        <i class="bi bi-person-plus-fill text-lg"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-bold text-slate-900 text-base">Add Staff Account</h3>
+                                        <p class="text-xs text-slate-500 font-normal">Create a Doctor, Nurse, or Facility Admin login for this facility</p>
+                                    </div>
+                                </div>
 
-                                <!-- Card Header -->
-                                <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between flex-wrap gap-4">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold">
-                                            <i class="bi bi-signpost-split text-lg"></i>
+                                <form id="addUserForm" class="space-y-4">
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label for="inputUserFullName" class="block text-xs font-bold text-slate-700 mb-1.5">Full Name</label>
+                                            <input type="text" id="inputUserFullName" name="full_name" required
+                                                class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
                                         </div>
                                         <div>
-                                            <h3 class="font-bold text-slate-900 text-base">Referral Outcomes</h3>
-                                            <p class="text-xs text-slate-500 font-normal">Referrals your team accepted — whether the referring clinic ultimately chose your hospital or a competitor</p>
+                                            <label for="inputUserRole" class="block text-xs font-bold text-slate-700 mb-1.5">Role</label>
+                                            <select id="inputUserRole" name="role" required
+                                                class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
+                                                <option value="doctor">Doctor</option>
+                                                <option value="nurse">Nurse</option>
+                                                <option value="facility_admin">Facility Admin</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label for="inputUserUsername" class="block text-xs font-bold text-slate-700 mb-1.5">Username</label>
+                                            <input type="text" id="inputUserUsername" name="username" required
+                                                class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                        </div>
+                                        <div>
+                                            <label for="inputUserPassword" class="block text-xs font-bold text-slate-700 mb-1.5">Temporary Password</label>
+                                            <input type="text" id="inputUserPassword" name="password" required minlength="6"
+                                                class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
                                         </div>
                                     </div>
 
-                                    <button id="btnRefreshOutcomes"
+                                    <!-- Clinical Credentials (Doctor/Nurse only) -->
+                                    <div id="userClinicalFields" class="pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label for="inputUserLicenseNumber" class="block text-xs font-bold text-slate-700 mb-1.5">PRC License Number</label>
+                                            <input type="text" id="inputUserLicenseNumber" name="license_number" placeholder="e.g. 0123456"
+                                                class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                        </div>
+                                        <div>
+                                            <label for="inputUserTrainings" class="block text-xs font-bold text-slate-700 mb-1.5">Trainings Attended</label>
+                                            <input type="text" id="inputUserTrainings" name="trainings" placeholder="e.g. BLS Certification 2023, ACLS Training 2024"
+                                                class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                        </div>
+                                    </div>
+
+                                    <div class="pt-4 border-t border-slate-100 flex justify-end">
+                                        <button type="submit" id="btnSubmitAddUser"
+                                            class="py-2.5 px-6 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl shadow-lg shadow-red-600/25 active:scale-[0.99] transition-all text-xs flex items-center gap-2 ml-auto">
+                                            <i class="bi bi-person-plus text-sm"></i>
+                                            <span>Create Account</span>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <!-- Users Table -->
+                            <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                                <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                                    <div class="flex items-center gap-3">
+                                        <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-red-50 text-red-600">
+                                            <i class="bi bi-people-fill text-lg"></i>
+                                        </div>
+                                        <h3 class="text-base font-bold text-slate-900">Facility Staff Accounts</h3>
+                                    </div>
+                                    <button id="btnRefreshUsers"
                                         class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200 transition-all">
                                         <i class="bi bi-arrow-clockwise"></i>
                                         <span>Refresh</span>
                                     </button>
                                 </div>
-
-                                <!-- Filter Bar -->
-                                <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-end gap-3">
-                                    <div>
-                                        <label for="outcomeFilterType" class="block text-xs font-bold text-slate-700 mb-1.5">Outcome</label>
-                                        <select id="outcomeFilterType"
-                                            class="h-10 px-3.5 bg-white border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
-                                            <option value="">All Outcomes</option>
-                                            <option value="CHOSEN">Confirmed Transfers</option>
-                                            <option value="BYPASSED">Bypassed Transfers</option>
-                                        </select>
-                                    </div>
-
-                                    <div class="flex-1 min-w-[180px]">
-                                        <label for="outcomeFilterSearch" class="block text-xs font-bold text-slate-700 mb-1.5">Search</label>
-                                        <input type="text" id="outcomeFilterSearch" placeholder="Referral ID, patient ID, referring facility..."
-                                            class="w-full h-10 px-3.5 bg-white border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
-                                    </div>
-                                </div>
-
-                                <!-- DataTables Referral Outcomes Table -->
-                                <div class="overflow-x-auto">
-                                    <table id="outcomesTable" class="w-full text-left border-collapse">
+                                <div class="overflow-x-auto bg-slate-50/50">
+                                    <table class="w-full text-left border-collapse">
                                         <thead>
-                                            <tr class="bg-slate-50/80 text-xs uppercase tracking-wider font-bold text-slate-600 border-b border-slate-200/80">
-                                                <th class="py-4 px-6">Referral ID</th>
-                                                <th class="py-4 px-6">Patient</th>
-                                                <th class="py-4 px-6">Referring Facility</th>
-                                                <th class="py-4 px-6">Severity</th>
-                                                <th class="py-4 px-6">Outcome</th>
-                                                <th class="py-4 px-6">Accepted/Seen At</th>
-                                                <th class="py-4 px-6">Went To</th>
+                                            <tr class="bg-slate-300/60 text-xs uppercase tracking-wider font-bold text-slate-600 border-b border-slate-200/80">
+                                                <th class="py-4 px-6">Full Name</th>
+                                                <th class="py-4 px-6">Username</th>
+                                                <th class="py-4 px-6">Role</th>
+                                                <th class="py-4 px-6">License No.</th>
+                                                <th class="py-4 px-6">Trainings</th>
+                                                <th class="py-4 px-6">Status</th>
+                                                <th class="py-4 px-6 text-right">Action</th>
                                             </tr>
                                         </thead>
-                                        <tbody id="outcomesTableBody" class="divide-y divide-slate-100 text-sm">
+                                        <tbody id="usersTableBody" class="divide-y divide-slate-100 text-sm">
                                             <tr>
                                                 <td colspan="7" class="text-center py-8 text-slate-400 font-normal">
                                                     <div class="inline-block animate-spin rounded-full h-5 w-5 border-2 border-red-600 border-t-transparent mr-2"></div>
-                                                    Loading referral outcomes...
+                                                    Loading staff accounts...
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -915,10 +1100,35 @@
                         </div>
                     </div>
 
+                    <!-- TAB 7: SERVICE ASSESSMENT CONTENT (Facility Admin only, DOH Pre-Made Form) -->
+                    <div id="tabAssessmentContent" style="display: none;">
+                        <div id="dohAssessmentFormContainer"></div>
+                    </div>
+
                 </div>
 
             </div>
         </main>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- LOCKED NOTICE VIEW (Doctor/Nurse at an unassessed facility) -->
+    <!-- ======================================================== -->
+    <div id="lockedNoticeView" class="min-h-screen bg-slate-50 flex items-center justify-center p-4" style="display: none;">
+        <div class="max-w-md w-full bg-white rounded-2xl border border-slate-200/80 shadow-sm p-8 text-center space-y-4">
+            <div class="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-2xl mx-auto">
+                <i class="bi bi-hourglass-split"></i>
+            </div>
+            <h3 class="font-bold text-slate-900 text-lg">Facility Setup Pending</h3>
+            <p class="text-sm text-slate-500">
+                Your facility administrator must complete the Service Capability Assessment before staff
+                accounts can access the system. Please contact your Facility Admin.
+            </p>
+            <button id="btnLockedLogout" type="button"
+                class="mt-2 h-10 px-5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition-all">
+                Log Out
+            </button>
+        </div>
     </div>
 
     <!-- Compact "Hospital Accepted" Toast (replaces the old full-screen popup) -->
@@ -940,135 +1150,6 @@
         </div>
     </div>
 
-    <!-- ======================================================== -->
-    <!-- REFERRAL MODAL (MODERN MINIMALIST INTER DESIGN)          -->
-    <!-- ======================================================== -->
-    <div id="referralModal" class="fixed inset-0 bg-slate-950/50 backdrop-blur-xs z-50 flex items-center justify-center p-4" style="display: none;">
-        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden border border-slate-200/80 transition-all">
-            
-            <!-- Modal Header (Minimalist) -->
-            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                <div>
-                    <h3 class="font-bold text-slate-900 text-base">Refer Patient</h3>
-                    <p class="text-xs text-slate-500 font-normal">Select patient location and clinical severity</p>
-                </div>
-                <button type="button" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors" onclick="closeReferralModal();">
-                    <i class="bi bi-x-lg text-sm"></i>
-                </button>
-            </div>
-
-            <!-- Modal Form -->
-            <form id="referralForm" class="p-5 space-y-4">
-                <input type="hidden" id="modalPatientId" name="patient_id">
-                <input type="hidden" id="modalLatitude" name="latitude" value="7.1907">
-                <input type="hidden" id="modalLongitude" name="longitude" value="125.4553">
-
-                <!-- Patient Summary Card -->
-                <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200/70 space-y-1.5 text-xs">
-                    <div class="flex items-center justify-between">
-                        <span class="text-slate-700 font-bold">Patient Name:</span>
-                        <span class="font-bold text-slate-900" id="modalPatientName">--</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span class="text-slate-700 font-bold">Date of Birth:</span>
-                        <span class="font-normal text-slate-800" id="modalPatientDob">--</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span class="text-slate-700 font-bold">Gender:</span>
-                        <span class="font-normal text-slate-800" id="modalPatientGender">--</span>
-                    </div>
-                </div>
-
-                <!-- LOCATION DROPDOWNS -->
-                <div class="space-y-2">
-                    <label class="block text-xs font-bold text-slate-900">Location Selector</label>
-
-                    <div class="grid grid-cols-2 gap-2.5">
-                        <div>
-                            <label for="selectRegion" class="block text-xs font-bold text-slate-700 mb-1.5">Region</label>
-                            <select id="selectRegion" class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
-                                <option value="Mindanao" selected>Mindanao</option>
-                                <option value="Luzon">Luzon</option>
-                                <option value="Visayas">Visayas</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label for="selectProvince" class="block text-xs font-bold text-slate-700 mb-1.5">Province</label>
-                            <select id="selectProvince" class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
-                                <!-- Populated dynamically -->
-                            </select>
-                        </div>
-
-                        <div>
-                            <label for="selectCity" class="block text-xs font-bold text-slate-700 mb-1.5">City / Municipality</label>
-                            <select id="selectCity" class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
-                                <!-- Populated dynamically -->
-                            </select>
-                        </div>
-
-                        <div>
-                            <label for="selectBarangay" class="block text-xs font-bold text-slate-700 mb-1.5">Barangay</label>
-                            <select id="selectBarangay" class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
-                                <!-- Populated dynamically -->
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- Geocoded Location Text Badge (Minimalist) -->
-                    <div class="px-3.5 py-2.5 bg-slate-50 rounded-xl border border-slate-200/60 flex items-center justify-between text-xs">
-                        <span class="text-slate-600 truncate max-w-[210px] font-normal" id="displayResolvedAddress">Davao City, Davao del Sur, Mindanao</span>
-                        <span class="font-mono text-slate-500 font-normal" id="displayLatLongText">7.190700, 125.455300</span>
-                    </div>
-                </div>
-
-                <!-- CLINICAL & FINANCIAL DETAILS -->
-                <div class="grid grid-cols-2 gap-2.5">
-                    <div>
-                        <label for="modalSalary" class="block text-xs font-bold text-slate-700 mb-1.5">Monthly Income (PHP)</label>
-                        <div class="relative">
-                            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-normal">₱</span>
-                            <input type="number" step="any" id="modalSalary" name="salary" required value="12000"
-                                class="w-full h-10 pl-7 pr-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
-                        </div>
-                    </div>
-
-                    <div>
-                        <label for="modalSeverity" class="block text-xs font-bold text-slate-700 mb-1.5">Severity Level</label>
-                        <select id="modalSeverity" name="severity" required
-                            class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
-                            <option value="1">1 - Mild</option>
-                            <option value="2">2 - Moderate</option>
-                            <option value="3" selected>3 - Severe</option>
-                            <option value="4">4 - Critical</option>
-                            <option value="5">5 - Extreme</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div>
-                    <label for="modalReasonText" class="block text-xs font-bold text-slate-700 mb-1.5">Referral Reason / Diagnosis</label>
-                    <input type="text" id="modalReasonText" name="reason_text" required
-                        class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all"
-                        placeholder="e.g. Severe Pneumonia" value="Severe Pneumonia">
-                </div>
-
-                <!-- Modal Actions -->
-                <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
-                    <button type="button" class="h-10 px-4 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold transition-colors" onclick="closeReferralModal();">
-                        Cancel
-                    </button>
-                    <button type="submit" id="btnSubmitReferral"
-                        class="h-10 px-4 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-xl shadow-sm active:scale-[0.99] transition-all flex items-center gap-1.5">
-                        <i class="bi bi-send text-xs"></i>
-                        <span>Transmit Referral</span>
-                    </button>
-                </div>
-            </form>
-
-        </div>
-    </div>
-
 
     <!-- ======================================================== -->
     <!-- SCRIPTS                                                  -->
@@ -1081,7 +1162,9 @@
     <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
     <!-- Application JS -->
+    <script src="js/service_assessment.js"></script>
     <script src="js/app.js?v=20260806e"></script>
+
 
 </body>
 </html>

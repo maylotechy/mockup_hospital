@@ -29,18 +29,16 @@ if (file_exists($vendorAutoload)) {
     }
 }
 
-// 2. Always resolve the caller's API key with a live DB read for the logged-in
-// hospital — never trust a client-supplied X-API-Key header here. That header is
-// only ever a stale JS-memory snapshot taken at login, so trusting it means a key
-// rotated mid-session (e.g. via the IRDSS admin panel) wouldn't take effect until
-// the hospital logs out and back in.
-$apiKey = getFreshApiKeyForLoggedInHospital();
+require_once __DIR__ . '/crypto_helper.php';
 
-if (empty($apiKey)) {
+// Check logged in user session
+$user = getLoggedInUser();
+if (!$user) {
     sendJsonResponse([
         'detail' => 'Unauthorized. Please log in again.'
     ], 401);
 }
+requireRole(['doctor', 'nurse']);
 
 // 3. Query target URI path on central FastAPI backend
 $requestUri = $_SERVER['REQUEST_URI'] ?? '';
@@ -74,14 +72,13 @@ foreach ($portsToTry as $port) {
 
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
-    $requestHeaders = [
-        'Content-Type: application/json',
-        'Accept: application/json',
-        'Connection: close',
-        'X-API-Key: ' . $apiKey
-    ];
+    // Generate RSA-2048 Signed Headers with 3-Layer Authentication Context
+    $signedHeaders = signRequestHeaders($method, $path, $rawInput, $user);
+    $signedHeaders[] = 'Accept: application/json';
+    $signedHeaders[] = 'Connection: close';
 
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $requestHeaders);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $signedHeaders);
+
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1);
     curl_setopt($ch, CURLOPT_TIMEOUT, 3);
 

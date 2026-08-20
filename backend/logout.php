@@ -1,12 +1,12 @@
 <?php
 // ========================================================
-// API Endpoint: Hospital Logout
+// API Endpoint: Staff Logout
 // ========================================================
 
 require_once __DIR__ . '/config.php';
 
 // Clear session data
-unset($_SESSION['hospital']);
+unset($_SESSION['user']);
 session_destroy();
 
 sendJsonResponse([

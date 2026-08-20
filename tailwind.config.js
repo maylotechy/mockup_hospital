@@ -33,6 +33,15 @@ tailwind.config = {
             fontFamily: {
                 sans: ['Inter', 'system-ui', 'sans-serif'],
                 mono: ['JetBrains Mono', 'monospace'],
+            },
+            // Shifts every text-* utility up one step app-wide (text-xs now reads at the old
+            // text-sm size, etc.) so form labels/values are consistently more readable across
+            // every page, without having to touch every individual element's classes.
+            fontSize: {
+                xs: ['0.875rem', { lineHeight: '1.25rem' }],
+                sm: ['1rem', { lineHeight: '1.5rem' }],
+                base: ['1.125rem', { lineHeight: '1.75rem' }],
+                lg: ['1.25rem', { lineHeight: '1.75rem' }],
             }
         }
     }

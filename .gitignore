@@ -1,4 +1,6 @@
-database
+database/*
+!database/schema.sql
 vendor
 
 .env
+storage/keys/*.pem
