@@ -32,11 +32,15 @@ function getOrGenerateKeyPair() {
         ];
     }
 
-    // Generate new 2048-bit RSA key pair
+    // Generate new 2048-bit RSA key pair. 'config' is pinned to a copy of
+    // openssl.cnf bundled with the app -- without it, openssl_pkey_new() can
+    // fail on Windows with "error:80000003:system library::No such process"
+    // if that machine's own PHP/OpenSSL install can't locate a usable config.
     $config = [
         "digest_alg"       => "sha256",
         "private_key_bits" => 2048,
         "private_key_type" => OPENSSL_KEYTYPE_RSA,
+        "config"           => __DIR__ . '/openssl.cnf',
     ];
 
     $res = openssl_pkey_new($config);
