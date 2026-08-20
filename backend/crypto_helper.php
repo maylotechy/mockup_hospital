@@ -26,10 +26,20 @@ function getOrGenerateKeyPair() {
     $publicKeyPath  = $dir . '/public_key.pem';
 
     if (file_exists($privateKeyPath) && file_exists($publicKeyPath)) {
-        return [
-            'private_key' => file_get_contents($privateKeyPath),
-            'public_key'  => file_get_contents($publicKeyPath)
-        ];
+        $existingPrivate = file_get_contents($privateKeyPath);
+        $existingPublic  = file_get_contents($publicKeyPath);
+
+        // A key left over from a previously failed/interrupted generation attempt
+        // (e.g. before openssl.cnf was bundled with the app) can exist on disk but
+        // be empty or malformed. Validate it actually parses before trusting it --
+        // otherwise fall through and regenerate a fresh pair instead of forcing
+        // every request to keep failing until someone manually deletes the files.
+        if ($existingPrivate !== false && $existingPrivate !== '' && openssl_pkey_get_private($existingPrivate) !== false) {
+            return [
+                'private_key' => $existingPrivate,
+                'public_key'  => $existingPublic
+            ];
+        }
     }
 
     // Generate new 2048-bit RSA key pair. 'config' is pinned to a copy of
@@ -48,9 +58,13 @@ function getOrGenerateKeyPair() {
         throw new Exception("Failed to generate RSA key pair: " . openssl_error_string());
     }
 
-    openssl_pkey_export($res, $privateKeyPem);
+    openssl_pkey_export($res, $privateKeyPem, null, $config);
     $pubDetails = openssl_pkey_get_details($res);
     $publicKeyPem = $pubDetails["key"];
+
+    if (empty($privateKeyPem) || empty($publicKeyPem)) {
+        throw new Exception("RSA key pair generated but could not be exported: " . openssl_error_string());
+    }
 
     file_put_contents($privateKeyPath, $privateKeyPem);
     file_put_contents($publicKeyPath, $publicKeyPem);
@@ -78,8 +92,16 @@ function signRequestHeaders($method, $path, $bodyString = '', $userContext = nul
     // Build signing payload string
     $signingStr = strtoupper($method) . "\n" . $path . "\n" . $systemCode . "\n" . $keyId . "\n" . $timestamp . "\n" . $nonce . "\n" . $bodySha256;
 
-    // Create RSA-SHA256 signature
-    $success = openssl_sign($signingStr, $rawSignature, $privateKey, OPENSSL_ALGO_SHA256);
+    // Create RSA-SHA256 signature. Passing the raw PEM string straight to
+    // openssl_sign() fails on some OpenSSL 3.x builds with "Supplied key param
+    // cannot be coerced into a private key" / "DECODER routines::unsupported" --
+    // explicitly resolving it to a key resource first is the more portable path.
+    $privateKeyResource = openssl_pkey_get_private($privateKey);
+    if ($privateKeyResource === false) {
+        throw new Exception("Stored RSA private key could not be parsed: " . openssl_error_string());
+    }
+
+    $success = openssl_sign($signingStr, $rawSignature, $privateKeyResource, OPENSSL_ALGO_SHA256);
     if (!$success) {
         throw new Exception("Failed to compute RSA signature: " . openssl_error_string());
     }
