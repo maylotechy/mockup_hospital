@@ -15,6 +15,8 @@ if (session_status() === PHP_SESSION_NONE) {
 
 $iolHost = $_ENV['IOL_HOST'] ?? 'localhost'; 
 define('IOL_ENDPOINT_URL', 'http://' . $iolHost . ':8081/api/v1/referral/initiate');
+define('IOL_AUTH_LOGIN_URL', 'http://' . $iolHost . ':8081/api/auth/login');
+
 
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'hospital_db');
@@ -49,45 +51,61 @@ function getDbConnection() {
 }
 
 /**
- * Returns currently logged-in hospital info array or null
- * 
+ * Returns currently logged-in staff user (with nested facility info) or null
+ *
  * @return array|null
  */
-function getLoggedInHospital() {
-    if (isset($_SESSION['hospital']) && is_array($_SESSION['hospital'])) {
-        return $_SESSION['hospital'];
+function getLoggedInUser() {
+    if (isset($_SESSION['user']) && is_array($_SESSION['user'])) {
+        return $_SESSION['user'];
     }
     return null;
 }
 
 /**
- * Resolves the logged-in hospital's *current* API key with a live DB read, so a key
+ * Sends a 403 JSON response and terminates the script unless the logged-in user's
+ * role is in $allowedRoles. Must be called after confirming the user is authenticated.
+ *
+ * @param string[] $allowedRoles
+ */
+function requireRole(array $allowedRoles) {
+    $user = getLoggedInUser();
+    if (!$user || !in_array($user['role'], $allowedRoles, true)) {
+        sendJsonResponse([
+            'success' => false,
+            'message' => 'You do not have permission to perform this action.'
+        ], 403);
+    }
+}
+
+/**
+ * Resolves the logged-in user's facility's *current* API key with a live DB read, so a key
  * rotated mid-session (e.g. by the IRDSS admin panel) takes effect on the very next
  * request instead of only after the browser logs out and back in. The session's
  * cached copy is refreshed too, so anything else reading it stays in sync.
  *
  * @return string|null
  */
-function getFreshApiKeyForLoggedInHospital() {
-    $hospital = getLoggedInHospital();
-    if (!$hospital || empty($hospital['id'])) {
+function getFreshApiKeyForLoggedInFacility() {
+    $user = getLoggedInUser();
+    if (!$user || empty($user['facility']['id'])) {
         return null;
     }
 
     try {
         $pdo = getDbConnection();
-        $stmt = $pdo->prepare('SELECT api_key FROM hospitals WHERE id = :id LIMIT 1');
-        $stmt->execute([':id' => $hospital['id']]);
+        $stmt = $pdo->prepare('SELECT api_key FROM facilities WHERE id = :id LIMIT 1');
+        $stmt->execute([':id' => $user['facility']['id']]);
         $row = $stmt->fetch();
     } catch (PDOException $e) {
-        return $hospital['api_key'] ?? null;
+        return $user['facility']['api_key'] ?? null;
     }
 
     if (!$row || empty($row['api_key'])) {
         return null;
     }
 
-    $_SESSION['hospital']['api_key'] = $row['api_key'];
+    $_SESSION['user']['facility']['api_key'] = $row['api_key'];
     return $row['api_key'];
 }
 

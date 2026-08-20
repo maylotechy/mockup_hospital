@@ -14,14 +14,18 @@ $(document).ready(function () {
     // API Base URL (auto-detect PhpStorm/IntelliJ built-in preview server, ports 63342/63343)
     const isIdeServer = location.port === '63342' || location.port === '63343';
     const API_BASE = isIdeServer ? 'http://localhost/mock_hospitals/backend' : '../backend';
-    const API_V1_ME = isIdeServer ? 'http://localhost/mock_hospitals/api/v1/hospitals/me/inventory' : '../api/v1/hospitals/me/inventory';
+    window.API_BASE = API_BASE;
     const API_V1_REFERRAL = isIdeServer ? 'http://localhost/mock_hospitals/api/v1/referral' : '../api/v1/referral';
 
-    // Active Hospital State
+
+    // Active Facility State (kept as `currentHospital` since referral/inventory/outcomes
+    // code throughout this file already treats it as the logged-in facility's own record)
     let currentHospital = null;
+    // Active Staff User State (role-based nav & assessment lockout)
+    let currentUser = null;
 
     /**
-     * Check active hospital session on page load
+     * Check active staff session on page load
      */
     function checkSession() {
         $.ajax({
@@ -29,10 +33,12 @@ $(document).ready(function () {
             type: 'GET',
             dataType: 'json',
             success: function (response) {
-                if (response.authenticated && response.hospital) {
-                    currentHospital = response.hospital;
-                    showDashboardView(response.hospital);
+                if (response.authenticated && response.user && response.facility) {
+                    currentUser = response.user;
+                    currentHospital = response.facility;
+                    showDashboardView();
                 } else {
+                    currentUser = null;
                     currentHospital = null;
                     showLoginView();
                 }
@@ -42,6 +48,25 @@ $(document).ready(function () {
             }
         });
     }
+
+    /**
+     * Mobile sidebar: off-canvas on small screens (toggled via hamburger + backdrop),
+     * always visible on lg+ via the `lg:translate-x-0` class already on #sidebar --
+     * these open/close calls are simply no-ops on desktop since that class wins there.
+     */
+    function openSidebar() {
+        $('#sidebar').removeClass('-translate-x-full');
+        $('#sidebarBackdrop').removeClass('hidden');
+    }
+    function closeSidebar() {
+        $('#sidebar').addClass('-translate-x-full');
+        $('#sidebarBackdrop').addClass('hidden');
+    }
+    $('#btnSidebarToggle').on('click', function () {
+        if ($('#sidebar').hasClass('-translate-x-full')) openSidebar(); else closeSidebar();
+    });
+    $('#sidebarBackdrop').on('click', closeSidebar);
+    $(document).on('click', '.sidebar-link', closeSidebar);
 
     /**
      * Update hospital logo based on hospital code
@@ -63,27 +88,71 @@ $(document).ready(function () {
     /**
      * Show Dashboard View (Authenticated State)
      */
-    function showDashboardView(hospital) {
-        $('#loginView').hide();
+    function showDashboardView() {
+        const isAdmin = currentUser && currentUser.role === 'facility_admin';
+        const isAssessed = !!(currentHospital && currentHospital.is_assessment_completed);
+
+        // Non-admin staff at a facility that hasn't completed its Service Assessment
+        // can't use the system at all yet -- they don't have a way to fill it in.
+        if (!isAdmin && !isAssessed) {
+            $('#loginView, #dashboardView').hide();
+            $('#lockedNoticeView').fadeIn(200);
+            return;
+        }
+
+        $('#loginView, #lockedNoticeView').hide();
         $('#dashboardView').fadeIn(200);
 
-        $('#sidebarHospitalName, #headerHospitalName').text(hospital.name);
-        $('#sidebarHospitalCode').text(hospital.code);
+        $('#sidebarHospitalName, #headerHospitalName').text(currentHospital.name);
+        $('#sidebarHospitalCode').text(currentHospital.code);
+        $('#sidebarFacilityTier').text(currentHospital.tier_level || '--').removeClass('hidden');
 
         // edit logo
-        updateHospitalLogo(hospital.code);
+        updateHospitalLogo(currentHospital.code);
 
-        // Default to Patients tab
-        switchTab('patients');
-        loadPatients();
-        checkAndPollRecommendations();
+        applyRoleBasedNav();
+
+        if (isAdmin && !isAssessed) {
+            // Facility admin must complete the Service Assessment before anything unlocks
+            $('#assessmentLockBanner').removeClass('hidden');
+            switchTab('assessment');
+        } else if (isAdmin) {
+            $('#assessmentLockBanner').addClass('hidden');
+            switchTab('users');
+        } else {
+            $('#assessmentLockBanner').addClass('hidden');
+            switchTab('patients');
+            loadPatients();
+            checkAndPollRecommendations();
+        }
+    }
+
+    /**
+     * Show/hide sidebar nav links based on the logged-in user's role -- Facility Admins
+     * manage staff & the Service Assessment, Doctors/Nurses handle patients & referrals.
+     * Also locks everything but Service Assessment for a facility_admin whose facility
+     * hasn't completed its assessment yet.
+     */
+    function applyRoleBasedNav() {
+        const isAdmin = currentUser && currentUser.role === 'facility_admin';
+        const isAssessed = !!(currentHospital && currentHospital.is_assessment_completed);
+
+        $('[data-nav-role="staff"]').toggle(!isAdmin);
+
+        if (isAdmin && !isAssessed) {
+            $('[data-nav-role="admin"]').hide();
+            $('#navTabAssessment').show();
+            return;
+        }
+
+        $('[data-nav-role="admin"]').toggle(isAdmin);
     }
 
     /**
      * Show Login View (Unauthenticated State)
      */
     function showLoginView() {
-        $('#dashboardView').hide();
+        $('#dashboardView, #lockedNoticeView').hide();
         $('#loginView').fadeIn(200);
     }
 
@@ -98,7 +167,7 @@ $(document).ready(function () {
             .removeClass('text-red-600')
             .addClass('text-slate-500');
 
-        const $allTabs = $('#tabPatientsContent, #tabInventoryContent, #tabProfileContent, #tabReferralsContent, #tabOutcomesContent');
+        const $allTabs = $('#tabPatientsContent, #tabAddPatientContent, #tabReferPatientContent, #tabPendingContent, #tabReferralsContent, #tabIncomingContent, #tabUsersContent, #tabAssessmentContent');
 
         if (tabName === 'patients') {
             $('#navTabPatients')
@@ -110,29 +179,16 @@ $(document).ready(function () {
             $('#mainHeaderTitle').text('Patient Records');
             $allTabs.hide();
             $('#tabPatientsContent').fadeIn(200);
-        } else if (tabName === 'inventory') {
-            $('#navTabInventory')
-                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
-                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
-            $('#navIconInventory')
-                .removeClass('text-slate-500')
-                .addClass('text-red-600');
-            $('#mainHeaderTitle').text('Hospital Inventory');
+        } else if (tabName === 'addPatient') {
+            $('#mainHeaderTitle').text('Register Patient');
             $allTabs.hide();
-            $('#tabInventoryContent').fadeIn(200);
-            loadInventory();
-        } else if (tabName === 'profile') {
-            $('#navTabProfile')
-                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
-                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
-            $('#navIconProfile')
-                .removeClass('text-slate-500')
-                .addClass('text-red-600');
-            $('#mainHeaderTitle').text('Facility Profile');
+            $('#tabAddPatientContent').fadeIn(200, function () {
+                patientLocationCascade.init();
+            });
+        } else if (tabName === 'referPatient') {
+            $('#mainHeaderTitle').text('Refer Patient');
             $allTabs.hide();
-            $('#tabProfileContent').fadeIn(200);
-            loadInventory();
-            initInventoryLocationDropdowns();
+            $('#tabReferPatientContent').fadeIn(200);
         } else if (tabName === 'referrals') {
             $('#navTabReferrals')
                 .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
@@ -145,33 +201,68 @@ $(document).ready(function () {
             $('#tabReferralsContent').fadeIn(200);
             loadMyReferrals();
             checkAndPollRecommendations();
-        } else if (tabName === 'outcomes') {
-            $('#navTabOutcomes')
+        } else if (tabName === 'pending') {
+            $('#navTabPending')
                 .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
                 .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
-            $('#navIconOutcomes')
+            $('#navIconPending')
                 .removeClass('text-slate-500')
                 .addClass('text-red-600');
-            $('#mainHeaderTitle').text('Referral Outcomes');
+            $('#mainHeaderTitle').text('Pending Referrals');
             $allTabs.hide();
-            $('#tabOutcomesContent').fadeIn(200);
-            loadReferralOutcomes();
+            $('#tabPendingContent').fadeIn(200);
+            stopAlarmSound();
+            pollIncomingReferrals();
+        } else if (tabName === 'incoming') {
+            $('#navTabIncoming')
+                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
+                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
+            $('#navIconIncoming')
+                .removeClass('text-slate-500')
+                .addClass('text-red-600');
+            $('#mainHeaderTitle').text('Incoming Patients');
+            $allTabs.hide();
+            $('#tabIncomingContent').fadeIn(200);
+            loadAcceptedPatients();
+        } else if (tabName === 'users') {
+            $('#navTabUsers')
+                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
+                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
+            $('#navIconUsers')
+                .removeClass('text-slate-500')
+                .addClass('text-red-600');
+            $('#mainHeaderTitle').text('Manage Users');
+            $allTabs.hide();
+            $('#tabUsersContent').fadeIn(200);
+            loadUsers();
+        } else if (tabName === 'assessment') {
+            $('#navTabAssessment')
+                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
+                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
+            $('#navIconAssessment')
+                .removeClass('text-slate-500')
+                .addClass('text-red-600');
+            $('#mainHeaderTitle').text('Service Assessment');
+            $allTabs.hide();
+            $('#tabAssessmentContent').fadeIn(200);
+            loadServiceAssessment();
         }
     }
+
+    function loadServiceAssessment() {
+        const doh = window.DOHAssessment || (typeof DOHAssessment !== 'undefined' ? DOHAssessment : null);
+        if (doh && typeof doh.loadForm === 'function') {
+            doh.loadForm();
+        } else {
+            console.error('DOHAssessment module not found on window object!');
+        }
+    }
+
+
 
     $('#navTabPatients').on('click', function (e) {
         e.preventDefault();
         switchTab('patients');
-    });
-
-    $('#navTabInventory').on('click', function (e) {
-        e.preventDefault();
-        switchTab('inventory');
-    });
-
-    $('#navTabProfile').on('click', function (e) {
-        e.preventDefault();
-        switchTab('profile');
     });
 
     $('#navTabReferrals').on('click', function (e) {
@@ -179,125 +270,33 @@ $(document).ready(function () {
         switchTab('referrals');
     });
 
-    $('#navTabOutcomes').on('click', function (e) {
+    $('#navTabPending').on('click', function (e) {
         e.preventDefault();
-        switchTab('outcomes');
+        switchTab('pending');
     });
 
-    /**
-     * Skeleton Loading Toggle for Inventory & Hospital Profile Tab
-     */
-    const INVENTORY_SKELETON_IDS = [
-        'statAvailableBeds', 'statMedicalSpecs', 'statHospitalLevel', 'statHospitalEnv',
-        'displayHospitalId', 'displayHospitalName', 'displayHospitalLevel', 'displayHospitalEnv', 'displayGpsCoords',
-        'badgeEmergencyEquip', 'badgeMedicalEquip', 'badgeCommSystems'
-    ];
+    $(document).on('click', '#btnRefreshPending', function () {
+        pollIncomingReferrals();
+    });
 
-    function showInventorySkeleton() {
-        INVENTORY_SKELETON_IDS.forEach(function (id) {
-            $(`#${id}Skeleton`).removeClass('hidden');
-            $(`#${id}`).addClass('hidden');
-        });
-    }
+    $(document).on('click', '#btnTestAlarm', function () {
+        playAlarmSound();
+    });
 
-    function hideInventorySkeleton() {
-        INVENTORY_SKELETON_IDS.forEach(function (id) {
-            $(`#${id}Skeleton`).addClass('hidden');
-            $(`#${id}`).removeClass('hidden');
-        });
-    }
+    $('#navTabIncoming').on('click', function (e) {
+        e.preventDefault();
+        switchTab('incoming');
+    });
 
-    /**
-     * Enables/disables both the Inventory and Profile submit buttons together,
-     * since a single GET (loadInventory) backs both split-out tabs.
-     */
-    function setHospitalFormsDisabled(disabled) {
-        if (disabled) {
-            $('#btnSubmitInventory, #btnSubmitProfile')
-                .prop('disabled', true)
-                .html('<i class="bi bi-wifi-off me-2"></i> Server Offline (Updates Disabled)');
-        } else {
-            $('#btnSubmitInventory').prop('disabled', false).html('<i class="bi bi-cloud-arrow-up me-2"></i> Update Inventory');
-            $('#btnSubmitProfile').prop('disabled', false).html('<i class="bi bi-cloud-arrow-up me-2"></i> Update Facility Profile');
-        }
-    }
+    $('#navTabUsers').on('click', function (e) {
+        e.preventDefault();
+        switchTab('users');
+    });
 
-    /**
-     * Load Hospital Inventory via GET /api/v1/hospitals/me/inventory
-     */
-    function loadInventory() {
-        if (!currentHospital) return;
-
-        showInventorySkeleton();
-
-        const apiKey = currentHospital.api_key || '';
-        const cacheKey = `cached_hospital_profile_${currentHospital.id}`;
-
-        $.ajax({
-            url: API_V1_ME,
-            type: 'GET',
-            headers: {
-                'X-API-Key': apiKey
-            },
-            dataType: 'json',
-            success: function (data) {
-                // Online mode: hide offline/connection alert banners & enable submit buttons
-                $('#serverOfflineAlert').slideUp(200);
-                $('#serverConnectionAlert').slideUp(200);
-                setHospitalFormsDisabled(false);
-
-                populateHospitalProfile(data);
-                hideInventorySkeleton();
-            },
-            error: function (xhr) {
-                const cachedRaw = localStorage.getItem(cacheKey);
-
-                if (cachedRaw) {
-                    // Load and display cached data fetched before server went offline
-                    try {
-                        const cachedData = JSON.parse(cachedRaw);
-                        populateHospitalProfile(cachedData, true);
-                        hideInventorySkeleton();
-
-                        // Show offline alert banner & disable submit buttons
-                        $('#serverConnectionAlert').slideUp(200);
-                        $('#serverOfflineAlert').slideDown(200);
-                        setHospitalFormsDisabled(true);
-
-                        Swal.fire({
-                            toast: true,
-                            position: 'top-end',
-                            icon: 'warning',
-                            title: 'Central Backend Offline — Showing Cached Profile',
-                            showConfirmButton: false,
-                            timer: 3500
-                        });
-                        return;
-                    } catch (e) {}
-                }
-
-                // If no cached data exists, keep the skeleton pulsing — there's nothing real to show yet
-                const errData = xhr.responseJSON || {};
-                const isConnectionErr = xhr.status === 503 || xhr.status === 0 || (errData.detail && errData.detail.includes("reach the server"));
-
-                if (isConnectionErr) {
-                    // Inline banner instead of a blocking alert — server being unreachable is common/expected
-                    $('#serverOfflineAlert').slideUp(200);
-                    $('#serverConnectionAlert').slideDown(200);
-                    setHospitalFormsDisabled(true);
-                    return;
-                }
-
-                $('#serverConnectionAlert').slideUp(200);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'API Authorization Notice',
-                    text: errData.detail || 'Could not retrieve hospital profile from backend.',
-                    confirmButtonColor: '#0d6efd'
-                });
-            }
-        });
-    }
+    $('#navTabAssessment').on('click', function (e) {
+        e.preventDefault();
+        switchTab('assessment');
+    });
 
     /**
      * Handle Login Form Submission
@@ -319,15 +318,16 @@ $(document).ready(function () {
             success: function (response) {
                 $btn.html('<span>Sign In</span> <i class="bi bi-arrow-right"></i>').prop('disabled', false);
 
-                if (response.success && response.hospital) {
-                    currentHospital = response.hospital;
-                    showDashboardView(response.hospital);
-                    
+                if (response.success && response.user && response.facility) {
+                    currentUser = response.user;
+                    currentHospital = response.facility;
+                    showDashboardView();
+
                     Swal.fire({
                         toast: true,
                         position: 'top-end',
                         icon: 'success',
-                        title: `Welcome back, ${response.hospital.name}!`,
+                        title: `Welcome back, ${response.user.full_name}!`,
                         showConfirmButton: false,
                         timer: 3000
                     });
@@ -361,7 +361,7 @@ $(document).ready(function () {
     /**
      * Handle Logout Button Click
      */
-    $(document).on('click', '#btnLogoutBtn', function () {
+    $(document).on('click', '#btnLogoutBtn, #btnLockedLogout', function () {
         Swal.fire({
             title: 'Log Out?',
             text: 'Are you sure you want to sign out?',
@@ -388,9 +388,11 @@ $(document).ready(function () {
                     dataType: 'json',
                     success: function () {
                         currentHospital = null;
+                        currentUser = null;
                         window.activeInitiatedReferralId = null;
 
                         // Clear referral notification state so the next login starts fresh
+                        stopAlarmSound();
                         notifiedReferralIds.clear();
                         incomingNotifications.clear();
                         renderNotificationBell();
@@ -553,160 +555,6 @@ $(document).ready(function () {
         });
     }
 
-    /**
-     * Populate Hospital Detail Schema into UI components and save to localStorage cache
-     */
-    function populateHospitalProfile(data, isCached = false) {
-        if (!data) return;
-
-        // Top widgets
-        $('#statAvailableBeds').text(data.available_beds ?? 0);
-        $('#statMedicalSpecs').text(data.medical_specialists_count ?? 0);
-        $('#statHospitalLevel').text(data.hospital_level || 'Level 2');
-        $('#statHospitalEnv').text(data.hospital_environment || 'Urban');
-
-        // Detailed table
-        $('#displayHospitalId').text(`#${data.id ?? (currentHospital ? currentHospital.id : 1)}`);
-        $('#displayHospitalName').text(data.hospital_name || (currentHospital ? currentHospital.name : 'Hospital'));
-        $('#displayHospitalLevel').text(data.hospital_level || 'Level 2');
-        $('#displayHospitalEnv').text(data.hospital_environment || 'Urban');
-        $('#displayGpsCoords').html(
-            resolveLocationAddressHtml(parseFloat(data.latitude), parseFloat(data.longitude), 'displayGpsCoordsText', { admin3: true })
-        );
-
-        // Badges
-        const BADGE_BASE_CLASS = 'inline-flex items-center flex-shrink-0 whitespace-nowrap px-3 py-1 rounded-full text-xs font-semibold';
-
-        $('#badgeEmergencyEquip').html(data.emergency_equipment ? '<i class="bi bi-check-circle me-1"></i> Available' : '<i class="bi bi-x-circle me-1"></i> Unavailable')
-            .attr('class', `${BADGE_BASE_CLASS} ${data.emergency_equipment ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`);
-
-        $('#badgeMedicalEquip').html(data.medical_equipment ? '<i class="bi bi-check-circle me-1"></i> Available' : '<i class="bi bi-x-circle me-1"></i> Unavailable')
-            .attr('class', `${BADGE_BASE_CLASS} ${data.medical_equipment ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`);
-
-        $('#badgeCommSystems').html(data.communication_systems ? '<i class="bi bi-check-circle me-1"></i> Active' : '<i class="bi bi-x-circle me-1"></i> Inactive')
-            .attr('class', `${BADGE_BASE_CLASS} ${data.communication_systems ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'}`);
-
-        // Form inputs
-        $('#inputBeds').val(data.available_beds ?? 0);
-        $('#inputSpecs').val(data.medical_specialists_count ?? 0);
-        $('#inputLevel').val(data.hospital_level || 'Level 2');
-        $('#inputEnv').val(data.hospital_environment || 'Urban');
-        $('#inputLat').val(data.latitude ?? 0);
-        $('#inputLng').val(data.longitude ?? 0);
-
-        $('#inputEmergencyEquip').prop('checked', !!data.emergency_equipment);
-        $('#inputMedicalEquip').prop('checked', !!data.medical_equipment);
-        $('#inputCommSystems').prop('checked', !!data.communication_systems);
-
-        // Cache data locally for offline display if it came live from API
-        if (!isCached && currentHospital) {
-            try {
-                localStorage.setItem(`cached_hospital_profile_${currentHospital.id}`, JSON.stringify(data));
-            } catch (e) {}
-        }
-    }
-
-
-
-    /**
-     * Shared PATCH submitter for /api/v1/hospitals/me/inventory (partial payloads),
-     * with a fallback to inventory_api.php, used by both the Inventory and Profile forms.
-     */
-    function submitHospitalPatch(fields, $btn, successTitle) {
-        if (!currentHospital) return;
-
-        const apiKey = currentHospital.api_key || '';
-        const originalText = $btn.html();
-        const payload = JSON.stringify(fields);
-
-        $btn.html('<span class="spinner-border spinner-border-sm me-2"></span> Updating...').prop('disabled', true);
-
-        function handlePatchSuccess() {
-            $btn.html(originalText).prop('disabled', false);
-
-            // Instantly trigger auto-refresh call to fetch fresh data from backend
-            loadInventory();
-
-            Swal.fire({
-                toast: true,
-                position: 'top-end',
-                icon: 'success',
-                title: successTitle,
-                showConfirmButton: false,
-                timer: 2000
-            });
-        }
-
-        $.ajax({
-            url: API_V1_ME,
-            type: 'PATCH',
-            headers: {
-                'X-API-Key': apiKey,
-                'Content-Type': 'application/json'
-            },
-            data: payload,
-            dataType: 'json',
-            success: function () {
-                handlePatchSuccess();
-            },
-            error: function () {
-                $.ajax({
-                    url: `${API_BASE}/inventory_api.php`,
-                    type: 'POST',
-                    headers: {
-                        'X-API-Key': apiKey,
-                        'Content-Type': 'application/json'
-                    },
-                    data: payload,
-                    dataType: 'json',
-                    success: function () {
-                        handlePatchSuccess();
-                    },
-                    error: function (errXhr) {
-                        $btn.html(originalText).prop('disabled', false);
-                        const errObj = errXhr.responseJSON || {};
-                        const isConnectionErr = errXhr.status === 503 || errXhr.status === 0 || (errObj.detail && errObj.detail.includes("reach the server"));
-
-                        Swal.fire({
-                            icon: 'error',
-                            title: isConnectionErr ? "Can't Reach Server" : "Update Failed",
-                            text: isConnectionErr
-                                ? "Can't reach the server, contact devs @ irdss.devs@up.edu.ph"
-                                : (errObj.detail || "Could not update hospital records."),
-                            confirmButtonColor: '#0d6efd'
-                        });
-                    }
-                });
-            }
-        });
-    }
-
-    /**
-     * Submit Inventory Update (beds, specialists, equipment) via PATCH /api/v1/hospitals/me/inventory
-     */
-    $('#updateInventoryForm').on('submit', function (e) {
-        e.preventDefault();
-        submitHospitalPatch({
-            available_beds: parseInt($('#inputBeds').val(), 10),
-            medical_specialists_count: parseInt($('#inputSpecs').val(), 10),
-            emergency_equipment: $('#inputEmergencyEquip').is(':checked'),
-            medical_equipment: $('#inputMedicalEquip').is(':checked'),
-            communication_systems: $('#inputCommSystems').is(':checked')
-        }, $('#btnSubmitInventory'), 'Hospital Inventory Updated!');
-    });
-
-    /**
-     * Submit Facility Profile Update (level, environment, location) via PATCH /api/v1/hospitals/me/inventory
-     */
-    $('#updateProfileForm').on('submit', function (e) {
-        e.preventDefault();
-        submitHospitalPatch({
-            hospital_level: $('#inputLevel').val(),
-            hospital_environment: $('#inputEnv').val(),
-            latitude: parseFloat($('#inputLat').val()),
-            longitude: parseFloat($('#inputLng').val())
-        }, $('#btnSubmitProfile'), 'Facility Profile Updated!');
-    });
 
     /**
      * Open Referral Modal for a specific patient
@@ -730,15 +578,21 @@ $(document).ready(function () {
                     const patient = response.data;
 
                     $('#modalPatientId').val(patient.id);
-                    $('#modalPatientIdBadge').text(`#${patient.id}`);
                     $('#modalPatientName').text(`${patient.first_name} ${patient.last_name}`);
                     $('#modalPatientDob').text(patient.dob);
                     $('#modalPatientGender').text(patient.gender);
                     $('#modalPatientPhone').text(patient.phone || 'N/A');
 
-                    $('#referralModal').fadeIn(200, function() {
-                        initLocationDropdowns();
+                    switchTab('referPatient');
+                    // Pre-fill the location selector from the patient's own registered
+                    // address instead of always defaulting to Davao City
+                    referralLocationCascade.init({
+                        region: patient.region,
+                        province: patient.province,
+                        city: patient.city_municipality,
+                        barangay: patient.barangay
                     });
+                    toggleReferralReasonOther();
                 } else {
                     Swal.fire({
                         icon: 'error',
@@ -761,6 +615,21 @@ $(document).ready(function () {
     });
 
     /**
+     * When "Others" is picked in the Referral Reason dropdown, reveal the free-text
+     * field for the doctor to specify it; otherwise keep #modalReasonText (the field
+     * actually submitted) synced to the selected dropdown option.
+     */
+    function toggleReferralReasonOther() {
+        const selected = $('#modalReasonSelect').val();
+        if (selected === 'Others') {
+            $('#modalReasonText').removeClass('hidden').val('');
+        } else {
+            $('#modalReasonText').addClass('hidden').val(selected);
+        }
+    }
+    $('#modalReasonSelect').on('change', toggleReferralReasonOther);
+
+    /**
      * Handle Referral Form Submit
      */
     $('#referralForm').on('submit', function (e) {
@@ -775,11 +644,16 @@ $(document).ready(function () {
             patient_id: parseInt($('#modalPatientId').val(), 10) || 1,
             latitude: parseFloat($('#modalLatitude').val()) || 7.1907,
             longitude: parseFloat($('#modalLongitude').val()) || 125.4553,
-            salary: parseFloat($('#modalSalary').val()) || 12000,
             severity: parseFloat($('#modalSeverity').val()) || 3,
             reason_text: $('#modalReasonText').val() || 'Severe Pneumonia',
             reason_code: '233604007',
-            reason_display: 'Pneumonia'
+            diagnosis: $('#modalDiagnosis').val() || 'Pneumonia',
+            chief_complaint: $('#modalChiefComplaint').val() || '',
+            vital_bp: $('#modalVitalBp').val() || '',
+            vital_hr: $('#modalVitalHr').val() || '',
+            vital_rr: $('#modalVitalRr').val() || '',
+            vital_temp_c: $('#modalVitalTemp').val() || '',
+            vital_o2sat: $('#modalVitalO2sat').val() || ''
         };
 
         $.ajax({
@@ -789,9 +663,9 @@ $(document).ready(function () {
             dataType: 'json',
             success: function (response) {
                 $submitBtn.html(originalBtnHtml).prop('disabled', false);
-                $('#referralModal').fadeOut(200);
 
                 if (response.success) {
+                    switchTab('patients');
                     let refId = response.referral_id || null;
                     if (!refId && response.iol_response) {
                         if (typeof response.iol_response === 'object') {
@@ -847,7 +721,6 @@ $(document).ready(function () {
             },
             error: function (xhr) {
                 $submitBtn.html(originalBtnHtml).prop('disabled', false);
-                $('#referralModal').fadeOut(200);
 
                 const status = xhr.status || 500;
                 const errData = xhr.responseJSON || {};
@@ -894,6 +767,204 @@ $(document).ready(function () {
         checkAndPollRecommendations();
     });
 
+    $(document).on('click', '#btnRefreshAcceptedPatients', function () {
+        loadAcceptedPatients();
+    });
+
+    /**
+     * Load referrals finalized to this facility via GET /api/v1/referral/outcomes,
+     * filtered to CHOSEN -- these are the only ones eligible for the full patient
+     * details reveal (GET .../patient-details is gated the same way server-side).
+     */
+    function loadAcceptedPatients() {
+        if (!currentHospital) return;
+
+        const apiKey = currentHospital.api_key || '';
+        const $list = $('#acceptedPatientsList');
+
+        $.ajax({
+            url: `${API_V1_REFERRAL}/outcomes`,
+            type: 'GET',
+            headers: { 'X-API-Key': apiKey },
+            dataType: 'json',
+            success: function (data) {
+                const all = Array.isArray(data) ? data : [];
+                const chosen = all.filter(o => o.outcome === 'CHOSEN');
+                const bypassed = all.filter(o => o.outcome === 'BYPASSED');
+
+                $('#statTransferredToUs').text(chosen.length);
+                $('#statRedirectedElsewhere').text(bypassed.length);
+
+                if (chosen.length === 0) {
+                    $list.html('<div class="px-6 py-6 text-center text-xs text-slate-400">No finalized referrals yet.</div>');
+                    return;
+                }
+
+                $list.html(chosen.map(function (o) {
+                    const arrivalControl = o.arrived_at
+                        ? `<span class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200">
+                               <i class="bi bi-check-circle-fill"></i> Arrived ${formatReferralTimestamp(o.arrived_at)}
+                           </span>`
+                        : `<button type="button" data-referral-id="${escapeHtml(o.referral_id)}"
+                               class="btn-mark-arrived inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold transition-all">
+                               <i class="bi bi-box-arrow-in-down"></i> Mark as Arrived
+                           </button>`;
+
+                    return `
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-4">
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-semibold text-slate-900">${escapeHtml(o.clinical_reason || 'Referral')}</p>
+                                <p class="text-xs text-slate-500 mt-0.5 break-words">
+                                    From <strong>${escapeHtml(o.referring_facility)}</strong> &middot;
+                                    Severity ${escapeHtml(String(o.disease_severity))} &middot;
+                                    ${formatReferralTimestamp(o.created_at)}
+                                </p>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2 flex-shrink-0">
+                                ${arrivalControl}
+                                <button type="button" data-referral-id="${escapeHtml(o.referral_id)}"
+                                    class="btn-view-patient-details inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-all">
+                                    <i class="bi bi-person-lines-fill"></i> View Full Patient Details
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join(''));
+            },
+            error: function () {
+                $list.html('<div class="px-6 py-6 text-center text-xs text-red-500">Could not load finalized referrals.</div>');
+            }
+        });
+    }
+
+    $(document).on('click', '.btn-mark-arrived', function () {
+        const $btn = $(this);
+        const referralId = $btn.data('referral-id');
+        const originalHtml = $btn.html();
+
+        Swal.fire({
+            icon: 'question',
+            title: 'Mark Patient as Arrived?',
+            text: 'This will confirm the patient has physically arrived at your facility and add them to your Patient Records.',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, Mark as Arrived',
+            cancelButtonText: 'Cancel',
+            confirmButtonColor: '#f59e0b',
+            reverseButtons: true
+        }).then(function (result) {
+            if (!result.isConfirmed) return;
+            submitMarkArrived($btn, referralId, originalHtml);
+        });
+    });
+
+    function submitMarkArrived($btn, referralId, originalHtml) {
+        $btn.prop('disabled', true).html('<span class="inline-block animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></span> Marking...');
+
+        $.ajax({
+            url: `${API_BASE}/receive_transferred_patient.php`,
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ referral_id: referralId }),
+            dataType: 'json',
+            success: function (response) {
+                if (response.success) {
+                    Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'success',
+                        title: response.message || 'Patient marked as arrived.',
+                        showConfirmButton: false,
+                        timer: 3000
+                    });
+                    loadAcceptedPatients();
+                    if (typeof loadPatients === 'function') loadPatients();
+                } else {
+                    $btn.prop('disabled', false).html(originalHtml);
+                    Swal.fire({ icon: 'error', title: 'Could Not Mark as Arrived', text: response.message, confirmButtonColor: '#dc3545' });
+                }
+            },
+            error: function (xhr) {
+                $btn.prop('disabled', false).html(originalHtml);
+                const errData = xhr.responseJSON || {};
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Could Not Mark as Arrived',
+                    text: errData.message || `Request failed (${xhr.status}).`,
+                    confirmButtonColor: '#dc3545'
+                });
+            }
+        });
+    }
+
+    $(document).on('click', '.btn-view-patient-details', function () {
+        const referralId = $(this).data('referral-id');
+
+        $.ajax({
+            url: `${API_BASE}/get_transferred_patient_details.php?referral_id=${encodeURIComponent(referralId)}`,
+            type: 'GET',
+            dataType: 'json',
+            success: function (d) {
+                const vitalTile = function (label, value) {
+                    return `
+                        <div class="bg-slate-50 rounded-lg p-2.5 text-center">
+                            <p class="text-[10px] uppercase tracking-wide text-slate-500">${label}</p>
+                            <p class="font-semibold text-slate-900">${escapeHtml(value != null && value !== '' ? String(value) : '—')}</p>
+                        </div>
+                    `;
+                };
+
+                Swal.fire({
+                    title: 'Patient Details',
+                    width: '46rem',
+                    html: `
+                        <div class="text-start text-sm">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 pb-4 mb-4 border-b border-slate-200">
+                                <p><strong>Full Name:</strong> ${escapeHtml(d.full_name || '—')}</p>
+                                <p><strong>DOB:</strong> ${escapeHtml(d.date_of_birth || '—')}</p>
+                                <p><strong>Age:</strong> ${d.age ?? '—'}</p>
+                                <p><strong>Gender:</strong> ${escapeHtml(d.gender || '—')}</p>
+                                <p><strong>Civil Status:</strong> ${escapeHtml(d.civil_status || '—')}</p>
+                                <p><strong>Phone:</strong> ${escapeHtml(d.phone || '—')}</p>
+                                <p><strong>PhilHealth:</strong> ${escapeHtml(d.philhealth_status || '—')} ${d.philhealth_number ? '(' + escapeHtml(d.philhealth_number) + ')' : ''}</p>
+                                <p class="sm:col-span-2"><strong>Address:</strong> ${escapeHtml(d.address || '—')}</p>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 pb-4 mb-4 border-b border-slate-200">
+                                <p><strong>Diagnosis:</strong> ${escapeHtml(d.diagnosis || '—')}</p>
+                                <p><strong>Severity:</strong> ${escapeHtml(String(d.disease_severity ?? '—'))}</p>
+                                <p class="sm:col-span-2"><strong>Chief Complaint:</strong> ${escapeHtml(d.chief_complaint || '—')}</p>
+                                <p class="sm:col-span-2"><strong>Referral Reason:</strong> ${escapeHtml(d.reason_text || '—')}</p>
+                                <p class="sm:col-span-2"><strong>Referring Facility:</strong> ${escapeHtml(d.referring_facility || '—')}</p>
+                            </div>
+
+                            <div>
+                                <p class="font-semibold text-slate-800 mb-2">Vitals at Time of Referral</p>
+                                <div class="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                                    ${vitalTile('BP', d.vital_bp)}
+                                    ${vitalTile('HR', d.vital_hr)}
+                                    ${vitalTile('RR', d.vital_rr)}
+                                    ${vitalTile('Temp °C', d.vital_temp_c)}
+                                    ${vitalTile('O2 Sat %', d.vital_o2sat)}
+                                </div>
+                            </div>
+                        </div>
+                    `,
+                    confirmButtonColor: '#16a34a',
+                    customClass: { popup: 'rounded-4 shadow-lg' }
+                });
+            },
+            error: function (xhr) {
+                const errData = xhr.responseJSON || {};
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Could Not Load Patient Details',
+                    text: errData.detail || 'This referral may not be finalized to your facility.',
+                    confirmButtonColor: '#dc3545'
+                });
+            }
+        });
+    });
+
     /**
      * Poll GET /api/v1/referral/{referral_id}/recommendations for accepting hospitals
      */
@@ -919,17 +990,46 @@ $(document).ready(function () {
             }
         }
 
-        if (!referralId) {
-            $('#acceptedHospitalsCard').hide();
+        if (referralId) {
+            $('#acceptedHospitalsCard').fadeIn(200);
+            $('#activeReferralIdText').text(referralId);
+            $('#activeReferralPatientText').text(patientName);
+            fetchRecommendationsForReferral(referralId, currentHospital.api_key || '');
             return;
         }
 
-        $('#acceptedHospitalsCard').fadeIn(200);
-        $('#activeReferralIdText').text(referralId);
-        $('#activeReferralPatientText').text(patientName);
+        // Nothing in this browser's local state (fresh login, different device, or
+        // logout wiped it) -- fall back to server truth: find the most recent referral
+        // this facility sent that has an acceptance still awaiting finalization.
+        $.ajax({
+            url: `${API_V1_REFERRAL}/mine`,
+            type: 'GET',
+            headers: { 'X-API-Key': currentHospital.api_key || '' },
+            dataType: 'json',
+            success: function (data) {
+                const awaitingFinalization = (Array.isArray(data) ? data : [])
+                    .filter(r => r.status === 'ACCEPTED' && !r.receiving_facility)
+                    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-        const apiKey = currentHospital.api_key || '';
-        fetchRecommendationsForReferral(referralId, apiKey);
+                if (awaitingFinalization.length === 0) {
+                    $('#acceptedHospitalsCard').hide();
+                    return;
+                }
+
+                const rehydrated = awaitingFinalization[0];
+                window.activeInitiatedReferralId = rehydrated.referral_id;
+                const rehydratedName = 'Patient';
+                localStorage.setItem('active_initiated_referral', JSON.stringify({ id: rehydrated.referral_id, patientName: rehydratedName }));
+
+                $('#acceptedHospitalsCard').fadeIn(200);
+                $('#activeReferralIdText').text(rehydrated.referral_id);
+                $('#activeReferralPatientText').text(rehydratedName);
+                fetchRecommendationsForReferral(rehydrated.referral_id, currentHospital.api_key || '');
+            },
+            error: function () {
+                $('#acceptedHospitalsCard').hide();
+            }
+        });
     }
 
     function fetchRecommendationsForReferral(referralId, apiKey) {
@@ -1491,7 +1591,7 @@ $(document).ready(function () {
                     <td class="py-3.5 px-6 text-slate-600 text-xs border-b border-slate-300/60">${formatReferralTimestamp(ref.seen_at)}</td>
                     <td class="py-3.5 px-6 text-xs border-b border-slate-300/60">
                         <button type="button" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium btn-view-referral-timeline" data-ref-id="${escapeHtml(ref.referral_id)}">
-                            <i class="bi bi-clock-history me-1"></i> ${responses.length} notified
+                            <i class="bi bi-truck me-1"></i> Track
                         </button>
                     </td>
                     <td class="py-3.5 px-6 text-right border-b border-slate-300/60">${cancelBtn}</td>
@@ -1538,32 +1638,76 @@ $(document).ready(function () {
     });
 
     /**
-     * Show a small SweetAlert2 popup listing which hospitals saw/responded and when
+     * Renders one step of the Shopee-style vertical tracker: a dot on a connecting line,
+     * filled/checked when complete, hollow/gray when still pending.
+     */
+    function trackerStep(label, timestamp, completed, isLast) {
+        const dotClasses = completed
+            ? 'bg-emerald-500 text-white'
+            : 'bg-white text-slate-300 border-2 border-slate-200';
+        const labelClasses = completed ? 'text-slate-900' : 'text-slate-400';
+        const icon = completed ? '<i class="bi bi-check-lg text-xs"></i>' : '';
+
+        return `
+            <div class="relative ${isLast ? '' : 'pb-6'} pl-9">
+                ${isLast ? '' : `<div class="absolute left-[11px] top-6 bottom-0 w-0.5 ${completed ? 'bg-emerald-400' : 'bg-slate-200'}"></div>`}
+                <div class="absolute left-0 top-0 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${dotClasses}">${icon}</div>
+                <p class="text-sm font-semibold ${labelClasses}">${label}</p>
+                <p class="text-xs text-slate-500 mt-0.5">${timestamp ? formatReferralTimestamp(timestamp) : 'Pending'}</p>
+            </div>
+        `;
+    }
+
+    /**
+     * Shopee-style order-tracking UI, adapted for referral lifecycle: Sent -> Seen ->
+     * Accepted -> Finalized -> Arrived, each step timestamped once it happens.
      */
     $(document).on('click', '.btn-view-referral-timeline', function () {
         const referralId = $(this).data('ref-id');
         const referrals = $('#referralsTableBody').data('referrals') || [];
         const ref = referrals.find(function (r) { return r.referral_id === referralId; });
-        const responses = (ref && Array.isArray(ref.responses)) ? ref.responses : [];
+        if (!ref) return;
 
-        const rowsHtml = responses.length
+        const responses = Array.isArray(ref.responses) ? ref.responses : [];
+
+        let stepsHtml;
+        if (ref.status === 'CANCELLED') {
+            stepsHtml =
+                trackerStep('Referral Sent', ref.created_at, true, false) +
+                trackerStep('Cancelled by Referring Facility', null, true, true);
+        } else {
+            stepsHtml =
+                trackerStep('Referral Sent', ref.created_at, true, false) +
+                trackerStep('Seen by a Facility', ref.seen_at, !!ref.seen_at, false) +
+                trackerStep(ref.receiving_facility ? `Accepted by ${escapeHtml(ref.receiving_facility)}` : 'Accepted', ref.accepted_at, !!ref.accepted_at, false) +
+                trackerStep(ref.receiving_facility ? `Finalized to ${escapeHtml(ref.receiving_facility)}` : 'Finalized', ref.finalized_at, !!ref.finalized_at, false) +
+                trackerStep('Patient Arrived', ref.arrived_at, !!ref.arrived_at, true);
+        }
+
+        const notifiedHtml = responses.length
             ? responses.map(function (r) {
                 const statusBadge = REFERRAL_STATUS_BADGE_CLASS[r.response_status] || 'bg-slate-100 text-slate-700';
                 return `
-                    <div class="flex items-center justify-between gap-3 py-2.5 border-b border-slate-100 last:border-0 text-left">
-                        <div class="min-w-0 flex-1">
-                            <p class="text-sm font-semibold text-slate-800">${escapeHtml(r.hospital_name)}</p>
-                            <p class="text-xs text-slate-500">Seen: ${formatReferralTimestamp(r.seen_at)}${r.responded_at ? ` · Responded: ${formatReferralTimestamp(r.responded_at)}` : ''}</p>
-                        </div>
-                        <span class="px-2.5 py-1 rounded-full text-xs font-bold flex-shrink-0 whitespace-nowrap ${statusBadge}">${escapeHtml(r.response_status)}</span>
+                    <div class="flex items-center justify-between gap-3 py-2 border-b border-slate-100 last:border-0">
+                        <p class="text-xs font-medium text-slate-700">${escapeHtml(r.hospital_name)}</p>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold flex-shrink-0 ${statusBadge}">${escapeHtml(r.response_status)}</span>
                     </div>
                 `;
             }).join('')
-            : '<p class="text-sm text-slate-400 text-center py-4">No hospitals have been notified yet.</p>';
+            : '<p class="text-xs text-slate-400 text-center py-3">No hospitals have been notified yet.</p>';
 
         Swal.fire({
-            title: 'Referral Timeline',
-            html: `<div class="text-left">${rowsHtml}</div>`,
+            title: 'Track Referral',
+            width: '32rem',
+            html: `
+                <div class="text-left">
+                    <div class="pt-2 pb-2">${stepsHtml}</div>
+                    <div class="mt-2 pt-3 border-t border-slate-200">
+                        <p class="text-xs font-bold text-slate-700 mb-1.5">Notified Hospitals (${responses.length})</p>
+                        ${notifiedHtml}
+                    </div>
+                </div>
+            `,
             confirmButtonText: '<i class="bi bi-check-lg me-1"></i> Close',
             confirmButtonColor: '#0d6efd',
             customClass: { popup: 'rounded-4 shadow-lg' }
@@ -1628,165 +1772,6 @@ $(document).ready(function () {
         });
     });
 
-    // ============================================================
-    // REFERRAL OUTCOMES PAGE (who chose us vs who bypassed us)
-    // ============================================================
-    let referralOutcomesCache = [];
-
-    const OUTCOME_BADGE_CLASS = {
-        CHOSEN: 'bg-emerald-100 text-emerald-800',
-        BYPASSED: 'bg-amber-100 text-amber-800'
-    };
-    const OUTCOME_LABEL = {
-        CHOSEN: 'Confirmed Transfer',
-        BYPASSED: 'Bypassed Transfer'
-    };
-
-    /**
-     * Load this hospital's accept outcomes via GET /api/v1/referral/outcomes
-     */
-    function loadReferralOutcomes() {
-        if (!currentHospital) return;
-
-        const apiKey = currentHospital.api_key || '';
-        const $tableBody = $('#outcomesTableBody');
-
-        $.ajax({
-            url: `${API_V1_REFERRAL}/outcomes`,
-            type: 'GET',
-            headers: { 'X-API-Key': apiKey },
-            dataType: 'json',
-            success: function (data) {
-                $('#outcomesConnectionAlert').slideUp(200);
-                referralOutcomesCache = Array.isArray(data) ? data : [];
-
-                const chosenCount = referralOutcomesCache.filter(o => o.outcome === 'CHOSEN').length;
-                const bypassedCount = referralOutcomesCache.filter(o => o.outcome === 'BYPASSED').length;
-                $('#statChoseUsCount').text(chosenCount);
-                $('#statBypassedUsCount').text(bypassedCount);
-
-                applyOutcomeFilters();
-            },
-            error: function (xhr) {
-                const errData = xhr.responseJSON || {};
-                const httpStatus = xhr.status || 500;
-                const isConnectionErr = httpStatus === 503 || httpStatus === 0 || (errData.detail && errData.detail.includes("reach the server"));
-
-                if (isConnectionErr) {
-                    $('#outcomesConnectionAlert').slideDown(200);
-                    $tableBody.html(`
-                        <tr>
-                            <td colspan="7" class="text-center py-8 text-slate-400 font-normal text-xs">
-                                Can't reach the server — showing nothing to display.
-                            </td>
-                        </tr>
-                    `);
-                    return;
-                }
-
-                $('#outcomesConnectionAlert').slideUp(200);
-                $tableBody.html(`
-                    <tr>
-                        <td colspan="7" class="text-center py-8 text-red-500 font-normal text-xs">
-                            ${escapeHtml(cleanErrorMessage(errData.detail || 'Could not load referral outcomes.', httpStatus))}
-                        </td>
-                    </tr>
-                `);
-            }
-        });
-    }
-
-    /**
-     * Filter the cached outcomes list by type/search, then re-render
-     */
-    function applyOutcomeFilters() {
-        const typeFilter = $('#outcomeFilterType').val();
-        const search = ($('#outcomeFilterSearch').val() || '').trim().toLowerCase();
-
-        const filtered = referralOutcomesCache.filter(function (o) {
-            if (typeFilter && o.outcome !== typeFilter) return false;
-
-            if (search) {
-                const haystack = `${o.referral_id} ${o.patient_id} ${o.referring_facility}`.toLowerCase();
-                if (!haystack.includes(search)) return false;
-            }
-
-            return true;
-        });
-
-        renderOutcomesTable(filtered);
-    }
-
-    /**
-     * Render the "Referral Outcomes" DataTable from a (pre-filtered) list
-     */
-    function renderOutcomesTable(outcomes) {
-        if ($.fn.DataTable.isDataTable('#outcomesTable')) {
-            $('#outcomesTable').DataTable().destroy();
-        }
-
-        const $tableBody = $('#outcomesTableBody');
-        $tableBody.empty();
-
-        if (outcomes.length === 0) {
-            $tableBody.html(`
-                <tr>
-                    <td colspan="7" class="text-center py-8 text-slate-400 font-normal">
-                        No referral outcomes match the current filters.
-                    </td>
-                </tr>
-            `);
-            return;
-        }
-
-        outcomes.forEach(function (o) {
-            const badgeClass = OUTCOME_BADGE_CLASS[o.outcome] || 'bg-slate-100 text-slate-700';
-            const label = OUTCOME_LABEL[o.outcome] || o.outcome;
-            const patientInfo = `${escapeHtml(String(o.patient_id))}${o.patient_age !== undefined && o.patient_age !== null ? ` · ${escapeHtml(String(o.patient_age))}y` : ''}${o.patient_gender ? ` · ${escapeHtml(o.patient_gender)}` : ''}`;
-            const wentTo = o.outcome === 'BYPASSED'
-                ? escapeHtml(o.receiving_facility || 'Another facility')
-                : '<span class="text-slate-400">—</span>';
-
-            const row = `
-                <tr class="hover:bg-slate-50/80 transition-colors border-b border-slate-100">
-                    <td class="py-3.5 px-6 font-mono text-xs font-semibold text-slate-500">${escapeHtml(o.referral_id)}</td>
-                    <td class="py-3.5 px-6 text-slate-700 text-xs">${patientInfo}</td>
-                    <td class="py-3.5 px-6 text-slate-700 text-xs font-semibold">${escapeHtml(o.referring_facility)}</td>
-                    <td class="py-3.5 px-6 text-slate-600 text-xs">${escapeHtml(String(o.disease_severity))}</td>
-                    <td class="py-3.5 px-6"><span class="px-2.5 py-1 rounded-full text-xs font-bold ${badgeClass}">${escapeHtml(label)}</span></td>
-                    <td class="py-3.5 px-6 text-slate-600 text-xs">${formatReferralTimestamp(o.seen_at || o.responded_at)}</td>
-                    <td class="py-3.5 px-6 text-xs">${wentTo}</td>
-                </tr>
-            `;
-            $tableBody.append(row);
-        });
-
-        $('#outcomesTable').DataTable({
-            paging: true,
-            searching: false,
-            ordering: true,
-            info: true,
-            responsive: true,
-            pageLength: 10,
-            lengthMenu: [5, 10, 25, 50],
-            language: {
-                lengthMenu: "Show _MENU_ records",
-                info: "Showing _START_ to _END_ of _TOTAL_ outcomes",
-                paginate: {
-                    next: '<i class="bi bi-chevron-right"></i>',
-                    previous: '<i class="bi bi-chevron-left"></i>'
-                }
-            }
-        });
-    }
-
-    $('#btnRefreshOutcomes').on('click', function () {
-        if (currentHospital) loadReferralOutcomes();
-    });
-
-    $('#outcomeFilterType').on('change', applyOutcomeFilters);
-    $('#outcomeFilterSearch').on('input', applyOutcomeFilters);
-
     // Track which referral IDs have already surfaced as a notification, and pending polling state
     const notifiedReferralIds = new Set();
     const incomingNotifications = new Map(); // referral_id -> alert payload, backs the bell dropdown
@@ -1796,7 +1781,8 @@ $(document).ready(function () {
      * Poll Incoming Referrals for active hospital session
      */
     function pollIncomingReferrals() {
-        if (!currentHospital || isPollingInProgress) return;
+        const isClinicalUser = currentUser && (currentUser.role === 'doctor' || currentUser.role === 'nurse');
+        if (!currentHospital || !isClinicalUser || isPollingInProgress) return;
 
         const apiKey = currentHospital.api_key || '';
         isPollingInProgress = true;
@@ -1824,21 +1810,40 @@ $(document).ready(function () {
                 }
 
                 let hasNewNotification = false;
+                const stillPendingIds = new Set();
 
                 items.forEach(item => {
                     const id = item.referral_id || item.id;
                     const respStatus = (item.response_status || item.status || '').toUpperCase();
-                    if (!id || notifiedReferralIds.has(id) || respStatus === 'ACCEPTED' || respStatus === 'REDIRECTED') return;
+                    if (!id || respStatus === 'ACCEPTED' || respStatus === 'REDIRECTED') return;
 
-                    notifiedReferralIds.add(id);
+                    stillPendingIds.add(id);
+                    // Always refresh with the latest server data (not just on first sight) so a
+                    // stale/deleted-then-recreated referral never shows outdated info
                     incomingNotifications.set(id, item);
-                    hasNewNotification = true;
+
+                    if (!notifiedReferralIds.has(id)) {
+                        notifiedReferralIds.add(id);
+                        hasNewNotification = true;
+                    }
                 });
 
+                // Drop anything that's no longer PENDING server-side (accepted/redirected/
+                // cancelled/deleted) so the bell and Pending Referrals page never show a
+                // referral that's already been resolved out from under the doctor
+                Array.from(incomingNotifications.keys()).forEach(id => {
+                    if (!stillPendingIds.has(id)) {
+                        incomingNotifications.delete(id);
+                        notifiedReferralIds.delete(id);
+                    }
+                });
+
+                renderNotificationBell();
+                if (typeof renderPendingReferralsList === 'function') renderPendingReferralsList();
+
                 if (hasNewNotification) {
-                    renderNotificationBell();
                     showNewReferralToast();
-                    playNotificationSound();
+                    playAlarmSound();
                 }
             },
             error: function () {
@@ -1886,6 +1891,87 @@ $(document).ready(function () {
         });
         $list.html(html);
     }
+
+    const PENDING_SEVERITY_LABEL = { 1: 'Mild', 2: 'Moderate', 3: 'Severe', 4: 'Critical', 5: 'Extreme' };
+
+    /**
+     * Waiting time, color-escalated to match the 15-30 minute ER turnaround window this
+     * system already tracks elsewhere -- green while fresh, amber approaching it, red
+     * once it's actually overdue. Plain text color, not a badge -- just a signal, not decor.
+     */
+    function formatWaitLabel(createdAt) {
+        if (!createdAt) return { text: 'Unknown', cls: 'text-slate-500' };
+        const mins = Math.max(0, Math.round((Date.now() - new Date(createdAt).getTime()) / 60000));
+        const text = mins < 1 ? 'Just now' : mins < 60 ? `${mins}m` : `${Math.floor(mins / 60)}h ${mins % 60}m`;
+        const cls = mins < 5 ? 'text-emerald-700' : mins < 15 ? 'text-amber-700' : 'text-red-700 font-bold';
+        return { text, cls };
+    }
+
+    /**
+     * Renders the full-page Pending Referrals queue (triage view) from the same
+     * `incomingNotifications` map the bell uses, sorted most-severe-first so a doctor
+     * can see everything stacked up at once instead of only the last one that popped in.
+     */
+    function renderPendingReferralsList() {
+        const $list = $('#pendingReferralsList');
+        if ($list.length === 0) return;
+
+        const items = Array.from(incomingNotifications.values());
+        const count = items.length;
+        const criticalCount = items.filter(i => (parseInt(i.disease_severity, 10) || 0) >= 4).length;
+
+        $('#statPendingCount').text(count);
+        $('#statCriticalPendingCount').text(criticalCount);
+        $('#navPendingBadge').text(count > 9 ? '9+' : count).toggleClass('hidden', count === 0);
+
+        if (count === 0) {
+            $list.html('<div class="px-6 py-10 text-center text-xs text-slate-400"><i class="bi bi-check2-circle text-2xl text-slate-300 block mb-2"></i>No pending referrals right now.</div>');
+            return;
+        }
+
+        const sorted = items.slice().sort(function (a, b) {
+            const sevDiff = (parseInt(b.disease_severity, 10) || 0) - (parseInt(a.disease_severity, 10) || 0);
+            if (sevDiff !== 0) return sevDiff;
+            return new Date(a.created_at || 0) - new Date(b.created_at || 0); // oldest first within same severity
+        });
+
+        $list.html(sorted.map(function (item) {
+            const referralId = item.referral_id || item.id;
+            const severity = parseInt(item.disease_severity, 10) || 0;
+            const severityLabel = PENDING_SEVERITY_LABEL[severity] || String(item.disease_severity);
+            const wait = formatWaitLabel(item.created_at);
+
+            return `
+                <div class="bg-white rounded-xl border border-slate-200/70 p-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm text-slate-800"><span class="font-semibold">Referral from:</span> ${escapeHtml(item.referring_facility || 'Unknown Facility')}</p>
+                            <p class="text-sm text-slate-800"><span class="font-semibold">Severity:</span> ${severity} &middot; ${escapeHtml(severityLabel)}</p>
+                            <p class="text-sm"><span class="font-semibold text-slate-800">Waiting time:</span> <span class="${wait.cls}">${escapeHtml(wait.text)}</span></p>
+                        </div>
+                        <button type="button" data-ref-id="${escapeHtml(String(referralId))}"
+                            class="btn-review-pending-referral flex-shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition-all">
+                            <i class="bi bi-file-earmark-text-fill"></i> Review &amp; Decide
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join(''));
+    }
+
+    $(document).on('click', '.btn-review-pending-referral', function () {
+        const referralId = $(this).data('ref-id');
+        const incomingAlert = incomingNotifications.get(referralId);
+        if (!incomingAlert) return;
+
+        // Don't delete from the map just for opening it -- it should only disappear once
+        // it's actually resolved (accepted/redirected), which the next poll picks up
+        // naturally. Deleting here made it vanish for up to 12s if the doctor closed the
+        // popup without deciding, which looked like a bug (and was reported as one).
+        stopAlarmSound();
+        markReferralSeen(referralId);
+        showIncomingReferralDetail(incomingAlert);
+    });
 
     let newReferralToastTimeout = null;
 
@@ -1944,11 +2030,71 @@ $(document).ready(function () {
         }
     }
 
+    let alarmIntervalId = null;
+    let alarmStopTimeoutId = null;
+
+    function playAlarmBeep() {
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+
+            if (!window._notificationAudioCtx) {
+                window._notificationAudioCtx = new AudioCtx();
+            }
+            const ctx = window._notificationAudioCtx;
+            if (ctx.state === 'suspended') ctx.resume();
+
+            const now = ctx.currentTime;
+            [1046, 784].forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.value = freq;
+
+                const start = now + i * 0.18;
+                gain.gain.setValueAtTime(0, start);
+                gain.gain.linearRampToValueAtTime(0.22, start + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, start + 0.3);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(start);
+                osc.stop(start + 0.35);
+            });
+        } catch (e) {
+            // Autoplay restrictions or unsupported browser — fail silently
+        }
+    }
+
+    /**
+     * Urgent, repeating alarm for a brand-new incoming referral -- a single short chime
+     * is too easy to miss in a busy ER. Repeats every ~0.9s for up to 20s as a safety cap,
+     * but stops immediately the moment the doctor acknowledges it (opens the bell, opens
+     * the referral from the Pending Referrals page, or switches to that page).
+     */
+    function playAlarmSound() {
+        stopAlarmSound();
+        playAlarmBeep();
+        alarmIntervalId = setInterval(playAlarmBeep, 900);
+        alarmStopTimeoutId = setTimeout(stopAlarmSound, 20000);
+    }
+
+    function stopAlarmSound() {
+        if (alarmIntervalId) {
+            clearInterval(alarmIntervalId);
+            alarmIntervalId = null;
+        }
+        if (alarmStopTimeoutId) {
+            clearTimeout(alarmStopTimeoutId);
+            alarmStopTimeoutId = null;
+        }
+    }
+
     // Toggle the notification dropdown open/closed
     $(document).on('click', '#btnNotificationBell', function (e) {
-        console.log('clicked');
         e.stopPropagation();
         $('#notificationDropdown').toggleClass('hidden');
+        stopAlarmSound();
     });
     $(document).on('click', '#notificationDropdown', function (e) {
         e.stopPropagation();
@@ -1963,9 +2109,9 @@ $(document).ready(function () {
         const incomingAlert = incomingNotifications.get(referralId);
         if (!incomingAlert) return;
 
-        incomingNotifications.delete(referralId);
-        renderNotificationBell();
+        // Same fix as the Pending Referrals page: don't delete on open, only once resolved
         $('#notificationDropdown').addClass('hidden');
+        stopAlarmSound();
 
         markReferralSeen(referralId);
         showIncomingReferralDetail(incomingAlert);
@@ -1996,10 +2142,18 @@ $(document).ready(function () {
         const referringFacility = incomingAlert.referring_facility || incomingAlert.referring_hospital || (incomingAlert.serviceProvider && incomingAlert.serviceProvider.display) || 'Unknown Hospital';
         const patientId = incomingAlert.patient_id || (incomingAlert.subject && incomingAlert.subject.reference) || 'N/A';
         const age = incomingAlert.patient_age !== undefined ? incomingAlert.patient_age : (incomingAlert.age !== undefined ? incomingAlert.age : 'N/A');
+        const ageMonths = incomingAlert.patient_age_months !== undefined ? incomingAlert.patient_age_months : null;
+        // Under a year old, "0 years old" is meaningless -- show months instead
+        // (e.g. a 6-month-old baby reads as "6 months old", not "0 years old")
+        const ageDisplay = (typeof age === 'number' && age < 1 && ageMonths !== null)
+            ? `${ageMonths} month${ageMonths === 1 ? '' : 's'} old`
+            : `${age} years old`;
         const gender = incomingAlert.patient_gender || incomingAlert.gender || 'N/A';
-        const patientInfo = `${age} years old (${gender})`;
+        const patientInfo = `${ageDisplay} (${gender})`;
         const severity = incomingAlert.disease_severity !== undefined ? incomingAlert.disease_severity : (incomingAlert.severity !== undefined ? incomingAlert.severity : '3');
         const clinicalReason = incomingAlert.clinical_reason || incomingAlert.reason_text || incomingAlert.reason || 'Referral Request';
+        const diagnosis = incomingAlert.diagnosis || 'Not specified';
+        const chiefComplaint = incomingAlert.chief_complaint || 'Not specified';
 
         // Extract patient coordinates (origin)
         const patientLat = incomingAlert.patient_latitude !== undefined && incomingAlert.patient_latitude !== null ? parseFloat(incomingAlert.patient_latitude) : (incomingAlert.patient_lat !== undefined && incomingAlert.patient_lat !== null ? parseFloat(incomingAlert.patient_lat) : (incomingAlert.patient && incomingAlert.patient.latitude !== undefined && incomingAlert.patient.latitude !== null ? parseFloat(incomingAlert.patient.latitude) : null));
@@ -2043,12 +2197,15 @@ $(document).ready(function () {
         // Update placeholder elements if present in DOM
         $('#modal-referring-hospital').text(referringFacility);
         $('#modal-patient-id').text(patientId);
-        $('#modal-patient-age').text(patientInfo);
+        $('#modal-patient-age').text(ageDisplay);
         $('#modal-severity').text("Triage Category: " + severity);
+        $('#modal-diagnosis').text(diagnosis);
+        $('#modal-chief-complaint').text(chiefComplaint);
         $('#modal-reason').text(clinicalReason);
 
         Swal.fire({
             title: '<div class="flex items-center justify-center gap-2 text-red-600"><i class="bi bi-hospital text-2xl"></i> <span>Incoming Patient Referral</span></div>',
+            width: '42rem',
             html: `
                 <div class="text-start space-y-3 p-2 text-sm text-slate-700">
                     <p class="text-xs text-slate-500 uppercase font-semibold tracking-wider mb-2">Hospital Referral Notification</p>
@@ -2061,41 +2218,49 @@ $(document).ready(function () {
                     </div>
 
                     <div class="space-y-2 bg-slate-50 p-3.5 rounded-xl border border-slate-200/70 text-xs">
-                        <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
+                        <div class="flex flex-col sm:flex-row sm:justify-between border-b border-slate-200/60 pb-1.5 gap-0.5 sm:gap-2">
                             <span class="text-slate-700 font-bold shrink-0">Referring Facility:</span>
-                            <span class="font-bold text-slate-800 text-right" id="modal-referring-hospital">${escapeHtml(referringFacility)}</span>
+                            <span class="font-bold text-slate-800 sm:text-right" id="modal-referring-hospital">${escapeHtml(referringFacility)}</span>
                         </div>
-                        <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
+                        <div class="flex flex-col sm:flex-row sm:justify-between border-b border-slate-200/60 pb-1.5 gap-0.5 sm:gap-2">
                             <span class="text-slate-700 font-bold shrink-0">Referring Facility Location:</span>
-                            <span class="font-normal text-slate-800 text-right leading-relaxed">${hospLocationHtml}</span>
+                            <span class="font-normal text-slate-800 sm:text-right leading-relaxed">${hospLocationHtml}</span>
                         </div>
-                        <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
+                        <div class="flex flex-col sm:flex-row sm:justify-between border-b border-slate-200/60 pb-1.5 gap-0.5 sm:gap-2">
                             <span class="text-slate-700 font-bold shrink-0">Patient ID:</span>
-                            <span class="font-bold text-slate-800 font-mono text-right" id="modal-patient-id">${escapeHtml(String(patientId))}</span>
+                            <span class="font-bold text-slate-800 font-mono sm:text-right" id="modal-patient-id">${escapeHtml(String(patientId))}</span>
                         </div>
-                        <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
+                        <div class="flex flex-col sm:flex-row sm:justify-between border-b border-slate-200/60 pb-1.5 gap-0.5 sm:gap-2">
                             <span class="text-slate-700 font-bold shrink-0">Age:</span>
-                            <span class="font-normal text-slate-800 text-right" id="modal-patient-age">${escapeHtml(String(age))}</span>
+                            <span class="font-normal text-slate-800 sm:text-right" id="modal-patient-age">${escapeHtml(ageDisplay)}</span>
                         </div>
-                        <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
+                        <div class="flex flex-col sm:flex-row sm:justify-between border-b border-slate-200/60 pb-1.5 gap-0.5 sm:gap-2">
                             <span class="text-slate-700 font-bold shrink-0">Gender:</span>
-                            <span class="font-normal text-slate-800 text-right" id="modal-patient-gender">${escapeHtml(String(gender))}</span>
+                            <span class="font-normal text-slate-800 sm:text-right" id="modal-patient-gender">${escapeHtml(String(gender))}</span>
                         </div>
-                        <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
+                        <div class="flex flex-col sm:flex-row sm:justify-between border-b border-slate-200/60 pb-1.5 gap-0.5 sm:gap-2">
                             <span class="text-slate-700 font-bold shrink-0">Patient Location:</span>
-                            <span class="font-normal text-slate-800 text-right leading-relaxed">${patientLocationHtml}</span>
+                            <span class="font-normal text-slate-800 sm:text-right leading-relaxed">${patientLocationHtml}</span>
                         </div>
-                        <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
+                        <div class="flex flex-col sm:flex-row sm:justify-between border-b border-slate-200/60 pb-1.5 gap-0.5 sm:gap-2">
                             <span class="text-slate-700 font-bold shrink-0">Transfer Distance & ETA:</span>
-                            <span class="font-bold text-red-700 text-right" id="modal-transfer-eta">${escapeHtml(etaText)}</span>
+                            <span class="font-bold text-red-700 sm:text-right" id="modal-transfer-eta">${escapeHtml(etaText)}</span>
                         </div>
-                        <div class="flex justify-between border-b border-slate-200/60 pb-1.5 gap-2">
+                        <div class="flex flex-col sm:flex-row sm:justify-between border-b border-slate-200/60 pb-1.5 gap-0.5 sm:gap-2">
                             <span class="text-slate-700 font-bold shrink-0">Severity:</span>
-                            <span class="font-bold text-amber-700 text-right" id="modal-severity">Triage Category: ${escapeHtml(String(severity))}</span>
+                            <span class="font-bold text-amber-700 sm:text-right" id="modal-severity">Triage Category: ${escapeHtml(String(severity))}</span>
                         </div>
-                        <div class="flex justify-between pt-0.5 gap-2">
-                            <span class="text-slate-700 font-bold shrink-0">Clinical Reason:</span>
-                            <span class="font-bold text-slate-800 text-right" id="modal-reason">${escapeHtml(clinicalReason)}</span>
+                        <div class="flex flex-col sm:flex-row sm:justify-between border-b border-slate-200/60 pb-1.5 gap-0.5 sm:gap-2">
+                            <span class="text-slate-700 font-bold shrink-0">Diagnosis:</span>
+                            <span class="font-bold text-slate-800 sm:text-right" id="modal-diagnosis">${escapeHtml(diagnosis)}</span>
+                        </div>
+                        <div class="flex flex-col sm:flex-row sm:justify-between border-b border-slate-200/60 pb-1.5 gap-0.5 sm:gap-2">
+                            <span class="text-slate-700 font-bold shrink-0">Chief Complaint:</span>
+                            <span class="font-bold text-slate-800 sm:text-right" id="modal-chief-complaint">${escapeHtml(chiefComplaint)}</span>
+                        </div>
+                        <div class="flex flex-col sm:flex-row sm:justify-between pt-0.5 gap-0.5 sm:gap-2">
+                            <span class="text-slate-700 font-bold shrink-0">Reason for Referral:</span>
+                            <span class="font-bold text-slate-800 sm:text-right" id="modal-reason">${escapeHtml(clinicalReason)}</span>
                         </div>
                     </div>
 
@@ -2222,13 +2387,393 @@ $(document).ready(function () {
                 });
             }
         });
-    }    // Global function to close referral modal
-    window.closeReferralModal = function() {
-        $('#referralModal').fadeOut(200);
-    };
+    }
+
+    // Returns to Patient Records without saving
+    function cancelReferPatient() {
+        $('#referralForm')[0].reset();
+        switchTab('patients');
+    }
+    $('#btnCancelReferral, #btnCancelReferral2').on('click', cancelReferPatient);
+
+    // Returns to Patient Records without saving
+    function cancelAddPatient() {
+        $('#patientForm')[0].reset();
+        switchTab('patients');
+    }
 
     /**
-     * PSGC API (https://psgc.cloud/api) Cascading Location Selector
+     * Lock Status Type / PhilHealth Number unless the patient is a PhilHealth member
+     */
+    function togglePhilhealthFields() {
+        const isMember = $('#patPhilhealthMember').val() === 'Yes';
+        $('#patPhilhealthStatus, #patPhilhealthNumber').prop('disabled', !isMember);
+        if (!isMember) {
+            $('#patPhilhealthStatus').val('');
+            $('#patPhilhealthNumber').val('');
+        }
+    }
+    $('#patPhilhealthMember').on('change', togglePhilhealthFields);
+
+    /**
+     * Navigate to the Register Patient page
+     */
+    $('#btnAddPatient').on('click', function () {
+        $('#patientForm')[0].reset();
+        togglePhilhealthFields();
+        switchTab('addPatient');
+    });
+
+    $('#btnCancelAddPatient, #btnCancelAddPatient2').on('click', cancelAddPatient);
+
+    /**
+     * Handle Add Patient Form Submit
+     */
+    $('#patientForm').on('submit', function (e) {
+        e.preventDefault();
+
+        const $submitBtn = $('#btnSubmitPatient');
+        const originalBtnHtml = $submitBtn.html();
+        $submitBtn.html('<span class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent me-2"></span> Saving...').prop('disabled', true);
+
+        const formData = {
+            first_name: $('#patFirstName').val(),
+            middle_name: $('#patMiddleName').val(),
+            last_name: $('#patLastName').val(),
+            suffix: $('#patSuffix').val(),
+            dob: $('#patDob').val(),
+            gender: $('#patGender').val(),
+            civil_status: $('#patCivilStatus').val(),
+            phone: $('#patPhone').val(),
+            region: $('#patRegion').val(),
+            province: $('#patProvince').val(),
+            city_municipality: $('#patCity').val(),
+            barangay: $('#patBarangay').val(),
+            zip_code: $('#patZip').val(),
+            philhealth_member: $('#patPhilhealthMember').val(),
+            philhealth_number: $('#patPhilhealthNumber').val(),
+            philhealth_status_type: $('#patPhilhealthStatus').val(),
+            is_4ps_member: $('#pat4psMember').val()
+        };
+
+        $.ajax({
+            url: `${API_BASE}/save_patient.php`,
+            type: 'POST',
+            data: formData,
+            dataType: 'json',
+            success: function (response) {
+                $submitBtn.html(originalBtnHtml).prop('disabled', false);
+
+                if (response.success) {
+                    $('#patientForm')[0].reset();
+                    switchTab('patients');
+                    loadPatients();
+                    Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'success',
+                        title: 'Patient registered successfully.',
+                        showConfirmButton: false,
+                        timer: 2500
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Could Not Register Patient',
+                        text: response.message || 'Please check the form and try again.',
+                        confirmButtonColor: '#dc3545'
+                    });
+                }
+            },
+            error: function (xhr) {
+                $submitBtn.html(originalBtnHtml).prop('disabled', false);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: `Failed to register patient (${xhr.status}).`,
+                    confirmButtonColor: '#dc3545'
+                });
+            }
+        });
+    });
+
+    /**
+     * Load facility staff accounts (Facility Admin only)
+     */
+    function loadUsers() {
+        const $tableBody = $('#usersTableBody');
+        $tableBody.html(`
+            <tr>
+                <td colspan="7" class="text-center py-4 text-muted">
+                    <div class="spinner-border spinner-border-sm me-2 text-primary" role="status"></div>
+                    Loading staff accounts...
+                </td>
+            </tr>
+        `);
+
+        $.ajax({
+            url: `${API_BASE}/manage_users.php`,
+            type: 'GET',
+            dataType: 'json',
+            success: function (response) {
+                if (response.success && Array.isArray(response.data)) {
+                    renderUsersTable(response.data);
+                } else {
+                    $tableBody.html(`
+                        <tr>
+                            <td colspan="7" class="text-center py-4 text-danger">
+                                ${response.message || 'Failed to load staff accounts.'}
+                            </td>
+                        </tr>
+                    `);
+                }
+            },
+            error: function (xhr, status, error) {
+                $tableBody.html(`
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-danger">
+                            Error connecting to backend API (${xhr.status} ${error}).
+                        </td>
+                    </tr>
+                `);
+            }
+        });
+    }
+
+    const ROLE_LABELS = { facility_admin: 'Facility Admin', doctor: 'Doctor', nurse: 'Nurse' };
+
+    function renderUsersTable(users) {
+        const $tableBody = $('#usersTableBody');
+        $tableBody.empty();
+
+        if (users.length === 0) {
+            $tableBody.html(`<tr><td colspan="7" class="text-center py-4 text-muted">No staff accounts yet.</td></tr>`);
+            return;
+        }
+
+        users.forEach(function (user) {
+            const statusBadge = user.is_active
+                ? '<span class="px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">Active</span>'
+                : '<span class="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-500 border border-slate-200">Inactive</span>';
+            const isSelf = currentUser && currentUser.id === user.id;
+
+            const row = `
+                <tr class="!bg-slate-200/40 hover:!bg-slate-300/40 transition-colors">
+                    <td class="py-3.5 px-6 font-semibold text-slate-900 border-b border-slate-300/60">${escapeHtml(user.full_name)}${isSelf ? ' <span class="text-[10px] text-slate-400 font-normal">(you)</span>' : ''}</td>
+                    <td class="py-3.5 px-6 text-slate-600 text-xs font-mono border-b border-slate-300/60">${escapeHtml(user.username)}</td>
+                    <td class="py-3.5 px-6 text-slate-600 text-xs border-b border-slate-300/60">${escapeHtml(ROLE_LABELS[user.role] || user.role)}</td>
+                    <td class="py-3.5 px-6 text-slate-600 text-xs font-mono border-b border-slate-300/60">${user.license_number ? escapeHtml(user.license_number) : '<span class="text-slate-300">—</span>'}</td>
+                    <td class="py-3.5 px-6 text-slate-600 text-xs border-b border-slate-300/60 max-w-[220px] truncate" title="${escapeHtml(user.trainings || '')}">${user.trainings ? escapeHtml(user.trainings) : '<span class="text-slate-300">—</span>'}</td>
+                    <td class="py-3.5 px-6 border-b border-slate-300/60">${statusBadge}</td>
+                    <td class="py-3.5 px-6 text-right border-b border-slate-300/60">
+                        <div class="flex items-center justify-end gap-2">
+                            <button class="px-3 py-1.5 bg-white/50 hover:bg-white text-slate-600 border border-slate-600/50 text-xs font-medium rounded-lg shadow-sm transition-all btn-toggle-user" data-id="${user.id}" ${isSelf ? 'disabled' : ''}>
+                                ${user.is_active ? 'Deactivate' : 'Activate'}
+                            </button>
+                            <button class="px-3 py-1.5 bg-white/50 hover:bg-white text-red-600 border border-red-300 text-xs font-medium rounded-lg shadow-sm transition-all btn-delete-user" data-id="${user.id}" ${isSelf ? 'disabled' : ''}>
+                                Delete
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            $tableBody.append(row);
+        });
+    }
+
+    $('#btnRefreshUsers').on('click', function () { loadUsers(); });
+
+    // Clinical credentials (license number / trainings) only make sense for Doctor/Nurse
+    function toggleUserClinicalFields() {
+        const isClinical = $('#inputUserRole').val() !== 'facility_admin';
+        $('#userClinicalFields').toggle(isClinical);
+        if (!isClinical) {
+            $('#inputUserLicenseNumber, #inputUserTrainings').val('');
+        }
+    }
+    $('#inputUserRole').on('change', toggleUserClinicalFields);
+    toggleUserClinicalFields();
+
+    $('#addUserForm').on('submit', function (e) {
+        e.preventDefault();
+
+        const $submitBtn = $('#btnSubmitAddUser');
+        const originalBtnHtml = $submitBtn.html();
+        $submitBtn.html('<span class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent me-2"></span> Creating...').prop('disabled', true);
+
+        $.ajax({
+            url: `${API_BASE}/manage_users.php`,
+            type: 'POST',
+            data: {
+                full_name: $('#inputUserFullName').val(),
+                role: $('#inputUserRole').val(),
+                username: $('#inputUserUsername').val(),
+                password: $('#inputUserPassword').val(),
+                license_number: $('#inputUserLicenseNumber').val(),
+                trainings: $('#inputUserTrainings').val()
+            },
+            dataType: 'json',
+            success: function (response) {
+                $submitBtn.html(originalBtnHtml).prop('disabled', false);
+                if (response.success) {
+                    $('#addUserForm')[0].reset();
+                    toggleUserClinicalFields();
+                    loadUsers();
+                    Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'success',
+                        title: 'Staff account created.',
+                        showConfirmButton: false,
+                        timer: 2500
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Could Not Create Account',
+                        text: response.message || 'Please check the form and try again.',
+                        confirmButtonColor: '#dc3545'
+                    });
+                }
+            },
+            error: function (xhr) {
+                $submitBtn.html(originalBtnHtml).prop('disabled', false);
+                const serverMsg = xhr.responseJSON && xhr.responseJSON.message;
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Could Not Create Account',
+                    text: serverMsg || `Failed to create account (${xhr.status}).`,
+                    confirmButtonColor: '#dc3545'
+                });
+            }
+        });
+    });
+
+    $(document).on('click', '.btn-toggle-user', function () {
+        const userId = $(this).data('id');
+        $.ajax({
+            url: `${API_BASE}/manage_users.php`,
+            type: 'PATCH',
+            contentType: 'application/json',
+            data: JSON.stringify({ id: userId, action: 'toggle_active' }),
+            dataType: 'json',
+            success: function (response) {
+                if (response.success) {
+                    loadUsers();
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: response.message || 'Could not update account.', confirmButtonColor: '#dc3545' });
+                }
+            }
+        });
+    });
+
+    $(document).on('click', '.btn-delete-user', function () {
+        const userId = $(this).data('id');
+        Swal.fire({
+            title: 'Remove this account?',
+            text: 'This staff member will no longer be able to log in.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            confirmButtonText: 'Yes, Remove'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: `${API_BASE}/manage_users.php?id=${encodeURIComponent(userId)}`,
+                    type: 'DELETE',
+                    dataType: 'json',
+                    success: function (response) {
+                        if (response.success) {
+                            loadUsers();
+                        } else {
+                            Swal.fire({ icon: 'error', title: 'Error', text: response.message || 'Could not remove account.', confirmButtonColor: '#dc3545' });
+                        }
+                    }
+                });
+            }
+        });
+    });
+
+    /**
+     * Load / populate the facility's Service Assessment (streamlined DOH HFP checklist)
+     */
+    const ASSESSMENT_BOOL_FIELDS = [
+        'has_icu', 'has_nicu', 'has_er_trauma', 'has_delivery_room', 'has_hemodialysis',
+        'has_blood_bank', 'has_ct_mri', 'has_cardiologist', 'has_obgyn', 'has_neurologist', 'has_general_surgeon'
+    ];
+
+    function loadServiceAssessment() {
+        const doh = window.DOHAssessment || (typeof DOHAssessment !== 'undefined' ? DOHAssessment : null);
+        if (doh && typeof doh.loadForm === 'function') {
+            doh.loadForm();
+        } else {
+            console.error('DOHAssessment module not found on window object!');
+        }
+    }
+
+
+    $('#assessmentForm').on('submit', function (e) {
+        e.preventDefault();
+
+        const $submitBtn = $('#btnSubmitAssessment');
+        const originalBtnHtml = $submitBtn.html();
+        $submitBtn.html('<span class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent me-2"></span> Saving...').prop('disabled', true);
+
+        const formData = {
+            authorized_bed_capacity: $('#inputAuthorizedBeds').val(),
+            functional_beds: $('#inputFunctionalBeds').val()
+        };
+        ASSESSMENT_BOOL_FIELDS.forEach(function (field) {
+            formData[field] = $(`#assessmentForm [name="${field}"]`).is(':checked') ? 1 : 0;
+        });
+
+        $.ajax({
+            url: `${API_BASE}/service_assessment.php`,
+            type: 'POST',
+            data: formData,
+            dataType: 'json',
+            success: function (response) {
+                $submitBtn.html(originalBtnHtml).prop('disabled', false);
+
+                if (response.success) {
+                    if (currentHospital) currentHospital.is_assessment_completed = true;
+                    $('#assessmentLockBanner').addClass('hidden');
+                    applyRoleBasedNav();
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Assessment Submitted',
+                        text: 'Your facility is now unlocked for staff to use the system.',
+                        confirmButtonColor: '#dc3545'
+                    }).then(function () {
+                        switchTab('patients');
+                        loadPatients();
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Could Not Save Assessment',
+                        text: response.message || 'Please check the form and try again.',
+                        confirmButtonColor: '#dc3545'
+                    });
+                }
+            },
+            error: function (xhr) {
+                $submitBtn.html(originalBtnHtml).prop('disabled', false);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: `Failed to save assessment (${xhr.status}).`,
+                    confirmButtonColor: '#dc3545'
+                });
+            }
+        });
+    });
+
+    /**
+     * PSGC API (https://psgc.cloud/api) Cascading Location Selector.
+     * Shared cache + fetch logic, instantiated per set of region/province/city/barangay
+     * selects (referral modal has geocoding, patient modal is just the four dropdowns).
      */
     let psgcCache = {
         regions: null,
@@ -2236,66 +2781,6 @@ $(document).ready(function () {
         cities: {},
         barangays: {}
     };
-
-    let geocodeDebounceTimer = null;
-    let isLocationEventsBound = false;
-
-    function setupLocationCascade() {
-        if (isLocationEventsBound) return;
-        isLocationEventsBound = true;
-
-        $('#selectRegion').on('change', function() {
-            loadProvincesForSelectedRegion();
-        });
-
-        $('#selectProvince').on('change', function() {
-            loadCitiesForSelectedProvince();
-        });
-
-        $('#selectCity').on('change', function() {
-            loadBarangaysForSelectedCity();
-        });
-
-        $('#selectBarangay').on('change', function() {
-            triggerGeocodeResolution();
-        });
-    }
-
-    function initLocationDropdowns() {
-        setupLocationCascade();
-        loadRegions();
-    }
-
-    function loadRegions() {
-        const $regionSelect = $('#selectRegion');
-        $regionSelect.empty().append('<option value="">Loading regions...</option>');
-
-        if (psgcCache.regions && psgcCache.regions.length > 0) {
-            populateRegionDropdown(psgcCache.regions);
-            return;
-        }
-
-        $.ajax({
-            url: 'https://psgc.cloud/api/regions',
-            type: 'GET',
-            dataType: 'json',
-            xhrFields: {
-                withCredentials: false
-            },
-            timeout: 5000,
-            success: function(data) {
-                if (Array.isArray(data) && data.length > 0) {
-                    psgcCache.regions = data;
-                    populateRegionDropdown(data);
-                } else {
-                    fallbackRegions();
-                }
-            },
-            error: function() {
-                fallbackRegions();
-            }
-        });
-    }
 
     // psgc.cloud occasionally returns unrelated entries appended to a province/region's
     // city list (observed: Sarangani's cities-municipalities response also includes every
@@ -2311,277 +2796,350 @@ $(document).ready(function () {
         return filtered.length > 0 ? filtered : cities;
     }
 
-    function populateRegionDropdown(regions) {
-        const $regionSelect = $('#selectRegion');
-        $regionSelect.empty();
+    /**
+     * @param {{region:string, province:string, city:string, barangay:string}} sel jQuery selectors
+     * @param {function(string,string,string,string):void} [onResolved] called with (region, province, city, barangay) after every cascade step
+     */
+    function createLocationCascade(sel, onResolved) {
+        let eventsBound = false;
+        // When set (via init(preferredTarget)), each dropdown prefers selecting this exact
+        // value over the hardcoded Davao-area defaults below -- used to prefill a patient's
+        // own registered address instead of always defaulting to Davao City.
+        let preferredTarget = null;
+        const hasPreferred = function (fieldName) {
+            return !!(preferredTarget && preferredTarget[fieldName]);
+        };
+        const prefers = function (fieldName, optionName) {
+            return hasPreferred(fieldName) &&
+                optionName.trim().toLowerCase() === preferredTarget[fieldName].trim().toLowerCase();
+        };
 
-        regions.forEach(region => {
-            const option = $('<option>')
-                .attr('value', region.name)
-                .attr('data-code', region.code)
-                .text(region.name);
+        function resolve() {
+            if (onResolved) {
+                onResolved($(sel.region).val(), $(sel.province).val(), $(sel.city).val(), $(sel.barangay).val());
+            }
+        }
 
-            // Default to Region XI (Davao Region) or Mindanao if present
-            if (region.code === '1100000000' || region.name.includes('Davao')) {
-                option.prop('selected', true);
+        function loadRegions() {
+            const $regionSelect = $(sel.region);
+            $regionSelect.empty().append('<option value="">Loading regions...</option>');
+
+            if (psgcCache.regions && psgcCache.regions.length > 0) {
+                populateRegionDropdown(psgcCache.regions);
+                return;
             }
 
-            $regionSelect.append(option);
-        });
-
-        if (!$regionSelect.val() && regions.length > 0) {
-            $regionSelect.val(regions[0].name);
+            $.ajax({
+                url: 'https://psgc.cloud/api/regions',
+                type: 'GET',
+                dataType: 'json',
+                xhrFields: { withCredentials: false },
+                timeout: 5000,
+                success: function(data) {
+                    if (Array.isArray(data) && data.length > 0) {
+                        psgcCache.regions = data;
+                        populateRegionDropdown(data);
+                    } else {
+                        fallbackRegions();
+                    }
+                },
+                error: function() {
+                    fallbackRegions();
+                }
+            });
         }
 
-        loadProvincesForSelectedRegion();
-    }
+        function populateRegionDropdown(regions) {
+            const $regionSelect = $(sel.region);
+            $regionSelect.empty();
 
-    function fallbackRegions() {
-        const $regionSelect = $('#selectRegion');
-        $regionSelect.empty().append(`
-            <option value="Region XI (Davao Region)" data-code="1100000000" selected>Region XI (Davao Region)</option>
-            <option value="Region X (Northern Mindanao)" data-code="1000000000">Region X (Northern Mindanao)</option>
-            <option value="Region IX (Zamboanga Peninsula)" data-code="0900000000">Region IX (Zamboanga Peninsula)</option>
-            <option value="Region XII (SOCCSKSARGEN)" data-code="1200000000">Region XII (SOCCSKSARGEN)</option>
-            <option value="Region XIII (Caraga)" data-code="1600000000">Region XIII (Caraga)</option>
-            <option value="BARMM" data-code="1900000000">BARMM</option>
-            <option value="NCR (Metro Manila)" data-code="1300000000">NCR (Metro Manila)</option>
-        `);
-        loadProvincesForSelectedRegion();
-    }
+            regions.forEach(region => {
+                const option = $('<option>')
+                    .attr('value', region.name)
+                    .attr('data-code', region.code)
+                    .text(region.name);
 
-    function loadProvincesForSelectedRegion() {
-        const $regionSelect = $('#selectRegion');
-        const regionCode = $regionSelect.find('option:selected').attr('data-code');
-        const $provinceSelect = $('#selectProvince');
-        $provinceSelect.empty().append('<option value="">Loading provinces...</option>');
+                // Prefer the patient's own registered region if we have one; otherwise
+                // default to Region XI (Davao Region)
+                if (hasPreferred('region') ? prefers('region', region.name) : (region.code === '1100000000' || region.name.includes('Davao'))) {
+                    option.prop('selected', true);
+                }
 
-        if (!regionCode) {
-            loadCitiesForSelectedProvince();
-            return;
+                $regionSelect.append(option);
+            });
+
+            if (!$regionSelect.val() && regions.length > 0) {
+                $regionSelect.val(regions[0].name);
+            }
+
+            loadProvincesForSelectedRegion();
         }
 
-        if (psgcCache.provinces[regionCode]) {
-            populateProvinceDropdown(psgcCache.provinces[regionCode]);
-            return;
+        function fallbackRegions() {
+            const $regionSelect = $(sel.region);
+            $regionSelect.empty().append(`
+                <option value="Region XI (Davao Region)" data-code="1100000000" selected>Region XI (Davao Region)</option>
+                <option value="Region X (Northern Mindanao)" data-code="1000000000">Region X (Northern Mindanao)</option>
+                <option value="Region IX (Zamboanga Peninsula)" data-code="0900000000">Region IX (Zamboanga Peninsula)</option>
+                <option value="Region XII (SOCCSKSARGEN)" data-code="1200000000">Region XII (SOCCSKSARGEN)</option>
+                <option value="Region XIII (Caraga)" data-code="1600000000">Region XIII (Caraga)</option>
+                <option value="BARMM" data-code="1900000000">BARMM</option>
+                <option value="NCR (Metro Manila)" data-code="1300000000">NCR (Metro Manila)</option>
+            `);
+            loadProvincesForSelectedRegion();
         }
 
-        $.ajax({
-            url: `https://psgc.cloud/api/regions/${regionCode}/provinces`,
-            type: 'GET',
-            dataType: 'json',
-            xhrFields: {
-                withCredentials: false
-            },
-            timeout: 5000,
-            success: function(data) {
-                if (Array.isArray(data)) {
-                    psgcCache.provinces[regionCode] = data;
-                    populateProvinceDropdown(data);
-                } else {
+        function loadProvincesForSelectedRegion() {
+            const regionCode = $(sel.region).find('option:selected').attr('data-code');
+            const $provinceSelect = $(sel.province);
+            $provinceSelect.empty().append('<option value="">Loading provinces...</option>');
+
+            if (!regionCode) {
+                loadCitiesForSelectedProvince();
+                return;
+            }
+
+            if (psgcCache.provinces[regionCode]) {
+                populateProvinceDropdown(psgcCache.provinces[regionCode]);
+                return;
+            }
+
+            $.ajax({
+                url: `https://psgc.cloud/api/regions/${regionCode}/provinces`,
+                type: 'GET',
+                dataType: 'json',
+                xhrFields: { withCredentials: false },
+                timeout: 5000,
+                success: function(data) {
+                    if (Array.isArray(data)) {
+                        psgcCache.provinces[regionCode] = data;
+                        populateProvinceDropdown(data);
+                    } else {
+                        fallbackProvinces();
+                    }
+                },
+                error: function() {
                     fallbackProvinces();
                 }
-            },
-            error: function() {
-                fallbackProvinces();
-            }
-        });
-    }
-
-    function populateProvinceDropdown(provinces) {
-        const $provinceSelect = $('#selectProvince');
-        $provinceSelect.empty();
-
-        if (provinces.length === 0) {
-            const regionName = $('#selectRegion').val();
-            $provinceSelect.append(`<option value="${regionName}" data-code="N/A">${regionName}</option>`);
-        } else {
-            provinces.forEach(prov => {
-                const option = $('<option>')
-                    .attr('value', prov.name)
-                    .attr('data-code', prov.code)
-                    .text(prov.name);
-                
-                if (prov.name.includes('Davao del Sur')) {
-                    option.prop('selected', true);
-                }
-                $provinceSelect.append(option);
             });
+        }
 
-            if (!$provinceSelect.val() && provinces.length > 0) {
-                $provinceSelect.val(provinces[0].name);
+        function populateProvinceDropdown(provinces) {
+            const $provinceSelect = $(sel.province);
+            $provinceSelect.empty();
+
+            if (provinces.length === 0) {
+                const regionName = $(sel.region).val();
+                $provinceSelect.append(`<option value="${regionName}" data-code="N/A">${regionName}</option>`);
+            } else {
+                provinces.forEach(prov => {
+                    const option = $('<option>')
+                        .attr('value', prov.name)
+                        .attr('data-code', prov.code)
+                        .text(prov.name);
+
+                    if (hasPreferred('province') ? prefers('province', prov.name) : prov.name.includes('Davao del Sur')) {
+                        option.prop('selected', true);
+                    }
+                    $provinceSelect.append(option);
+                });
+
+                if (!$provinceSelect.val() && provinces.length > 0) {
+                    $provinceSelect.val(provinces[0].name);
+                }
             }
+
+            loadCitiesForSelectedProvince();
         }
 
-        loadCitiesForSelectedProvince();
-    }
-
-    function fallbackProvinces() {
-        const $provinceSelect = $('#selectProvince');
-        $provinceSelect.empty().append(`
-            <option value="Davao del Sur" data-code="1102400000" selected>Davao del Sur</option>
-            <option value="Davao del Norte" data-code="1102300000">Davao del Norte</option>
-            <option value="Misamis Oriental" data-code="1004300000">Misamis Oriental</option>
-            <option value="South Cotabato" data-code="1206300000">South Cotabato</option>
-        `);
-        loadCitiesForSelectedProvince();
-    }
-
-    function loadCitiesForSelectedProvince() {
-        const $provinceSelect = $('#selectProvince');
-        const provinceCode = $provinceSelect.find('option:selected').attr('data-code');
-        const regionCode = $('#selectRegion option:selected').attr('data-code');
-        const $citySelect = $('#selectCity');
-        $citySelect.empty().append('<option value="">Loading cities...</option>');
-
-        const fetchUrl = (provinceCode && provinceCode !== 'N/A')
-            ? `https://psgc.cloud/api/provinces/${provinceCode}/cities-municipalities`
-            : `https://psgc.cloud/api/regions/${regionCode}/cities-municipalities`;
-
-        const cacheKey = (provinceCode && provinceCode !== 'N/A') ? provinceCode : `region_${regionCode}`;
-
-        if (psgcCache.cities[cacheKey]) {
-            populateCityDropdown(psgcCache.cities[cacheKey]);
-            return;
+        function fallbackProvinces() {
+            const $provinceSelect = $(sel.province);
+            $provinceSelect.empty().append(`
+                <option value="Davao del Sur" data-code="1102400000" selected>Davao del Sur</option>
+                <option value="Davao del Norte" data-code="1102300000">Davao del Norte</option>
+                <option value="Misamis Oriental" data-code="1004300000">Misamis Oriental</option>
+                <option value="South Cotabato" data-code="1206300000">South Cotabato</option>
+            `);
+            loadCitiesForSelectedProvince();
         }
 
-        $.ajax({
-            url: fetchUrl,
-            type: 'GET',
-            dataType: 'json',
-            xhrFields: {
-                withCredentials: false
-            },
-            timeout: 5000,
-            success: function(data) {
-                if (Array.isArray(data)) {
-                    const cleanData = filterCitiesToExpectedArea(data, provinceCode, regionCode);
-                    psgcCache.cities[cacheKey] = cleanData;
-                    populateCityDropdown(cleanData);
-                } else {
+        function loadCitiesForSelectedProvince() {
+            const provinceCode = $(sel.province).find('option:selected').attr('data-code');
+            const regionCode = $(sel.region).find('option:selected').attr('data-code');
+            const $citySelect = $(sel.city);
+            $citySelect.empty().append('<option value="">Loading cities...</option>');
+
+            const fetchUrl = (provinceCode && provinceCode !== 'N/A')
+                ? `https://psgc.cloud/api/provinces/${provinceCode}/cities-municipalities`
+                : `https://psgc.cloud/api/regions/${regionCode}/cities-municipalities`;
+
+            const cacheKey = (provinceCode && provinceCode !== 'N/A') ? provinceCode : `region_${regionCode}`;
+
+            if (psgcCache.cities[cacheKey]) {
+                populateCityDropdown(psgcCache.cities[cacheKey]);
+                return;
+            }
+
+            $.ajax({
+                url: fetchUrl,
+                type: 'GET',
+                dataType: 'json',
+                xhrFields: { withCredentials: false },
+                timeout: 5000,
+                success: function(data) {
+                    if (Array.isArray(data)) {
+                        const cleanData = filterCitiesToExpectedArea(data, provinceCode, regionCode);
+                        psgcCache.cities[cacheKey] = cleanData;
+                        populateCityDropdown(cleanData);
+                    } else {
+                        fallbackCities();
+                    }
+                },
+                error: function() {
                     fallbackCities();
                 }
-            },
-            error: function() {
-                fallbackCities();
-            }
-        });
-    }
-
-    function populateCityDropdown(cities) {
-        const $citySelect = $('#selectCity');
-        $citySelect.empty();
-
-        cities.forEach(city => {
-            const option = $('<option>')
-                .attr('value', city.name)
-                .attr('data-code', city.code)
-                .text(city.name);
-
-            if (city.name.includes('Davao')) {
-                option.prop('selected', true);
-            }
-            $citySelect.append(option);
-        });
-
-        if (!$citySelect.val() && cities.length > 0) {
-            $citySelect.val(cities[0].name);
+            });
         }
 
-        loadBarangaysForSelectedCity();
-    }
+        function populateCityDropdown(cities) {
+            const $citySelect = $(sel.city);
+            $citySelect.empty();
 
-    function fallbackCities() {
-        const $citySelect = $('#selectCity');
-        $citySelect.empty().append(`
-            <option value="City of Davao" data-code="1130700000" selected>City of Davao</option>
-            <option value="City of Digos" data-code="1102403000">City of Digos</option>
-            <option value="Santa Cruz" data-code="1102412000">Santa Cruz</option>
-        `);
-        loadBarangaysForSelectedCity();
-    }
-
-    function loadBarangaysForSelectedCity() {
-        const $citySelect = $('#selectCity');
-        const cityCode = $citySelect.find('option:selected').attr('data-code');
-        const $barangaySelect = $('#selectBarangay');
-        $barangaySelect.empty().append('<option value="">Loading barangays...</option>');
-
-        if (!cityCode) {
-            triggerGeocodeResolution();
-            return;
-        }
-
-        if (psgcCache.barangays[cityCode]) {
-            populateBarangayDropdown(psgcCache.barangays[cityCode]);
-            return;
-        }
-
-        $.ajax({
-            url: `https://psgc.cloud/api/cities-municipalities/${cityCode}/barangays`,
-            type: 'GET',
-            dataType: 'json',
-            xhrFields: {
-                withCredentials: false
-            },
-            timeout: 5000,
-            success: function(data) {
-                if (Array.isArray(data)) {
-                    psgcCache.barangays[cityCode] = data;
-                    populateBarangayDropdown(data);
-                } else {
-                    fallbackBarangays();
-                }
-            },
-            error: function() {
-                fallbackBarangays();
-            }
-        });
-    }
-
-    function populateBarangayDropdown(barangays) {
-        const $barangaySelect = $('#selectBarangay');
-        $barangaySelect.empty();
-
-        if (barangays.length === 0) {
-            $barangaySelect.append('<option value="Poblacion" data-code="N/A">Poblacion</option>');
-        } else {
-            barangays.forEach(brgy => {
+            cities.forEach(city => {
                 const option = $('<option>')
-                    .attr('value', brgy.name)
-                    .attr('data-code', brgy.code)
-                    .text(brgy.name);
-                
-                if (brgy.name.toLowerCase().includes('buhangin') || brgy.name.toLowerCase().includes('poblacion')) {
+                    .attr('value', city.name)
+                    .attr('data-code', city.code)
+                    .text(city.name);
+
+                if (hasPreferred('city') ? prefers('city', city.name) : city.name.includes('Davao')) {
                     option.prop('selected', true);
                 }
-                $barangaySelect.append(option);
+                $citySelect.append(option);
             });
 
-            if (!$barangaySelect.val() && barangays.length > 0) {
-                $barangaySelect.val(barangays[0].name);
+            if (!$citySelect.val() && cities.length > 0) {
+                $citySelect.val(cities[0].name);
             }
+
+            loadBarangaysForSelectedCity();
         }
 
-        triggerGeocodeResolution();
+        function fallbackCities() {
+            const $citySelect = $(sel.city);
+            $citySelect.empty().append(`
+                <option value="City of Davao" data-code="1130700000" selected>City of Davao</option>
+                <option value="City of Digos" data-code="1102403000">City of Digos</option>
+                <option value="Santa Cruz" data-code="1102412000">Santa Cruz</option>
+            `);
+            loadBarangaysForSelectedCity();
+        }
+
+        function loadBarangaysForSelectedCity() {
+            const cityCode = $(sel.city).find('option:selected').attr('data-code');
+            const $barangaySelect = $(sel.barangay);
+            $barangaySelect.empty().append('<option value="">Loading barangays...</option>');
+
+            if (!cityCode) {
+                resolve();
+                return;
+            }
+
+            if (psgcCache.barangays[cityCode]) {
+                populateBarangayDropdown(psgcCache.barangays[cityCode]);
+                return;
+            }
+
+            $.ajax({
+                url: `https://psgc.cloud/api/cities-municipalities/${cityCode}/barangays`,
+                type: 'GET',
+                dataType: 'json',
+                xhrFields: { withCredentials: false },
+                timeout: 5000,
+                success: function(data) {
+                    if (Array.isArray(data)) {
+                        psgcCache.barangays[cityCode] = data;
+                        populateBarangayDropdown(data);
+                    } else {
+                        fallbackBarangays();
+                    }
+                },
+                error: function() {
+                    fallbackBarangays();
+                }
+            });
+        }
+
+        function populateBarangayDropdown(barangays) {
+            const $barangaySelect = $(sel.barangay);
+            $barangaySelect.empty();
+
+            if (barangays.length === 0) {
+                $barangaySelect.append('<option value="Poblacion" data-code="N/A">Poblacion</option>');
+            } else {
+                barangays.forEach(brgy => {
+                    const option = $('<option>')
+                        .attr('value', brgy.name)
+                        .attr('data-code', brgy.code)
+                        .text(brgy.name);
+
+                    if (hasPreferred('barangay') ? prefers('barangay', brgy.name) : (brgy.name.toLowerCase().includes('buhangin') || brgy.name.toLowerCase().includes('poblacion'))) {
+                        option.prop('selected', true);
+                    }
+                    $barangaySelect.append(option);
+                });
+
+                if (!$barangaySelect.val() && barangays.length > 0) {
+                    $barangaySelect.val(barangays[0].name);
+                }
+            }
+
+            resolve();
+        }
+
+        function fallbackBarangays() {
+            const $barangaySelect = $(sel.barangay);
+            $barangaySelect.empty().append(`
+                <option value="Buhangin" data-code="1130700100" selected>Buhangin</option>
+                <option value="Poblacion" data-code="1130700200">Poblacion</option>
+                <option value="Agdao" data-code="1130700300">Agdao</option>
+            `);
+            resolve();
+        }
+
+        return {
+            /**
+             * @param {{region:string, province:string, city:string, barangay:string}} [target]
+             *   When given, each dropdown selects this exact address instead of the
+             *   hardcoded Davao-area defaults -- e.g. a patient's own registered address.
+             */
+            init: function(target) {
+                preferredTarget = target || null;
+                if (!eventsBound) {
+                    eventsBound = true;
+                    $(sel.region).on('change', loadProvincesForSelectedRegion);
+                    $(sel.province).on('change', loadCitiesForSelectedProvince);
+                    $(sel.city).on('change', loadBarangaysForSelectedCity);
+                    $(sel.barangay).on('change', resolve);
+                }
+                loadRegions();
+            }
+        };
     }
 
-    function fallbackBarangays() {
-        const $barangaySelect = $('#selectBarangay');
-        $barangaySelect.empty().append(`
-            <option value="Buhangin" data-code="1130700100" selected>Buhangin</option>
-            <option value="Poblacion" data-code="1130700200">Poblacion</option>
-            <option value="Agdao" data-code="1130700300">Agdao</option>
-        `);
-        triggerGeocodeResolution();
+    let geocodeDebounceTimer = null;
+
+    function applyCoordinates(lat, lng) {
+        const latFormatted = parseFloat(lat).toFixed(6);
+        const lngFormatted = parseFloat(lng).toFixed(6);
+
+        $('#modalLatitude').val(latFormatted);
+        $('#modalLongitude').val(lngFormatted);
+        $('#displayLatLongText').text(`${latFormatted}, ${lngFormatted}`);
     }
 
-    function triggerGeocodeResolution() {
-        const region = $('#selectRegion').val();
-        const province = $('#selectProvince').val();
-        const city = $('#selectCity').val();
-        const barangay = $('#selectBarangay').val();
-
+    const referralLocationCascade = createLocationCascade({
+        region: '#selectRegion', province: '#selectProvince', city: '#selectCity', barangay: '#selectBarangay'
+    }, function(region, province, city, barangay) {
         const resolvedAddress = [barangay, city, province, region].filter(Boolean).join(', ');
         $('#displayResolvedAddress').text(resolvedAddress);
 
@@ -2608,15 +3166,9 @@ $(document).ready(function () {
 
             $.ajax({
                 url: 'https://nominatim.openstreetmap.org/search',
-                data: {
-                    format: 'json',
-                    q: query,
-                    limit: 1
-                },
+                data: { format: 'json', q: query, limit: 1 },
                 dataType: 'json',
-                xhrFields: {
-                    withCredentials: false
-                },
+                xhrFields: { withCredentials: false },
                 timeout: 4000,
                 success: function(results) {
                     if (results && results.length > 0) {
@@ -2627,388 +3179,11 @@ $(document).ready(function () {
                 }
             });
         }, 400);
-    }
+    });
 
-    function applyCoordinates(lat, lng) {
-        const latFormatted = parseFloat(lat).toFixed(6);
-        const lngFormatted = parseFloat(lng).toFixed(6);
-
-        $('#modalLatitude').val(latFormatted);
-        $('#modalLongitude').val(lngFormatted);
-        $('#displayLatLongText').text(`${latFormatted}, ${lngFormatted}`);
-    }
-
-    /**
-     * Hospital Profile Inventory Location Selector
-     */
-    let invGeocodeDebounceTimer = null;
-    let isInvLocationEventsBound = false;
-
-    function setupInventoryLocationCascade() {
-        if (isInvLocationEventsBound) return;
-        isInvLocationEventsBound = true;
-
-        $('#invSelectRegion').on('change', function() {
-            loadInventoryProvinces();
-        });
-
-        $('#invSelectProvince').on('change', function() {
-            loadInventoryCities();
-        });
-
-        $('#invSelectCity').on('change', function() {
-            loadInventoryBarangays();
-        });
-
-        $('#invSelectBarangay').on('change', function() {
-            triggerInventoryGeocodeResolution();
-        });
-    }
-
-    function initInventoryLocationDropdowns() {
-        setupInventoryLocationCascade();
-        loadInventoryRegions();
-    }
-
-    function loadInventoryRegions() {
-        const $regionSelect = $('#invSelectRegion');
-        $regionSelect.empty().append('<option value="">Loading regions...</option>');
-
-        if (psgcCache.regions && psgcCache.regions.length > 0) {
-            populateInventoryRegionDropdown(psgcCache.regions);
-            return;
-        }
-
-        $.ajax({
-            url: 'https://psgc.cloud/api/regions',
-            type: 'GET',
-            dataType: 'json',
-            xhrFields: { withCredentials: false },
-            timeout: 5000,
-            success: function(data) {
-                if (Array.isArray(data) && data.length > 0) {
-                    psgcCache.regions = data;
-                    populateInventoryRegionDropdown(data);
-                } else {
-                    fallbackInventoryRegions();
-                }
-            },
-            error: function() {
-                fallbackInventoryRegions();
-            }
-        });
-    }
-
-    function populateInventoryRegionDropdown(regions) {
-        const $regionSelect = $('#invSelectRegion');
-        $regionSelect.empty();
-
-        regions.forEach(region => {
-            const option = $('<option>')
-                .attr('value', region.name)
-                .attr('data-code', region.code)
-                .text(region.name);
-
-            if (region.code === '1100000000' || region.name.includes('Davao')) {
-                option.prop('selected', true);
-            }
-
-            $regionSelect.append(option);
-        });
-
-        if (!$regionSelect.val() && regions.length > 0) {
-            $regionSelect.val(regions[0].name);
-        }
-
-        loadInventoryProvinces();
-    }
-
-    function fallbackInventoryRegions() {
-        const $regionSelect = $('#invSelectRegion');
-        $regionSelect.empty().append(`
-            <option value="Region XI (Davao Region)" data-code="1100000000" selected>Region XI (Davao Region)</option>
-            <option value="Region X (Northern Mindanao)" data-code="1000000000">Region X (Northern Mindanao)</option>
-            <option value="Region IX (Zamboanga Peninsula)" data-code="0900000000">Region IX (Zamboanga Peninsula)</option>
-            <option value="Region XII (SOCCSKSARGEN)" data-code="1200000000">Region XII (SOCCSKSARGEN)</option>
-            <option value="Region XIII (Caraga)" data-code="1600000000">Region XIII (Caraga)</option>
-            <option value="BARMM" data-code="1900000000">BARMM</option>
-            <option value="NCR (Metro Manila)" data-code="1300000000">NCR (Metro Manila)</option>
-        `);
-        loadInventoryProvinces();
-    }
-
-    function loadInventoryProvinces() {
-        const $regionSelect = $('#invSelectRegion');
-        const regionCode = $regionSelect.find('option:selected').attr('data-code');
-        const $provinceSelect = $('#invSelectProvince');
-        $provinceSelect.empty().append('<option value="">Loading provinces...</option>');
-
-        if (!regionCode) {
-            loadInventoryCities();
-            return;
-        }
-
-        if (psgcCache.provinces[regionCode]) {
-            populateInventoryProvinceDropdown(psgcCache.provinces[regionCode]);
-            return;
-        }
-
-        $.ajax({
-            url: `https://psgc.cloud/api/regions/${regionCode}/provinces`,
-            type: 'GET',
-            dataType: 'json',
-            xhrFields: { withCredentials: false },
-            timeout: 5000,
-            success: function(data) {
-                if (Array.isArray(data)) {
-                    psgcCache.provinces[regionCode] = data;
-                    populateInventoryProvinceDropdown(data);
-                } else {
-                    fallbackInventoryProvinces();
-                }
-            },
-            error: function() {
-                fallbackInventoryProvinces();
-            }
-        });
-    }
-
-    function populateInventoryProvinceDropdown(provinces) {
-        const $provinceSelect = $('#invSelectProvince');
-        $provinceSelect.empty();
-
-        if (provinces.length === 0) {
-            const regionName = $('#invSelectRegion').val();
-            $provinceSelect.append(`<option value="${regionName}" data-code="N/A">${regionName}</option>`);
-        } else {
-            provinces.forEach(prov => {
-                const option = $('<option>')
-                    .attr('value', prov.name)
-                    .attr('data-code', prov.code)
-                    .text(prov.name);
-                
-                if (prov.name.includes('Davao del Sur')) {
-                    option.prop('selected', true);
-                }
-                $provinceSelect.append(option);
-            });
-
-            if (!$provinceSelect.val() && provinces.length > 0) {
-                $provinceSelect.val(provinces[0].name);
-            }
-        }
-
-        loadInventoryCities();
-    }
-
-    function fallbackInventoryProvinces() {
-        const $provinceSelect = $('#invSelectProvince');
-        $provinceSelect.empty().append(`
-            <option value="Davao del Sur" data-code="1102400000" selected>Davao del Sur</option>
-            <option value="Davao del Norte" data-code="1102300000">Davao del Norte</option>
-            <option value="Misamis Oriental" data-code="1004300000">Misamis Oriental</option>
-        `);
-        loadInventoryCities();
-    }
-
-    function loadInventoryCities() {
-        const $provinceSelect = $('#invSelectProvince');
-        const provinceCode = $provinceSelect.find('option:selected').attr('data-code');
-        const regionCode = $('#invSelectRegion option:selected').attr('data-code');
-        const $citySelect = $('#invSelectCity');
-        $citySelect.empty().append('<option value="">Loading cities...</option>');
-
-        const fetchUrl = (provinceCode && provinceCode !== 'N/A')
-            ? `https://psgc.cloud/api/provinces/${provinceCode}/cities-municipalities`
-            : `https://psgc.cloud/api/regions/${regionCode}/cities-municipalities`;
-
-        const cacheKey = (provinceCode && provinceCode !== 'N/A') ? provinceCode : `region_${regionCode}`;
-
-        if (psgcCache.cities[cacheKey]) {
-            populateInventoryCityDropdown(psgcCache.cities[cacheKey]);
-            return;
-        }
-
-        $.ajax({
-            url: fetchUrl,
-            type: 'GET',
-            dataType: 'json',
-            xhrFields: { withCredentials: false },
-            timeout: 5000,
-            success: function(data) {
-                if (Array.isArray(data)) {
-                    const cleanData = filterCitiesToExpectedArea(data, provinceCode, regionCode);
-                    psgcCache.cities[cacheKey] = cleanData;
-                    populateInventoryCityDropdown(cleanData);
-                } else {
-                    fallbackInventoryCities();
-                }
-            },
-            error: function() {
-                fallbackInventoryCities();
-            }
-        });
-    }
-
-    function populateInventoryCityDropdown(cities) {
-        const $citySelect = $('#invSelectCity');
-        $citySelect.empty();
-
-        cities.forEach(city => {
-            const option = $('<option>')
-                .attr('value', city.name)
-                .attr('data-code', city.code)
-                .text(city.name);
-
-            if (city.name.includes('Davao')) {
-                option.prop('selected', true);
-            }
-            $citySelect.append(option);
-        });
-
-        if (!$citySelect.val() && cities.length > 0) {
-            $citySelect.val(cities[0].name);
-        }
-
-        loadInventoryBarangays();
-    }
-
-    function fallbackInventoryCities() {
-        const $citySelect = $('#invSelectCity');
-        $citySelect.empty().append(`
-            <option value="City of Davao" data-code="1130700000" selected>City of Davao</option>
-            <option value="City of Digos" data-code="1102403000">City of Digos</option>
-        `);
-        loadInventoryBarangays();
-    }
-
-    function loadInventoryBarangays() {
-        const $citySelect = $('#invSelectCity');
-        const cityCode = $citySelect.find('option:selected').attr('data-code');
-        const $barangaySelect = $('#invSelectBarangay');
-        $barangaySelect.empty().append('<option value="">Loading barangays...</option>');
-
-        if (!cityCode) {
-            triggerInventoryGeocodeResolution();
-            return;
-        }
-
-        if (psgcCache.barangays[cityCode]) {
-            populateInventoryBarangayDropdown(psgcCache.barangays[cityCode]);
-            return;
-        }
-
-        $.ajax({
-            url: `https://psgc.cloud/api/cities-municipalities/${cityCode}/barangays`,
-            type: 'GET',
-            dataType: 'json',
-            xhrFields: { withCredentials: false },
-            timeout: 5000,
-            success: function(data) {
-                if (Array.isArray(data)) {
-                    psgcCache.barangays[cityCode] = data;
-                    populateInventoryBarangayDropdown(data);
-                } else {
-                    fallbackInventoryBarangays();
-                }
-            },
-            error: function() {
-                fallbackInventoryBarangays();
-            }
-        });
-    }
-
-    function populateInventoryBarangayDropdown(barangays) {
-        const $barangaySelect = $('#invSelectBarangay');
-        $barangaySelect.empty();
-
-        if (barangays.length === 0) {
-            $barangaySelect.append('<option value="Poblacion" data-code="N/A">Poblacion</option>');
-        } else {
-            barangays.forEach(brgy => {
-                const option = $('<option>')
-                    .attr('value', brgy.name)
-                    .attr('data-code', brgy.code)
-                    .text(brgy.name);
-                
-                if (brgy.name.toLowerCase().includes('buhangin') || brgy.name.toLowerCase().includes('poblacion')) {
-                    option.prop('selected', true);
-                }
-                $barangaySelect.append(option);
-            });
-
-            if (!$barangaySelect.val() && barangays.length > 0) {
-                $barangaySelect.val(barangays[0].name);
-            }
-        }
-
-        triggerInventoryGeocodeResolution();
-    }
-
-    function fallbackInventoryBarangays() {
-        const $barangaySelect = $('#invSelectBarangay');
-        $barangaySelect.empty().append(`
-            <option value="Buhangin" data-code="1130700100" selected>Buhangin</option>
-            <option value="Poblacion" data-code="1130700200">Poblacion</option>
-        `);
-        triggerInventoryGeocodeResolution();
-    }
-
-    function triggerInventoryGeocodeResolution() {
-        const region = $('#invSelectRegion').val();
-        const province = $('#invSelectProvince').val();
-        const city = $('#invSelectCity').val();
-        const barangay = $('#invSelectBarangay').val();
-
-        const resolvedAddress = [barangay, city, province, region].filter(Boolean).join(', ');
-        $('#invDisplayResolvedAddress').text(resolvedAddress);
-
-        let defaultLat = 7.1907;
-        let defaultLng = 125.4553;
-
-        if (city) {
-            const cLower = city.toLowerCase();
-            if (cLower.includes('cagayan de oro')) { defaultLat = 8.4542; defaultLng = 124.6319; }
-            else if (cLower.includes('general santos')) { defaultLat = 6.1164; defaultLng = 125.1716; }
-            else if (cLower.includes('zamboanga')) { defaultLat = 6.9214; defaultLng = 122.0790; }
-            else if (cLower.includes('butuan')) { defaultLat = 8.9475; defaultLng = 125.5406; }
-            else if (cLower.includes('digos')) { defaultLat = 6.7583; defaultLng = 125.3572; }
-            else if (cLower.includes('cebu')) { defaultLat = 10.3157; defaultLng = 123.8854; }
-            else if (cLower.includes('manila') || cLower.includes('quezon')) { defaultLat = 14.5995; defaultLng = 120.9842; }
-        }
-
-        applyInventoryCoordinates(defaultLat, defaultLng);
-
-        if (invGeocodeDebounceTimer) clearTimeout(invGeocodeDebounceTimer);
-
-        invGeocodeDebounceTimer = setTimeout(() => {
-            const query = `${barangay ? barangay + ', ' : ''}${city}, ${province}, Philippines`;
-
-            $.ajax({
-                url: 'https://nominatim.openstreetmap.org/search',
-                data: { format: 'json', q: query, limit: 1 },
-                dataType: 'json',
-                xhrFields: { withCredentials: false },
-                timeout: 4000,
-                success: function(results) {
-                    if (results && results.length > 0) {
-                        const lat = parseFloat(results[0].lat);
-                        const lng = parseFloat(results[0].lon);
-                        applyInventoryCoordinates(lat, lng);
-                    }
-                }
-            });
-        }, 400);
-    }
-
-    function applyInventoryCoordinates(lat, lng) {
-        const latFormatted = parseFloat(lat).toFixed(6);
-        const lngFormatted = parseFloat(lng).toFixed(6);
-
-        $('#inputLat').val(latFormatted);
-        $('#inputLng').val(lngFormatted);
-        $('#invDisplayLatLongText').text(`${latFormatted}, ${lngFormatted}`);
-    }
+    const patientLocationCascade = createLocationCascade({
+        region: '#patRegion', province: '#patProvince', city: '#patCity', barangay: '#patBarangay'
+    });
 
     // Start incoming referral polling every 12 seconds
     setInterval(pollIncomingReferrals, 12000);

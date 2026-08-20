@@ -2,3 +2,4 @@ database
 vendor
 
 .env
+storage/keys/*.pem
