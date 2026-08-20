@@ -51,6 +51,15 @@ $vitalHr        = isset($input['vital_hr']) && $input['vital_hr'] !== '' ? (int)
 $vitalRr        = isset($input['vital_rr']) && $input['vital_rr'] !== '' ? (int)$input['vital_rr'] : null;
 $vitalTempC     = isset($input['vital_temp_c']) && $input['vital_temp_c'] !== '' ? (float)$input['vital_temp_c'] : null;
 $vitalO2sat     = isset($input['vital_o2sat']) && $input['vital_o2sat'] !== '' ? (int)$input['vital_o2sat'] : null;
+$vitalHeightCm  = isset($input['vital_height_cm']) && $input['vital_height_cm'] !== '' ? (float)$input['vital_height_cm'] : null;
+$vitalWeightKg  = isset($input['vital_weight_kg']) && $input['vital_weight_kg'] !== '' ? (float)$input['vital_weight_kg'] : null;
+
+// Patient status flags entered by the referring doctor/nurse -- all optional
+$isPwd          = !empty($input['is_pwd']);
+$isPregnant     = !empty($input['is_pregnant']);
+$isSeniorCitizen = !empty($input['is_senior_citizen']);
+$hasAllergy     = !empty($input['has_allergy']);
+$allergyDetails = $hasAllergy && isset($input['allergy_details']) ? trim((string)$input['allergy_details']) : '';
 
 // Basic validation
 if ($patientId <= 0) {
@@ -152,6 +161,27 @@ try {
     }
     if ($vitalO2sat !== null) {
         $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/vitalOxygenSaturation", "valueDecimal" => $vitalO2sat];
+    }
+    if ($vitalHeightCm !== null) {
+        $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/vitalHeight", "valueDecimal" => $vitalHeightCm];
+    }
+    if ($vitalWeightKg !== null) {
+        $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/vitalWeight", "valueDecimal" => $vitalWeightKg];
+    }
+    if ($isPwd) {
+        $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/isPwd", "valueBoolean" => true];
+    }
+    if ($isPregnant) {
+        $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/isPregnant", "valueBoolean" => true];
+    }
+    if ($isSeniorCitizen) {
+        $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/isSeniorCitizen", "valueBoolean" => true];
+    }
+    if ($hasAllergy) {
+        $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/hasAllergy", "valueBoolean" => true];
+        if ($allergyDetails !== '') {
+            $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/allergyDetails", "valueString" => $allergyDetails];
+        }
     }
 
     $payload = [

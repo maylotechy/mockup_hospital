@@ -630,6 +630,18 @@ $(document).ready(function () {
     $('#modalReasonSelect').on('change', toggleReferralReasonOther);
 
     /**
+     * Reveal the free-text allergy details field only when "Has Allergy" is checked.
+     */
+    function toggleAllergyDetails() {
+        if ($('#modalHasAllergy').is(':checked')) {
+            $('#modalAllergyDetails').removeClass('hidden');
+        } else {
+            $('#modalAllergyDetails').addClass('hidden').val('');
+        }
+    }
+    $('#modalHasAllergy').on('change', toggleAllergyDetails);
+
+    /**
      * Handle Referral Form Submit
      */
     $('#referralForm').on('submit', function (e) {
@@ -653,7 +665,14 @@ $(document).ready(function () {
             vital_hr: $('#modalVitalHr').val() || '',
             vital_rr: $('#modalVitalRr').val() || '',
             vital_temp_c: $('#modalVitalTemp').val() || '',
-            vital_o2sat: $('#modalVitalO2sat').val() || ''
+            vital_o2sat: $('#modalVitalO2sat').val() || '',
+            vital_height_cm: $('#modalVitalHeight').val() || '',
+            vital_weight_kg: $('#modalVitalWeight').val() || '',
+            is_pwd: $('#modalIsPwd').is(':checked') ? 1 : 0,
+            is_pregnant: $('#modalIsPregnant').is(':checked') ? 1 : 0,
+            is_senior_citizen: $('#modalIsSeniorCitizen').is(':checked') ? 1 : 0,
+            has_allergy: $('#modalHasAllergy').is(':checked') ? 1 : 0,
+            allergy_details: $('#modalHasAllergy').is(':checked') ? ($('#modalAllergyDetails').val() || '') : ''
         };
 
         $.ajax({
@@ -935,16 +954,26 @@ $(document).ready(function () {
                                 <p class="sm:col-span-2"><strong>Chief Complaint:</strong> ${escapeHtml(d.chief_complaint || '—')}</p>
                                 <p class="sm:col-span-2"><strong>Referral Reason:</strong> ${escapeHtml(d.reason_text || '—')}</p>
                                 <p class="sm:col-span-2"><strong>Referring Facility:</strong> ${escapeHtml(d.referring_facility || '—')}</p>
+                                ${(function () {
+                                    const tags = [];
+                                    if (d.is_pwd) tags.push('PWD');
+                                    if (d.is_pregnant) tags.push('Pregnant');
+                                    if (d.is_senior_citizen) tags.push('Senior Citizen');
+                                    return tags.length > 0 ? `<p class="sm:col-span-2"><strong>Patient Status:</strong> ${escapeHtml(tags.join(', '))}</p>` : '';
+                                })()}
+                                ${d.has_allergy ? `<p class="sm:col-span-2"><strong>Allergy:</strong> <span class="text-red-700 font-semibold">${escapeHtml(d.allergy_details || 'Yes (unspecified)')}</span></p>` : ''}
                             </div>
 
                             <div>
                                 <p class="font-semibold text-slate-800 mb-2">Vitals at Time of Referral</p>
-                                <div class="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                                <div class="grid grid-cols-3 sm:grid-cols-4 gap-2">
                                     ${vitalTile('BP', d.vital_bp)}
                                     ${vitalTile('HR', d.vital_hr)}
                                     ${vitalTile('RR', d.vital_rr)}
                                     ${vitalTile('Temp °C', d.vital_temp_c)}
                                     ${vitalTile('O2 Sat %', d.vital_o2sat)}
+                                    ${vitalTile('Height (cm)', d.vital_height_cm)}
+                                    ${vitalTile('Weight (kg)', d.vital_weight_kg)}
                                 </div>
                             </div>
                         </div>
@@ -2155,6 +2184,16 @@ $(document).ready(function () {
         const diagnosis = incomingAlert.diagnosis || 'Not specified';
         const chiefComplaint = incomingAlert.chief_complaint || 'Not specified';
 
+        // Patient status flags -- only ever shown if at least one applies, to avoid clutter
+        const statusTags = [];
+        if (incomingAlert.is_pwd) statusTags.push('PWD');
+        if (incomingAlert.is_pregnant) statusTags.push('Pregnant');
+        if (incomingAlert.is_senior_citizen) statusTags.push('Senior Citizen');
+        const patientStatusText = statusTags.length > 0 ? statusTags.join(', ') : null;
+        const allergyText = incomingAlert.has_allergy
+            ? (incomingAlert.allergy_details ? incomingAlert.allergy_details : 'Yes (unspecified)')
+            : null;
+
         // Extract patient coordinates (origin)
         const patientLat = incomingAlert.patient_latitude !== undefined && incomingAlert.patient_latitude !== null ? parseFloat(incomingAlert.patient_latitude) : (incomingAlert.patient_lat !== undefined && incomingAlert.patient_lat !== null ? parseFloat(incomingAlert.patient_lat) : (incomingAlert.patient && incomingAlert.patient.latitude !== undefined && incomingAlert.patient.latitude !== null ? parseFloat(incomingAlert.patient.latitude) : null));
         const patientLng = incomingAlert.patient_longitude !== undefined && incomingAlert.patient_longitude !== null ? parseFloat(incomingAlert.patient_longitude) : (incomingAlert.patient_lng !== undefined && incomingAlert.patient_lng !== null ? parseFloat(incomingAlert.patient_lng) : (incomingAlert.patient && incomingAlert.patient.longitude !== undefined && incomingAlert.patient.longitude !== null ? parseFloat(incomingAlert.patient.longitude) : null));
@@ -2203,13 +2242,25 @@ $(document).ready(function () {
         $('#modal-chief-complaint').text(chiefComplaint);
         $('#modal-reason').text(clinicalReason);
 
+        // Builds one label/value row inside a grouped info card; `last` drops the divider.
+        const infoRow = (label, valueHtml, opts = {}) => `
+            <div class="flex flex-col sm:flex-row sm:justify-between ${opts.last ? '' : 'border-b border-slate-200/60'} pb-1.5 gap-0.5 sm:gap-2">
+                <span class="text-slate-700 font-bold shrink-0">${label}:</span>
+                <span class="${opts.valueClass || 'font-bold text-slate-800'} sm:text-right${opts.leading ? ' leading-relaxed' : ''}" ${opts.id ? `id="${opts.id}"` : ''}>${valueHtml}</span>
+            </div>`;
+        const infoCard = (title, rowsHtml, extraClass = '') => `
+            <div class="${extraClass}">
+                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-2">${title}</p>
+                <div class="bg-slate-50 rounded-xl border border-slate-200/70 p-3.5 space-y-1.5 text-xs">${rowsHtml}</div>
+            </div>`;
+
         Swal.fire({
             title: '<div class="flex items-center justify-center gap-2 text-red-600"><i class="bi bi-hospital text-2xl"></i> <span>Incoming Patient Referral</span></div>',
-            width: '42rem',
+            width: '60rem',
             html: `
                 <div class="text-start space-y-3 p-2 text-sm text-slate-700">
                     <p class="text-xs text-slate-500 uppercase font-semibold tracking-wider mb-2">Hospital Referral Notification</p>
-                    
+
                     <div class="p-3 bg-red-50 rounded-xl border border-red-100 space-y-1">
                         <div class="flex justify-between items-center">
                             <span class="text-xs font-bold text-red-900 font-mono">Referral ID: ${escapeHtml(referralId)}</span>
@@ -2217,52 +2268,28 @@ $(document).ready(function () {
                         </div>
                     </div>
 
-                    <div class="space-y-2 bg-slate-50 p-3.5 rounded-xl border border-slate-200/70 text-xs">
-                        <div class="flex flex-col sm:flex-row sm:justify-between border-b border-slate-200/60 pb-1.5 gap-0.5 sm:gap-2">
-                            <span class="text-slate-700 font-bold shrink-0">Referring Facility:</span>
-                            <span class="font-bold text-slate-800 sm:text-right" id="modal-referring-hospital">${escapeHtml(referringFacility)}</span>
-                        </div>
-                        <div class="flex flex-col sm:flex-row sm:justify-between border-b border-slate-200/60 pb-1.5 gap-0.5 sm:gap-2">
-                            <span class="text-slate-700 font-bold shrink-0">Referring Facility Location:</span>
-                            <span class="font-normal text-slate-800 sm:text-right leading-relaxed">${hospLocationHtml}</span>
-                        </div>
-                        <div class="flex flex-col sm:flex-row sm:justify-between border-b border-slate-200/60 pb-1.5 gap-0.5 sm:gap-2">
-                            <span class="text-slate-700 font-bold shrink-0">Patient ID:</span>
-                            <span class="font-bold text-slate-800 font-mono sm:text-right" id="modal-patient-id">${escapeHtml(String(patientId))}</span>
-                        </div>
-                        <div class="flex flex-col sm:flex-row sm:justify-between border-b border-slate-200/60 pb-1.5 gap-0.5 sm:gap-2">
-                            <span class="text-slate-700 font-bold shrink-0">Age:</span>
-                            <span class="font-normal text-slate-800 sm:text-right" id="modal-patient-age">${escapeHtml(ageDisplay)}</span>
-                        </div>
-                        <div class="flex flex-col sm:flex-row sm:justify-between border-b border-slate-200/60 pb-1.5 gap-0.5 sm:gap-2">
-                            <span class="text-slate-700 font-bold shrink-0">Gender:</span>
-                            <span class="font-normal text-slate-800 sm:text-right" id="modal-patient-gender">${escapeHtml(String(gender))}</span>
-                        </div>
-                        <div class="flex flex-col sm:flex-row sm:justify-between border-b border-slate-200/60 pb-1.5 gap-0.5 sm:gap-2">
-                            <span class="text-slate-700 font-bold shrink-0">Patient Location:</span>
-                            <span class="font-normal text-slate-800 sm:text-right leading-relaxed">${patientLocationHtml}</span>
-                        </div>
-                        <div class="flex flex-col sm:flex-row sm:justify-between border-b border-slate-200/60 pb-1.5 gap-0.5 sm:gap-2">
-                            <span class="text-slate-700 font-bold shrink-0">Transfer Distance & ETA:</span>
-                            <span class="font-bold text-red-700 sm:text-right" id="modal-transfer-eta">${escapeHtml(etaText)}</span>
-                        </div>
-                        <div class="flex flex-col sm:flex-row sm:justify-between border-b border-slate-200/60 pb-1.5 gap-0.5 sm:gap-2">
-                            <span class="text-slate-700 font-bold shrink-0">Severity:</span>
-                            <span class="font-bold text-amber-700 sm:text-right" id="modal-severity">Triage Category: ${escapeHtml(String(severity))}</span>
-                        </div>
-                        <div class="flex flex-col sm:flex-row sm:justify-between border-b border-slate-200/60 pb-1.5 gap-0.5 sm:gap-2">
-                            <span class="text-slate-700 font-bold shrink-0">Diagnosis:</span>
-                            <span class="font-bold text-slate-800 sm:text-right" id="modal-diagnosis">${escapeHtml(diagnosis)}</span>
-                        </div>
-                        <div class="flex flex-col sm:flex-row sm:justify-between border-b border-slate-200/60 pb-1.5 gap-0.5 sm:gap-2">
-                            <span class="text-slate-700 font-bold shrink-0">Chief Complaint:</span>
-                            <span class="font-bold text-slate-800 sm:text-right" id="modal-chief-complaint">${escapeHtml(chiefComplaint)}</span>
-                        </div>
-                        <div class="flex flex-col sm:flex-row sm:justify-between pt-0.5 gap-0.5 sm:gap-2">
-                            <span class="text-slate-700 font-bold shrink-0">Reason for Referral:</span>
-                            <span class="font-bold text-slate-800 sm:text-right" id="modal-reason">${escapeHtml(clinicalReason)}</span>
-                        </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+                        ${infoCard('Referring Hospital', `
+                            ${infoRow('Referring Facility', escapeHtml(referringFacility), { id: 'modal-referring-hospital' })}
+                            ${infoRow('Location', hospLocationHtml, { valueClass: 'font-normal text-slate-800', leading: true })}
+                            ${infoRow('Transfer Distance & ETA', escapeHtml(etaText), { valueClass: 'font-bold text-red-700', id: 'modal-transfer-eta', last: true })}
+                        `)}
+                        ${infoCard('Patient Info', `
+                            ${infoRow('Patient ID', escapeHtml(String(patientId)), { valueClass: 'font-bold text-slate-800 font-mono', id: 'modal-patient-id' })}
+                            ${infoRow('Age', escapeHtml(ageDisplay), { valueClass: 'font-normal text-slate-800', id: 'modal-patient-age' })}
+                            ${infoRow('Gender', escapeHtml(String(gender)), { valueClass: 'font-normal text-slate-800', id: 'modal-patient-gender' })}
+                            ${infoRow('Location', patientLocationHtml, { valueClass: 'font-normal text-slate-800', leading: true, last: true })}
+                        `)}
                     </div>
+
+                    ${infoCard('Clinical Info', `
+                        ${infoRow('Severity', 'Triage Category: ' + escapeHtml(String(severity)), { valueClass: 'font-bold text-amber-700', id: 'modal-severity' })}
+                        ${infoRow('Diagnosis', escapeHtml(diagnosis), { id: 'modal-diagnosis' })}
+                        ${infoRow('Chief Complaint', escapeHtml(chiefComplaint), { id: 'modal-chief-complaint' })}
+                        ${patientStatusText ? infoRow('Patient Status', escapeHtml(patientStatusText)) : ''}
+                        ${allergyText ? infoRow('Allergy', escapeHtml(allergyText), { valueClass: 'font-bold text-red-700' }) : ''}
+                        ${infoRow('Reason for Referral', escapeHtml(clinicalReason), { id: 'modal-reason', last: true })}
+                    `, 'mt-3')}
 
                     <p class="text-xs text-slate-500 text-center mt-3">Please choose your decision for this incoming referral:</p>
                 </div>
@@ -2392,6 +2419,7 @@ $(document).ready(function () {
     // Returns to Patient Records without saving
     function cancelReferPatient() {
         $('#referralForm')[0].reset();
+        toggleAllergyDetails();
         switchTab('patients');
     }
     $('#btnCancelReferral, #btnCancelReferral2').on('click', cancelReferPatient);
