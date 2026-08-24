@@ -640,14 +640,136 @@
                                         <label for="modalReasonSelect" class="block text-xs font-semibold text-slate-500 mb-1.5">Referral Reason <span class="text-red-600">*</span></label>
                                         <select id="modalReasonSelect"
                                             class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
-                                            <option value="No Specialist Available">No Specialist Available</option>
-                                            <option value="No Available Facility/Equipment">No Available Facility/Equipment</option>
-                                            <option value="No Available Bed / Bed Capacity Full">No Available Bed / Bed Capacity Full</option>
-                                            <option value="Higher Level of Care Required" selected>Higher Level of Care Required</option>
-                                            <option value="Diagnostic Services Not Available">Diagnostic Services Not Available</option>
-                                            <option value="Surgical Intervention Required">Surgical Intervention Required</option>
-                                            <option value="Patient/Family Request">Patient/Family Request</option>
-                                            <option value="Others">Others (please specify)</option>
+                                            <option value="" selected disabled>-- Select Reason for Referral --</option>
+                                            <optgroup label="HUMAN RESOURCE (Medical Specialist)">
+                                                <option value="No Available Anaesthesiologist">No Available Anaesthesiologist</option>
+                                                <option value="No Available Cardiologist">No Available Cardiologist</option>
+                                                <option value="No Available Cardio Thoracic Surgeon">No Available Cardio Thoracic Surgeon</option>
+                                                <option value="No Available Dentist">No Available Dentist</option>
+                                                <option value="No Available Dermatologist">No Available Dermatologist</option>
+                                                <option value="No Available Endocrinologist">No Available Endocrinologist</option>
+                                                <option value="No Available Orthodontist">No Available Orthodontist</option>
+                                                <option value="No Available Rheumatologist">No Available Rheumatologist</option>
+                                                <option value="No Available Urologist">No Available Urologist</option>
+                                                <option value="No Available General Physician">No Available General Physician</option>
+                                                <option value="No Available Family Medicine Physician">No Available Family Medicine Physician</option>
+                                                <option value="No Available General Surgeon">No Available General Surgeon</option>
+                                                <option value="No Available Critical Care Surgeon">No Available Critical Care Surgeon</option>
+                                                <option value="No Available Internal Medicine">No Available Internal Medicine</option>
+                                                <option value="No Available Neurologist">No Available Neurologist</option>
+                                                <option value="No Available Gastroenterologist">No Available Gastroenterologist</option>
+                                                <option value="No Available Toxicologist">No Available Toxicologist</option>
+                                                <option value="No Available Neonatologist">No Available Neonatologist</option>
+                                                <option value="No Available Nephrologist">No Available Nephrologist</option>
+                                                <option value="No Available Neurosurgeon">No Available Neurosurgeon</option>
+                                                <option value="No Available Obstetrician-Gynecologist">No Available Obstetrician-Gynecologist</option>
+                                                <option value="No Available Oncologist">No Available Oncologist</option>
+                                                <option value="No Available Ophthalmologist">No Available Ophthalmologist</option>
+                                                <option value="No Available Haematologist">No Available Haematologist</option>
+                                                <option value="No Available Colorectal Surgeon">No Available Colorectal Surgeon</option>
+                                                <option value="No Available ENT Specialist">No Available ENT Specialist</option>
+                                                <option value="No Available Orthopaedic Surgeon">No Available Orthopaedic Surgeon</option>
+                                                <option value="No Available Paediatrician">No Available Paediatrician</option>
+                                                <option value="No Available Psychiatrist">No Available Psychiatrist</option>
+                                                <option value="No Available Diabetologist">No Available Diabetologist</option>
+                                                <option value="No Available Pulmonologist">No Available Pulmonologist</option>
+                                            </optgroup>
+                                            <optgroup label="HEALTH FACILITY (Resources and Infrastructure)">
+                                                <option value="No Available Delivery Room">No Available Delivery Room</option>
+                                                <option value="No Available Operating Room">No Available Operating Room</option>
+                                                <option value="No Available Intensive Care Unit">No Available Intensive Care Unit</option>
+                                                <option value="No Available Coronary Care Unit">No Available Coronary Care Unit</option>
+                                                <option value="No Available Critical Care Unit (CCU)">No Available Critical Care Unit (CCU)</option>
+                                                <option value="No Available Neonatal Intensive Care Unit">No Available Neonatal Intensive Care Unit</option>
+                                                <option value="No Available Pediatrics Intensive Care Unit">No Available Pediatrics Intensive Care Unit</option>
+                                                <option value="No Available Burn Unit">No Available Burn Unit</option>
+                                                <option value="No Available CoVid19 Isolation">No Available CoVid19 Isolation</option>
+                                                <option value="Full Delivery Room">Full Delivery Room</option>
+                                                <option value="Full Operating Room">Full Operating Room</option>
+                                                <option value="Full Intensive Care Unit">Full Intensive Care Unit</option>
+                                                <option value="Full Coronary Care Unit">Full Coronary Care Unit</option>
+                                                <option value="Full Critical Care Unit (CCU)">Full Critical Care Unit (CCU)</option>
+                                                <option value="Full Neonatal Intensive Care Unit">Full Neonatal Intensive Care Unit</option>
+                                                <option value="Full Pediatrics Intensive Care Unit">Full Pediatrics Intensive Care Unit</option>
+                                                <option value="Full Burn Unit">Full Burn Unit</option>
+                                                <option value="Full CoVid19 Isolation">Full CoVid19 Isolation</option>
+                                            </optgroup>
+                                            <optgroup label="MEDICATION (Medication and Vaccines)">
+                                                <option value="No Available Anaesthesia Medication">No Available Anaesthesia Medication</option>
+                                                <option value="No Available Anti-Convulsant Medication">No Available Anti-Convulsant Medication</option>
+                                                <option value="No Available Epinephrine">No Available Epinephrine</option>
+                                                <option value="No Available Anti-Rabies Vaccine">No Available Anti-Rabies Vaccine</option>
+                                                <option value="No Available Anti-Tetanus Vaccine">No Available Anti-Tetanus Vaccine</option>
+                                                <option value="No Available Anti-Venom">No Available Anti-Venom</option>
+                                                <option value="No Available Thrombolytic Medication">No Available Thrombolytic Medication</option>
+                                                <option value="No Available Blood Product">No Available Blood Product</option>
+                                                <option value="No Available Dialysis Medication">No Available Dialysis Medication</option>
+                                                <option value="No Available Insulin">No Available Insulin</option>
+                                                <option value="No Available MGSO4">No Available MGSO4</option>
+                                                <option value="No Available Nitroglycerine">No Available Nitroglycerine</option>
+                                            </optgroup>
+                                            <optgroup label="DIAGNOSTIC EQUIPMENT">
+                                                <option value="No Available Mammogram Machine">No Available Mammogram Machine</option>
+                                                <option value="No Available Cardiac Monitor">No Available Cardiac Monitor</option>
+                                                <option value="No Available Anaesthesia Machine">No Available Anaesthesia Machine</option>
+                                                <option value="No Available CT Scan Machine">No Available CT Scan Machine</option>
+                                                <option value="No Available 2D Echo Ultrasound Machine">No Available 2D Echo Ultrasound Machine</option>
+                                                <option value="No Available Ultrasonography Machine">No Available Ultrasonography Machine</option>
+                                                <option value="No Available Endoscopy Machine">No Available Endoscopy Machine</option>
+                                                <option value="No Available Colonoscopy Machine">No Available Colonoscopy Machine</option>
+                                                <option value="No Available MRI Machine">No Available MRI Machine</option>
+                                                <option value="No Available Incubator">No Available Incubator</option>
+                                                <option value="No Available ECG Machine">No Available ECG Machine</option>
+                                                <option value="No Available Dental X-Ray">No Available Dental X-Ray</option>
+                                                <option value="No Available X-Ray Machine">No Available X-Ray Machine</option>
+                                                <option value="No Available PET Scan">No Available PET Scan</option>
+                                                <option value="Non Functional Ultrasonography Machine">Non Functional Ultrasonography Machine</option>
+                                                <option value="Non Functional Endoscopy Machine">Non Functional Endoscopy Machine</option>
+                                                <option value="Non Functional 2D Echo Ultrasound Machine">Non Functional 2D Echo Ultrasound Machine</option>
+                                                <option value="Non Functional Colonoscopy Machine">Non Functional Colonoscopy Machine</option>
+                                                <option value="Non Functional CT Scan Machine">Non Functional CT Scan Machine</option>
+                                                <option value="Non Functional Mechanical Ventilator">Non Functional Mechanical Ventilator</option>
+                                                <option value="Non Functional Mammogram Machine">Non Functional Mammogram Machine</option>
+                                                <option value="Non Functional Cardiac Monitor">Non Functional Cardiac Monitor</option>
+                                                <option value="Non Functional Anaesthesia Machine">Non Functional Anaesthesia Machine</option>
+                                                <option value="Non Functional MRI Machine">Non Functional MRI Machine</option>
+                                                <option value="Non Functional Incubator">Non Functional Incubator</option>
+                                                <option value="Non Functional ECG Machine">Non Functional ECG Machine</option>
+                                                <option value="Non Functional X-Ray Machine">Non Functional X-Ray Machine</option>
+                                                <option value="Non Functional PET Scan">Non Functional PET Scan</option>
+                                            </optgroup>
+                                            <optgroup label="HEALTH SERVICES">
+                                                <option value="No Available Animal Bite Center Services">No Available Animal Bite Center Services</option>
+                                                <option value="No Available Safe Birthing Facility Services">No Available Safe Birthing Facility Services</option>
+                                                <option value="No Available Dental Services">No Available Dental Services</option>
+                                                <option value="No Available Dialysis Services">No Available Dialysis Services</option>
+                                                <option value="No Available Laboratory Services">No Available Laboratory Services</option>
+                                                <option value="No Available Surgical Services">No Available Surgical Services</option>
+                                                <option value="No Available Ultrasound Services">No Available Ultrasound Services</option>
+                                                <option value="No Available X-Ray Services">No Available X-Ray Services</option>
+                                                <option value="No Available Endoscopy Services">No Available Endoscopy Services</option>
+                                                <option value="No Available Colonoscopy Services">No Available Colonoscopy Services</option>
+                                                <option value="No Available Mammogram Services">No Available Mammogram Services</option>
+                                                <option value="No Available Patient Admission Services">No Available Patient Admission Services</option>
+                                                <option value="No Available Admission Services">No Available Admission Services</option>
+                                                <option value="No Animal Bite Center Services Beyond Operating Hours">No Animal Bite Center Services Beyond Operating Hours</option>
+                                                <option value="No Safe Birthing Facility Services Beyond Operating Hours">No Safe Birthing Facility Services Beyond Operating Hours</option>
+                                                <option value="No Dental Services Beyond Operating Hours">No Dental Services Beyond Operating Hours</option>
+                                                <option value="No Dialysis Services Beyond Operating Hours">No Dialysis Services Beyond Operating Hours</option>
+                                                <option value="No Laboratory Services Beyond Operating Hours">No Laboratory Services Beyond Operating Hours</option>
+                                                <option value="No Surgical Services Beyond Operating Hours">No Surgical Services Beyond Operating Hours</option>
+                                                <option value="No Ultrasound Services Beyond Operating Hours">No Ultrasound Services Beyond Operating Hours</option>
+                                                <option value="No X-Ray Services Beyond Operating Hours">No X-Ray Services Beyond Operating Hours</option>
+                                                <option value="No Endoscopy Services Beyond Operating Hours">No Endoscopy Services Beyond Operating Hours</option>
+                                                <option value="No Colonoscopy Services Beyond Operating Hours">No Colonoscopy Services Beyond Operating Hours</option>
+                                                <option value="No Mammogram Services Beyond Operating Hours">No Mammogram Services Beyond Operating Hours</option>
+                                            </optgroup>
+                                            <optgroup label="MEDICAL PROCEDURE">
+                                                <option value="No Available Chest Tube Thoracostomy">No Available Chest Tube Thoracostomy</option>
+                                            </optgroup>
+                                            <optgroup label="OTHER">
+                                                <option value="Others">Others (please specify)</option>
+                                            </optgroup>
                                         </select>
                                         <input type="text" id="modalReasonText" name="reason_text" required
                                             class="mt-2 w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all disabled:bg-slate-100 disabled:text-slate-400 hidden"
@@ -681,9 +803,14 @@
                                 <label class="block text-xs font-semibold text-slate-500 mt-5 mb-1.5">Vital Signs</label>
                                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
                                     <div>
-                                        <label for="modalVitalBp" class="block text-[11px] text-slate-400 mb-1">BP (mmHg)</label>
-                                        <input type="text" id="modalVitalBp" name="vital_bp" placeholder="120/80"
-                                            class="w-full h-12 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                        <label for="modalVitalBpSystolic" class="block text-[11px] text-slate-400 mb-1">BP (mmHg)</label>
+                                        <div class="flex items-center gap-1.5">
+                                            <input type="number" min="0" id="modalVitalBpSystolic" placeholder="120"
+                                                class="w-full h-12 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-normal text-center focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                            <span class="text-slate-400 font-semibold shrink-0">/</span>
+                                            <input type="number" min="0" id="modalVitalBpDiastolic" placeholder="80"
+                                                class="w-full h-12 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-normal text-center focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                        </div>
                                     </div>
                                     <div>
                                         <label for="modalVitalHr" class="block text-[11px] text-slate-400 mb-1">HR (bpm)</label>

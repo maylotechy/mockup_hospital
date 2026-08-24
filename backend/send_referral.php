@@ -226,48 +226,30 @@ try {
 
     $payloadJson = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
 
-    // Determine hospital API Key (already fresh from the live join above; fall back
-    // to a fresh session lookup, never the raw cached $_SESSION value, if it's empty)
-    $apiKey = !empty($patient['api_key']) ? $patient['api_key'] : '';
-    if (empty($apiKey)) {
-        $apiKey = getFreshApiKeyForLoggedInFacility() ?? '';
+    [$httpCode, $iolResponseData, $curlErrno, $curlError] = sendSignedIolRequest(
+        'POST',
+        '/api/v1/referral/initiate',
+        $payloadJson,
+        $patient['facility_code'],
+        $patient['facility_name']
+    );
+
+    // DEBUG: Log raw IOL response for troubleshooting
+    if ($httpCode !== 200 && $httpCode !== 201) {
+        error_log("IOL Response ($httpCode): " . substr(is_string($iolResponseData) ? $iolResponseData : json_encode($iolResponseData), 0, 500));
     }
-
-    $requestHeaders = [
-        'Content-Type: application/json',
-        'Content-Length: ' . strlen($payloadJson)
-    ];
-    if (!empty($apiKey)) {
-        $requestHeaders[] = 'X-API-Key: ' . $apiKey;
-    }
-
-    // Send payload to IOL route /api/v1/referral/initiate using the configured endpoint
-    $ch = curl_init(IOL_ENDPOINT_URL);
-    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $payloadJson);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $requestHeaders);
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-
-    $iolResponse = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curlErrno = curl_errno($ch);
-    $curlError = curl_error($ch);
-    curl_close($ch);
 
     $referralId = null;
 
-    // Handle cURL connection failure gracefully
-    if ($curlErrno || !$iolResponse) {
-        $httpCode = 503;
-        $iolResponseData = "cURL Connection Error (#{$curlErrno}): {$curlError}. Please ensure the Interoperability Layer (IOL) service is reachable at " . IOL_ENDPOINT_URL . ".";
+    // Handle cURL connection / signing failure gracefully
+    if ($curlErrno) {
+        $httpCode = $httpCode ?: 503;
+        $iolResponseData = "Connection Error (#{$curlErrno}): {$curlError}. Please ensure the Interoperability Layer (IOL) service is reachable.";
         $isSuccess = false;
         $errorMessage = "Can't reach the server, contact devs @ irdss.devs@upmin.edu.ph";
     } else {
         $isSuccess = ($httpCode >= 200 && $httpCode < 300);
-        $decodedRes = json_decode($iolResponse, true);
-        $iolResponseData = ($decodedRes !== null) ? $decodedRes : $iolResponse;
+        $decodedRes = is_array($iolResponseData) ? $iolResponseData : null;
 
         $referralId = null;
         if (is_array($decodedRes)) {
@@ -275,43 +257,32 @@ try {
         }
 
         if (empty($referralId)) {
-            $rawStr = is_string($iolResponse) ? $iolResponse : json_encode($iolResponse);
+            $rawStr = is_string($iolResponseData) ? $iolResponseData : json_encode($iolResponseData);
             if (preg_match('#(ref_[a-zA-Z0-9_\-]+)#i', $rawStr, $m)) {
                 $referralId = $m[1];
             }
         }
 
         if (!$isSuccess) {
-            $statusTextMap = [
-                400 => 'Bad Request',
-                401 => 'Unauthorized',
-                403 => 'Forbidden',
-                404 => 'Not Found',
-                405 => 'Method Not Allowed',
-                422 => 'Unprocessable Entity',
-                500 => 'Internal Server Error',
-                502 => 'Bad Gateway',
-                503 => 'Service Unavailable'
+            // User-friendly error messages mapped by HTTP status code
+            $errorMessageMap = [
+                400 => 'Invalid referral data. Please check all fields and try again.',
+                401 => 'Authentication failed. Please contact your administrator.',
+                403 => 'Permission denied. Your facility may not be authorized for this action.',
+                404 => 'Receiving facility not found. Please verify the referral details.',
+                405 => 'Invalid request method. Please try again.',
+                409 => 'This referral cannot be processed because a duplicate or conflicting record already exists.',
+                422 => 'The referral data could not be processed. Please verify patient information and try again.',
+                500 => 'The server encountered an error. Please try again later or contact support.',
+                502 => 'Gateway error. The central server may be temporarily unavailable.',
+                503 => 'The central server is currently unavailable. Please try again in a few moments.'
             ];
-            $statusText = $statusTextMap[$httpCode] ?? 'Error';
 
-            $detail = '';
-            if (is_array($decodedRes)) {
-                if (!empty($decodedRes['detail'])) {
-                    $detail = is_array($decodedRes['detail']) ? json_encode($decodedRes['detail']) : $decodedRes['detail'];
-                } elseif (!empty($decodedRes['message'])) {
-                    $detail = $decodedRes['message'];
-                }
-            } elseif (is_string($iolResponse) && !empty($iolResponse)) {
-                $detail = trim(strip_tags($iolResponse));
-            }
-
-            if ($httpCode >= 500) {
-                $errorMessage = "An internal server error occurred while processing the referral request.";
-            } elseif (!empty($detail)) {
-                $errorMessage = $detail;
+            // Use mapped message, fall back to generic error for unknown codes
+            if (isset($errorMessageMap[$httpCode])) {
+                $errorMessage = $errorMessageMap[$httpCode];
             } else {
-                $errorMessage = $statusText;
+                $errorMessage = 'An error occurred while processing the referral. Please try again or contact support.';
             }
         } else {
             $errorMessage = null;
@@ -355,6 +326,9 @@ try {
         // transmitted to IOL by this point.
     }
 
+    // Return actual HTTP status code: 200/201 on success, error code on failure
+    $responseStatusCode = $isSuccess ? 200 : $httpCode;
+
     sendJsonResponse([
         'success'      => $isSuccess,
         'http_status'  => $httpCode,
@@ -362,7 +336,7 @@ try {
         'referral_id'  => $referralId,
         'iol_response' => $iolResponseData,
         'payload_sent' => $payload
-    ], 200);
+    ], $responseStatusCode);
 
 } catch (Exception $e) {
     sendJsonResponse([

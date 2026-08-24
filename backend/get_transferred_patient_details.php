@@ -27,7 +27,7 @@ try {
     $pdo = getDbConnection();
 
     $stmt = $pdo->prepare('
-        SELECT transferred_details_snapshot
+        SELECT id, transferred_details_snapshot
         FROM patients
         WHERE source_referral_id = :rid AND facility_id = :fid
         LIMIT 1
@@ -39,6 +39,10 @@ try {
         $snapshot = json_decode($row['transferred_details_snapshot'], true);
         if (is_array($snapshot)) {
             $snapshot['_source'] = 'local';
+            // Lets the frontend jump straight to the Refer Patient flow for this same
+            // local record (e.g. "Refer to Another Facility" from Mark as Out) without
+            // a second lookup.
+            $snapshot['local_patient_id'] = (int)$row['id'];
             sendJsonResponse($snapshot, 200);
         }
     }

@@ -24,6 +24,84 @@ define('DB_USER', 'root');
 define('DB_PASS', '');
 define('DB_CHARSET', 'utf8mb4');
 
+define('IOL_SYSTEM_CODE', 'SYSTEM-001');
+define('IOL_KEY_ID', 'KEY-2026-001');
+
+/**
+ * Signs a request per the IOL 3-layer RSA authentication scheme and sends it,
+ * centralizing the crypto boilerplate shared by every backend endpoint that
+ * talks to IOL. Returns [httpCode, decodedResponseOrRaw, curlErrno, curlError].
+ *
+ * @param string $method       HTTP method (GET, POST, PATCH, ...)
+ * @param string $path         IOL URL path, e.g. '/api/v1/referral/initiate'
+ * @param string $bodyJson     Raw JSON request body (use '{}' for bodyless requests)
+ * @param string $facilityCode
+ * @param string $facilityName
+ * @return array [int $httpCode, mixed $response, int $curlErrno, ?string $curlError]
+ */
+function sendSignedIolRequest($method, $path, $bodyJson, $facilityCode, $facilityName) {
+    $privKeyPath = __DIR__ . '/../storage/keys/private_key.pem';
+    if (!file_exists($privKeyPath)) {
+        return [0, null, -1, 'RSA private key not found at ' . $privKeyPath];
+    }
+
+    $privateKeyPem = file_get_contents($privKeyPath);
+    $privateKey = openssl_pkey_get_private($privateKeyPem);
+    if (!$privateKey) {
+        return [0, null, -1, 'Failed to load RSA private key: ' . openssl_error_string()];
+    }
+
+    $timestamp = (int)time();
+    $nonce = bin2hex(random_bytes(16));
+    $bodyHash = hash('sha256', $bodyJson, false);
+    $signingStr = "{$method}\n{$path}\n" . IOL_SYSTEM_CODE . "\n" . IOL_KEY_ID . "\n{$timestamp}\n{$nonce}\n{$bodyHash}";
+
+    $signature = '';
+    $signResult = openssl_sign($signingStr, $signature, $privateKey, OPENSSL_ALGO_SHA256);
+    if (!$signResult) {
+        return [0, null, -1, 'RSA signing failed: ' . openssl_error_string()];
+    }
+    $signatureB64 = base64_encode($signature);
+
+    $requestHeaders = [
+        'Content-Type: application/json',
+        'Content-Length: ' . strlen($bodyJson),
+        'X-System-Code: ' . IOL_SYSTEM_CODE,
+        'X-Key-ID: ' . IOL_KEY_ID,
+        'X-Signature-Timestamp: ' . $timestamp,
+        'X-Request-Nonce: ' . $nonce,
+        'X-System-Signature: ' . $signatureB64,
+        'X-Facility-Code: ' . $facilityCode,
+        'X-Facility-Name: ' . $facilityName
+    ];
+
+    $iolHost = $_ENV['IOL_HOST'] ?? 'localhost';
+    $iolUrl = 'http://' . $iolHost . ':8081' . $path;
+
+    $ch = curl_init($iolUrl);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+    if ($method !== 'GET') {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $bodyJson);
+    }
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $requestHeaders);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+
+    $rawResponse = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErrno = curl_errno($ch);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+
+    if ($curlErrno) {
+        return [503, null, $curlErrno, $curlError];
+    }
+
+    $decoded = json_decode($rawResponse, true);
+    return [$httpCode, $decoded !== null ? $decoded : $rawResponse, 0, null];
+}
+
 /**
  * Returns PDO Database Instance
  * 
@@ -107,6 +185,28 @@ function getFreshApiKeyForLoggedInFacility() {
 
     $_SESSION['user']['facility']['api_key'] = $row['api_key'];
     return $row['api_key'];
+}
+
+/**
+ * True if this facility has already successfully sent a referral for the given
+ * local patient (any row in initiated_referrals for them, regardless of its
+ * current status). Used to stop a discharge/departure record from being saved
+ * for a patient who's already been referred onward through the system -- the
+ * two facts would contradict each other on the original hospital's tracker.
+ *
+ * @return bool
+ */
+function hasPatientBeenReferredOnward($pdo, $facilityId, $localPatientId) {
+    if ($localPatientId <= 0) {
+        return false;
+    }
+    $stmt = $pdo->prepare('
+        SELECT 1 FROM initiated_referrals
+        WHERE hospital_id = :fid AND patient_id = :pid AND sync_status = "SENT"
+        LIMIT 1
+    ');
+    $stmt->execute([':fid' => $facilityId, ':pid' => $localPatientId]);
+    return (bool)$stmt->fetch();
 }
 
 // Handle preflight CORS requests with credentials support

@@ -29,11 +29,25 @@ if ($referralId === '') {
     sendJsonResponse(['success' => false, 'message' => 'Missing required field: referral_id.'], 400);
 }
 
+// Vitals taken by the receiving facility at the moment of arrival -- all optional,
+// never blocks marking the patient as arrived if left blank
+$arrivalVitals = [
+    'vital_bp'      => isset($input['arrival_vital_bp']) ? trim((string)$input['arrival_vital_bp']) : '',
+    'vital_hr'      => isset($input['arrival_vital_hr']) ? trim((string)$input['arrival_vital_hr']) : '',
+    'vital_rr'      => isset($input['arrival_vital_rr']) ? trim((string)$input['arrival_vital_rr']) : '',
+    'vital_temp_c'  => isset($input['arrival_vital_temp_c']) ? trim((string)$input['arrival_vital_temp_c']) : '',
+    'vital_o2sat'   => isset($input['arrival_vital_o2sat']) ? trim((string)$input['arrival_vital_o2sat']) : ''
+];
+$arrivalVitals = array_filter($arrivalVitals, fn($v) => $v !== '');
+
 $iolHost = $_ENV['IOL_HOST'] ?? '127.0.0.1';
 $portsToTry = [8081, 8000, 8001];
 
 function callCentralReferralApi($method, $path, $body, $user, $iolHost, $portsToTry) {
-    $bodyJson = $body !== null ? json_encode($body) : '';
+    // JSON_FORCE_OBJECT ensures an empty PHP array (e.g. no arrival vitals entered)
+    // still encodes as "{}" rather than "[]" -- the IOL endpoint expects a JSON object
+    // matching its Pydantic schema, and an empty array fails that validation.
+    $bodyJson = $body !== null ? json_encode($body, JSON_FORCE_OBJECT) : '';
 
     foreach ($portsToTry as $port) {
         $url = "http://{$iolHost}:{$port}" . $path;
@@ -67,7 +81,7 @@ function callCentralReferralApi($method, $path, $body, $user, $iolHost, $portsTo
 try {
     // Step 1: stamp arrival centrally. This also re-verifies (server-side) that this
     // referral was actually finalized to this facility -- can't be spoofed client-side.
-    $arriveRes = callCentralReferralApi('PATCH', "/api/v1/referral/{$referralId}/arrive", [], $user, $iolHost, $portsToTry);
+    $arriveRes = callCentralReferralApi('PATCH', "/api/v1/referral/{$referralId}/arrive", $arrivalVitals, $user, $iolHost, $portsToTry);
     if ($arriveRes['code'] < 200 || $arriveRes['code'] >= 300) {
         $detail = $arriveRes['data']['detail'] ?? "Can't reach the central server to confirm arrival.";
         sendJsonResponse(['success' => false, 'message' => $detail], $arriveRes['code'] ?: 502);

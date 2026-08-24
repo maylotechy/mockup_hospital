@@ -430,7 +430,7 @@ const DOHAssessment = (function () {
 
         const btn = formEl.querySelector('button[type="submit"]');
         btn.disabled = true;
-        btn.innerHTML = 'Submitting to PostgreSQL…';
+        btn.innerHTML = 'Submitting…';
 
         try {
             const res = await fetch(`${API_BASE}/assessment.php?action=submit`, {
@@ -446,15 +446,23 @@ const DOHAssessment = (function () {
             }
 
             const result = await res.json();
+            const lockBanner = document.getElementById('assessmentLockBanner');
+            if (lockBanner) lockBanner.classList.add('hidden');
+
             Swal.fire({
                 icon: 'success',
                 title: 'Assessment Submitted!',
                 text: result.message,
                 confirmButtonColor: '#0d6efd'
+            }).then(function () {
+                // Send the facility admin back to their home tab instead of
+                // reloading this form -- the assessment is done, nothing left to fix here.
+                if (typeof window.switchTab === 'function') {
+                    window.switchTab('users');
+                } else {
+                    loadForm();
+                }
             });
-            const lockBanner = document.getElementById('assessmentLockBanner');
-            if (lockBanner) lockBanner.classList.add('hidden');
-            loadForm(); // Reload updated form with saved answers
 
         } catch (err) {
             Swal.fire({
@@ -465,7 +473,7 @@ const DOHAssessment = (function () {
             });
         } finally {
             btn.disabled = false;
-            btn.innerHTML = 'Submit DOH Assessment to PostgreSQL';
+            btn.innerHTML = 'Submit DOH Assessment';
         }
     }
 

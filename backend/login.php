@@ -6,6 +6,24 @@
 require_once __DIR__ . '/config.php';
 
 /**
+ * Maps IOL's free-text facility_type (Postgres data is inconsistent -- e.g.
+ * both 'Level 3' and 'Level 3 Hospital' exist) onto MySQL's strict tier_level
+ * ENUM ('BHS', 'RHU', 'Level 1 Hospital', 'Level 2 Hospital', 'Level 3 Hospital').
+ * Returns null for empty/unrecognized input so callers can fall back safely
+ * instead of writing a value that violates the column's ENUM constraint.
+ */
+function normalizeTierLevel($rawType) {
+    if (empty($rawType)) return null;
+    $t = strtoupper(trim($rawType));
+    if (strpos($t, 'BHS') !== false || strpos($t, 'BARANGAY') !== false) return 'BHS';
+    if (strpos($t, 'RHU') !== false || strpos($t, 'RURAL') !== false) return 'RHU';
+    if (strpos($t, '3') !== false) return 'Level 3 Hospital';
+    if (strpos($t, '2') !== false) return 'Level 2 Hospital';
+    if (strpos($t, '1') !== false) return 'Level 1 Hospital';
+    return null;
+}
+
+/**
  * Builds the {user, facility} response shape shared by the GET session-check
  * and POST login success responses.
  */
@@ -158,10 +176,23 @@ try {
                 $facRow = $facStmtCode->fetch();
             }
 
-            // 3. Auto-provision facility in local MySQL if missing
+            // 3. Facility already exists locally -- refresh its cached tier_level from
+            // IOL's live value so a level change made in the central admin panel takes
+            // effect on the facility_admin's very next login, instead of staying stuck
+            // at whatever was captured the first time this facility ever logged in.
+            if ($facRow) {
+                $freshTier = normalizeTierLevel($iolData['facility_type'] ?? null);
+                if ($freshTier !== null && $freshTier !== $facRow['tier_level']) {
+                    $updTierStmt = $pdo->prepare('UPDATE facilities SET tier_level = :tier WHERE id = :id');
+                    $updTierStmt->execute([':tier' => $freshTier, ':id' => $facRow['id']]);
+                    $facRow['tier_level'] = $freshTier;
+                }
+            }
+
+            // 4. Auto-provision facility in local MySQL if missing
             if (!$facRow) {
                 $facCode = $iolFacilityCode ? $iolFacilityCode : ('FAC-' . str_pad((string)($iolData['facility_id'] ?? rand(100, 999)), 6, '0', STR_PAD_LEFT));
-                $facTier = !empty($iolData['facility_type']) ? $iolData['facility_type'] : 'Level 1 Hospital';
+                $facTier = normalizeTierLevel($iolData['facility_type'] ?? null) ?? 'Level 1 Hospital';
                 $facApiKey = 'irdss_api_key_' . strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $iolFacilityName));
 
                 try {
