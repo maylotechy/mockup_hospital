@@ -775,20 +775,94 @@ $(document).ready(function () {
         });
     }
 
-    /**
-     * When "Others" is picked in the Referral Reason dropdown, reveal the free-text
-     * field for the doctor to specify it; otherwise keep #modalReasonText (the field
-     * actually submitted) synced to the selected dropdown option.
-     */
-    function toggleReferralReasonOther() {
-        const selected = $('#modalReasonSelect').val();
-        if (selected === 'Others') {
+    const REFERRAL_REASONS = {
+        HUMAN_RESOURCE: [
+            'No Available Anaesthesiologist', 'No Available Cardiologist', 'No Available Cardio Thoracic Surgeon',
+            'No Available Dentist', 'No Available Dermatologist', 'No Available Endocrinologist', 'No Available Orthodontist',
+            'No Available Rheumatologist', 'No Available Urologist', 'No Available General Physician',
+            'No Available Family Medicine Physician', 'No Available General Surgeon', 'No Available Critical Care Surgeon',
+            'No Available Internal Medicine', 'No Available Neurologist', 'No Available Gastroenterologist',
+            'No Available Toxicologist', 'No Available Neonatologist', 'No Available Nephrologist', 'No Available Neurosurgeon',
+            'No Available Obstetrician-Gynecologist', 'No Available Oncologist', 'No Available Ophthalmologist',
+            'No Available Haematologist', 'No Available Colorectal Surgeon', 'No Available ENT Specialist',
+            'No Available Orthopaedic Surgeon', 'No Available Paediatrician', 'No Available Psychiatrist',
+            'No Available Diabetologist', 'No Available Pulmonologist'
+        ],
+        HEALTH_FACILITY: [
+            'No Available Delivery Room', 'No Available Operating Room', 'No Available Intensive Care Unit',
+            'No Available Coronary Care Unit', 'No Available Critical Care Unit (CCU)', 'No Available Neonatal Intensive Care Unit',
+            'No Available Pediatrics Intensive Care Unit', 'No Available Burn Unit', 'No Available CoVid19 Isolation',
+            'Full Delivery Room', 'Full Operating Room', 'Full Intensive Care Unit', 'Full Coronary Care Unit',
+            'Full Critical Care Unit (CCU)', 'Full Neonatal Intensive Care Unit', 'Full Pediatrics Intensive Care Unit',
+            'Full Burn Unit', 'Full CoVid19 Isolation'
+        ],
+        MEDICATION: [
+            'No Available Anaesthesia Medication', 'No Available Anti-Convulsant Medication', 'No Available Epinephrine',
+            'No Available Anti-Rabies Vaccine', 'No Available Anti-Tetanus Vaccine', 'No Available Anti-Venom',
+            'No Available Thrombolytic Medication', 'No Available Blood Product', 'No Available Dialysis Medication',
+            'No Available Insulin', 'No Available MGSO4', 'No Available Nitroglycerine'
+        ],
+        DIAGNOSTIC_EQUIPMENT: [
+            'No Available Mammogram Machine', 'No Available Cardiac Monitor', 'No Available Anaesthesia Machine',
+            'No Available CT Scan Machine', 'No Available 2D Echo Ultrasound Machine', 'No Available Ultrasonography Machine',
+            'No Available Endoscopy Machine', 'No Available Colonoscopy Machine', 'No Available MRI Machine',
+            'No Available Incubator', 'No Available ECG Machine', 'No Available Dental X-Ray', 'No Available X-Ray Machine',
+            'No Available PET Scan', 'Non Functional Ultrasonography Machine', 'Non Functional Endoscopy Machine',
+            'Non Functional 2D Echo Ultrasound Machine', 'Non Functional Colonoscopy Machine', 'Non Functional CT Scan Machine',
+            'Non Functional Mechanical Ventilator', 'Non Functional Mammogram Machine', 'Non Functional Cardiac Monitor',
+            'Non Functional Anaesthesia Machine', 'Non Functional MRI Machine', 'Non Functional Incubator',
+            'Non Functional ECG Machine', 'Non Functional X-Ray Machine', 'Non Functional PET Scan'
+        ],
+        HEALTH_SERVICES: [
+            'No Available Animal Bite Center Services', 'No Available Safe Birthing Facility Services',
+            'No Available Dental Services', 'No Available Dialysis Services', 'No Available Laboratory Services',
+            'No Available Surgical Services', 'No Available Ultrasound Services', 'No Available X-Ray Services',
+            'No Available Endoscopy Services', 'No Available Colonoscopy Services', 'No Available Mammogram Services',
+            'No Available Patient Admission Services', 'No Available Admission Services',
+            'No Animal Bite Center Services Beyond Operating Hours', 'No Safe Birthing Facility Services Beyond Operating Hours',
+            'No Dental Services Beyond Operating Hours', 'No Dialysis Services Beyond Operating Hours',
+            'No Laboratory Services Beyond Operating Hours', 'No Surgical Services Beyond Operating Hours',
+            'No Ultrasound Services Beyond Operating Hours', 'No X-Ray Services Beyond Operating Hours',
+            'No Endoscopy Services Beyond Operating Hours', 'No Colonoscopy Services Beyond Operating Hours',
+            'No Mammogram Services Beyond Operating Hours'
+        ],
+        MEDICAL_PROCEDURE: [
+            'No Available Chest Tube Thoracostomy'
+        ]
+    };
+
+    function updateReasonDropdown() {
+        const category = $('#modalReasonCategory').val();
+        const $reasonSelect = $('#modalReasonSelect');
+
+        $reasonSelect.empty().append('<option value="" selected disabled>-- Select Reason --</option>');
+
+        if (!category) {
+            $reasonSelect.prop('disabled', true);
+            return;
+        }
+
+        if (category === 'OTHER') {
+            $reasonSelect.prop('disabled', true);
             $('#modalReasonText').removeClass('hidden').val('');
-        } else {
+            return;
+        }
+
+        $reasonSelect.prop('disabled', false);
+        const reasons = REFERRAL_REASONS[category] || [];
+        reasons.forEach(reason => {
+            $reasonSelect.append(`<option value="${escapeHtml(reason)}">${escapeHtml(reason)}</option>`);
+        });
+    }
+
+    $('#modalReasonCategory').on('change', updateReasonDropdown);
+
+    $('#modalReasonSelect').on('change', function () {
+        const selected = $(this).val();
+        if (selected) {
             $('#modalReasonText').addClass('hidden').val(selected);
         }
-    }
-    $('#modalReasonSelect').on('change', toggleReferralReasonOther);
+    });
 
     /**
      * Reveal the free-text allergy details field only when "Has Allergy" is checked.
@@ -831,13 +905,15 @@ $(document).ready(function () {
             markField($field, !String($field.val() || '').trim());
         });
 
-        // Referral Reason: validate whichever control is actually visible --
-        // the dropdown itself, or the free-text field once "Others" is selected.
-        const reasonSelected = $('#modalReasonSelect').val();
-        if (!reasonSelected) {
-            markField($('#modalReasonSelect'), true);
-        } else if (reasonSelected === 'Others') {
+        // Referral Reason: validate category first, then reason or free-text
+        const categorySelected = $('#modalReasonCategory').val();
+        if (!categorySelected) {
+            markField($('#modalReasonCategory'), true);
+        } else if (categorySelected === 'OTHER') {
             markField($('#modalReasonText'), !String($('#modalReasonText').val() || '').trim());
+        } else {
+            const reasonSelected = $('#modalReasonSelect').val();
+            markField($('#modalReasonSelect'), !reasonSelected);
         }
 
         if ($firstInvalid) {
@@ -850,10 +926,9 @@ $(document).ready(function () {
 
     // Clear the red highlight on a required field as soon as it's fixed, rather
     // than making the doctor resubmit to find out it's no longer invalid.
-    // #modalReasonSelect is included even though it has no [required] attribute --
-    // it's flagged manually above since the real requirement lives on its hidden
-    // proxy field.
-    $(document).on('input change', '#referralForm [required], #modalReasonSelect', function () {
+    // #modalReasonCategory and #modalReasonSelect are included even though they don't have [required] attributes --
+    // they're flagged manually above since the real requirement lives on the reason dropdowns.
+    $(document).on('input change', '#referralForm [required], #modalReasonCategory, #modalReasonSelect', function () {
         const $field = $(this);
         if (String($field.val() || '').trim()) {
             $field.removeClass(REQUIRED_FIELD_ERROR_CLASSES);
@@ -3175,6 +3250,7 @@ $(document).ready(function () {
     // Returns to Patient Records without saving
     function cancelReferPatient() {
         $('#referralForm')[0].reset();
+        $('#modalReasonSelect').empty().append('<option value="" selected disabled>-- Select Reason --</option>').prop('disabled', true);
         toggleAllergyDetails();
         switchTab('patients');
     }
