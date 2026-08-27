@@ -157,6 +157,8 @@ try {
         ':created_by_user_id' => (int)($user['id'] ?? 0)
     ]);
 
+    logAuditEvent($user, 'PATIENT_ARRIVED', $referralId, $fullName);
+
     sendJsonResponse([
         'success' => true,
         'message' => 'Patient marked as arrived and added to your local patient records.',

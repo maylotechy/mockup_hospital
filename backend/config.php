@@ -40,6 +40,14 @@ define('IOL_KEY_ID', 'KEY-2026-001');
  * @return array [int $httpCode, mixed $response, int $curlErrno, ?string $curlError]
  */
 function sendSignedIolRequest($method, $path, $bodyJson, $facilityCode, $facilityName) {
+    // A GET request never actually carries a body over the wire (no CURLOPT_POSTFIELDS
+    // below), so IOL's signature check hashes zero bytes regardless of what's passed in
+    // here. Force it to '' so the signed hash always matches what's actually sent --
+    // signing hash('{}') for a GET would fail verification against hash('').
+    if ($method === 'GET') {
+        $bodyJson = '';
+    }
+
     $privKeyPath = __DIR__ . '/../storage/keys/private_key.pem';
     if (!file_exists($privKeyPath)) {
         return [0, null, -1, 'RSA private key not found at ' . $privKeyPath];
@@ -209,6 +217,42 @@ function hasPatientBeenReferredOnward($pdo, $facilityId, $localPatientId) {
     return (bool)$stmt->fetch();
 }
 
+/**
+ * Best-effort write to the facility-scoped audit trail -- records which staff account
+ * (doctor/nurse/facility_admin) performed a referral-lifecycle action, since IOL only
+ * authenticates at the facility level and has no concept of individual staff users.
+ * Never throws: a logging failure must not block the actual action it's describing.
+ *
+ * @param array       $user        getLoggedInUser() result
+ * @param string      $action      e.g. 'REFERRAL_SENT', 'REFERRAL_ACCEPTED'
+ * @param string|null $referralId
+ * @param string|null $patientName
+ * @param string|null $details     short free-text context, e.g. the chosen hospital name
+ */
+function logAuditEvent($user, $action, $referralId = null, $patientName = null, $details = null) {
+    try {
+        $pdo = getDbConnection();
+        $stmt = $pdo->prepare('
+            INSERT INTO audit_logs
+                (facility_id, user_id, user_full_name, user_role, action, referral_id, patient_name, details)
+            VALUES
+                (:facility_id, :user_id, :user_full_name, :user_role, :action, :referral_id, :patient_name, :details)
+        ');
+        $stmt->execute([
+            ':facility_id'     => (int)($user['facility']['id'] ?? 0),
+            ':user_id'         => isset($user['id']) ? (int)$user['id'] : null,
+            ':user_full_name'  => $user['full_name'] ?? 'Unknown',
+            ':user_role'       => $user['role'] ?? 'unknown',
+            ':action'          => $action,
+            ':referral_id'     => $referralId,
+            ':patient_name'    => $patientName,
+            ':details'         => $details
+        ]);
+    } catch (Exception $e) {
+        // Audit logging is best-effort -- never block the action it's describing
+    }
+}
+
 // Handle preflight CORS requests with credentials support
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
 
@@ -236,5 +280,27 @@ function sendJsonResponse($data, $statusCode = 200) {
     header('Access-Control-Allow-Headers: Content-Type, X-API-Key, Authorization');
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode($data, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+    exit;
+}
+
+/**
+ * Same CORS/headers handling as sendJsonResponse(), but passes $data through
+ * unwrapped -- for proxy endpoints forwarding IOL's raw array response (e.g.
+ * /mine, /incoming, /outcomes) straight to the frontend, which already parses
+ * that shape directly and shouldn't need to change just because the request
+ * now goes through this backend instead of hitting IOL from the browser.
+ *
+ * @param mixed $data
+ * @param int $statusCode
+ */
+function sendRawJsonResponse($data, $statusCode = 200) {
+    $origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
+    http_response_code($statusCode);
+    header("Access-Control-Allow-Origin: {$origin}");
+    header('Access-Control-Allow-Credentials: true');
+    header('Access-Control-Allow-Methods: GET, POST, PATCH, PUT, DELETE, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, X-API-Key, Authorization');
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($data, JSON_UNESCAPED_SLASHES);
     exit;
 }

@@ -83,6 +83,15 @@ if ($curlErrno) {
 
 $isSuccess = ($httpCode >= 200 && $httpCode < 300);
 
+if ($isSuccess) {
+    $patientName = null;
+    if ($localPatientRow && !empty($localPatientRow['transferred_details_snapshot'])) {
+        $snap = json_decode($localPatientRow['transferred_details_snapshot'], true);
+        $patientName = is_array($snap) ? ($snap['full_name'] ?? null) : null;
+    }
+    logAuditEvent($loggedInUser, 'PATIENT_DEPARTED', $referralId, $patientName, strtoupper($outcome));
+}
+
 // Mirror the departure onto the local snapshot too, so Patient Records (where this
 // patient actually lives day-to-day, unlike the one-time Incoming Patients list) can
 // show the current "Mark as Out" state without a fresh round-trip to IOL every time.

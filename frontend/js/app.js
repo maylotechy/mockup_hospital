@@ -17,12 +17,60 @@ $(document).ready(function () {
     window.API_BASE = API_BASE;
     const API_V1_REFERRAL = isIdeServer ? 'http://localhost/mock_hospitals/api/v1/referral' : '../api/v1/referral';
 
+    // Cache-buster appended to logo URLs so replacing a logo file (e.g. _default.png)
+    // shows up on next page load instead of silently serving the browser's old cached copy
+    const ASSET_CACHE_BUST = Date.now();
+
 
     // Active Facility State (kept as `currentHospital` since referral/inventory/outcomes
     // code throughout this file already treats it as the logged-in facility's own record)
     let currentHospital = null;
     // Active Staff User State (role-based nav & assessment lockout)
     let currentUser = null;
+
+    const TOAST_STYLE = {
+        success: { bg: '#5cb85c', bar: '#4a9440', title: 'Success' },
+        info:    { bg: '#4a9fc4', bar: '#3d84a3', title: 'Info' },
+        warning: { bg: '#f0a030', bar: '#cf8620', title: 'Warning' },
+        error:   { bg: '#c0504d', bar: '#a4423f', title: 'Error' }
+    };
+
+    /**
+     * Shows a corner toast notification in the shared design: solid colored card,
+     * icon, bold category title, a message line below it, and a bottom timer bar
+     * that drains as it counts down. Replaces every ad-hoc `Swal.fire({toast:true})`
+     * call so all transient notifications look and behave the same way.
+     *
+     * @param {'success'|'info'|'warning'|'error'} type
+     * @param {string} message - plain text; escaped internally, never pass raw HTML
+     * @param {number} [duration=3000] - ms before auto-dismiss
+     */
+    function showToast(type, message, duration) {
+        const style = TOAST_STYLE[type] || TOAST_STYLE.info;
+
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: duration || 3000,
+            timerProgressBar: true,
+            background: style.bg,
+            color: '#ffffff',
+            html: `
+                <div class="text-start" style="min-width: 240px; max-width: 340px;">
+                    <div style="font-weight: 700; font-size: 0.95rem; line-height: 1.25;">${style.title}</div>
+                    <div style="font-size: 0.82rem; opacity: 0.95; line-height: 1.3;">${escapeHtml(message)}</div>
+                </div>
+            `,
+            customClass: { popup: 'toast-notification-popup' },
+            didOpen: (toastEl) => {
+                const bar = toastEl.querySelector('.swal2-timer-progress-bar');
+                if (bar) bar.style.backgroundColor = style.bar;
+                toastEl.onmouseenter = Swal.stopTimer;
+                toastEl.onmouseleave = Swal.resumeTimer;
+            }
+        });
+    }
 
     /**
      * Check active staff session on page load
@@ -81,8 +129,7 @@ $(document).ready(function () {
 
         const logo = logoMap[hospitalCode] || 'assets/logos/hospitals/_default.png';
 
-        $('#hospitalLogo').attr('src', logo);
-        console.log(hospitalCode)
+        $('#hospitalLogo').attr('src', `${logo}?v=${ASSET_CACHE_BUST}`);
     }
 
     /**
@@ -169,7 +216,7 @@ $(document).ready(function () {
             .removeClass('text-red-600')
             .addClass('text-slate-500');
 
-        const $allTabs = $('#tabPatientsContent, #tabAddPatientContent, #tabReferPatientContent, #tabPendingContent, #tabReferralsContent, #tabIncomingContent, #tabUsersContent, #tabAssessmentContent');
+        const $allTabs = $('#tabPatientsContent, #tabAddPatientContent, #tabReferPatientContent, #tabPendingContent, #tabReferralsContent, #tabIncomingContent, #tabUsersContent, #tabAssessmentContent, #tabAnalyticsContent, #tabLogsContent');
 
         if (tabName === 'patients') {
             $('#navTabPatients')
@@ -248,6 +295,28 @@ $(document).ready(function () {
             $allTabs.hide();
             $('#tabAssessmentContent').fadeIn(200);
             loadServiceAssessment();
+        } else if (tabName === 'analytics') {
+            $('#navTabAnalytics')
+                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
+                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
+            $('#navIconAnalytics')
+                .removeClass('text-slate-500')
+                .addClass('text-red-600');
+            $('#mainHeaderTitle').text('Analytics');
+            $allTabs.hide();
+            $('#tabAnalyticsContent').fadeIn(200);
+            loadFacilityAnalytics();
+        } else if (tabName === 'logs') {
+            $('#navTabLogs')
+                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
+                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
+            $('#navIconLogs')
+                .removeClass('text-slate-500')
+                .addClass('text-red-600');
+            $('#mainHeaderTitle').text('System Logs');
+            $allTabs.hide();
+            $('#tabLogsContent').fadeIn(200);
+            loadSystemLogs();
         }
     }
 
@@ -300,6 +369,20 @@ $(document).ready(function () {
         switchTab('assessment');
     });
 
+    $('#navTabAnalytics').on('click', function (e) {
+        e.preventDefault();
+        switchTab('analytics');
+    });
+
+    $('#navTabLogs').on('click', function (e) {
+        e.preventDefault();
+        switchTab('logs');
+    });
+
+    $(document).on('click', '#btnRefreshLogs', function () {
+        loadSystemLogs();
+    });
+
     /**
      * Handle Login Form Submission
      */
@@ -325,14 +408,7 @@ $(document).ready(function () {
                     currentHospital = response.facility;
                     showDashboardView();
 
-                    Swal.fire({
-                        toast: true,
-                        position: 'top-end',
-                        icon: 'success',
-                        title: `Welcome back, ${response.user.full_name}!`,
-                        showConfirmButton: false,
-                        timer: 3000
-                    });
+                    showToast('success', `Welcome back, ${response.user.full_name}!`, 3000);
                 } else {
                     Swal.fire({
                         icon: 'error',
@@ -407,14 +483,7 @@ $(document).ready(function () {
 
                         showLoginView();
 
-                        Swal.fire({
-                            toast: true,
-                            position: 'top-end',
-                            icon: 'info',
-                            title: 'Signed out successfully.',
-                            showConfirmButton: false,
-                            timer: 2500
-                        });
+                        showToast('info', 'Signed out successfully.', 2500);
                     }
                 });
             }
@@ -505,7 +574,7 @@ $(document).ready(function () {
         if (patients.length === 0) {
             $tableBody.html(`
                 <tr>
-                    <td colspan="6" class="text-center py-4 text-muted">
+                    <td colspan="7" class="text-center py-4 text-muted">
                         No patient records registered for this hospital.
                     </td>
                 </tr>
@@ -521,25 +590,29 @@ $(document).ready(function () {
             // Transferred-in patients (came via a referral) get a "Mark as Out" action
             // here too, not just on the one-time Incoming Patients intake list -- this
             // is where a doctor actually finds the patient once treatment is ongoing.
-            let transferControl = '';
+            // Status badges (a fact about the patient) and the Mark as Out button (an
+            // action you take) are kept in separate columns so they don't read as the
+            // same kind of thing.
+            let statusBadge = '';
+            let markOutButton = '';
             if (patient.is_transferred_in) {
                 if (patient.departed_at) {
                     const label = DEPARTURE_OUTCOME_LABEL[patient.departure_outcome] || patient.departure_outcome || 'Out';
-                    transferControl = `
+                    statusBadge = `
                         <span class="whitespace-nowrap px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 inline-flex items-center gap-1">
-                            <i class="bi bi-box-arrow-right"></i> ${escapeHtml(label)}
+                            ${escapeHtml(label)}
                         </span>`;
                 } else if (patient.already_referred_onward) {
                     // Already sent to another facility through a real referral -- don't
                     // also offer a discharge action that would contradict it.
-                    transferControl = `
+                    statusBadge = `
                         <span class="whitespace-nowrap px-2.5 py-1.5 rounded-lg text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 inline-flex items-center gap-1">
-                            <i class="bi bi-arrow-right-circle"></i> Referred Onward
+                            Referred Onward
                         </span>`;
                 } else {
-                    transferControl = `
-                        <button class="whitespace-nowrap px-3.5 py-1.5 bg-white/50 hover:bg-white text-slate-600 border border-slate-600/50 text-xs font-medium rounded-lg shadow-sm hover:shadow-lg hover:border-slate-700/60 hover:text-slate-700 active:scale-[0.98] transition-all btn-mark-departed inline-flex items-center gap-1.5" data-referral-id="${escapeHtml(patient.source_referral_id)}">
-                            <i class="bi bi-box-arrow-right"></i> Mark as Out
+                    markOutButton = `
+                        <button class="whitespace-nowrap px-3.5 py-1.5 bg-white/50 hover:bg-white text-slate-600 border border-slate-600/50 text-xs font-medium rounded-lg shadow-sm hover:shadow-lg hover:border-slate-700/60 hover:text-slate-700 active:scale-[0.98] transition-all btn-mark-departed" data-referral-id="${escapeHtml(patient.source_referral_id)}">
+                            Mark as Out
                         </button>`;
                 }
             }
@@ -551,9 +624,10 @@ $(document).ready(function () {
                     <td class="py-3.5 px-6 text-slate-600 text-xs border-b border-slate-300/60">${escapeHtml(patient.dob)}</td>
                     <td class="py-3.5 px-6 border-b border-slate-300/60"><span class="px-2.5 py-1 rounded-full text-xs font-medium ${genderBadgeClass}">${escapeHtml(patient.gender)}</span></td>
                     <td class="py-3.5 px-6 text-slate-600 text-xs font-mono border-b border-slate-300/60">${escapeHtml(patient.phone)}</td>
+                    <td class="py-3.5 px-6 border-b border-slate-300/60 whitespace-nowrap">${statusBadge}</td>
                     <td class="py-3.5 px-6 text-right border-b border-slate-300/60 whitespace-nowrap">
                         <div class="flex items-center justify-end gap-1.5">
-                            ${transferControl}
+                            ${markOutButton}
                             <button class="whitespace-nowrap px-3.5 py-1.5 bg-white/50 hover:bg-white text-slate-600 border border-slate-600/50 text-xs font-medium rounded-lg shadow-sm hover:shadow-lg hover:border-slate-700/60 hover:text-slate-700 active:scale-[0.98] transition-all btn-refer-patient inline-flex items-center gap-1.5" data-id="${patient.id}">
                                 <i class="bi bi-send-plus"></i> Refer
                             </button>
@@ -600,8 +674,15 @@ $(document).ready(function () {
      * to Another Facility" option on an already-transferred-in patient's Mark as Out
      * flow, so re-referring a patient onward always goes through this one real path
      * instead of a redundant manual "Transferred" label.
+     *
+     * @param {number} patientId
+     * @param {jQuery|null} $btn - triggering button, gets a loading spinner while fetching
+     * @param {object|null} clinicalData - when re-referring an already transferred-in
+     *   patient, their last known vitals/status/severity/timestamp (see the
+     *   "Referred to Another Facility" branch below for how this is built). Never
+     *   passed for a brand-new patient -- there's no prior clinical data to reuse.
      */
-    function openReferralFormForPatientId(patientId, $btn) {
+    function openReferralFormForPatientId(patientId, $btn, clinicalData) {
         const originalText = $btn ? $btn.html() : null;
         if ($btn) $btn.html('<span class="spinner-border spinner-border-sm" role="status"></span>').prop('disabled', true);
 
@@ -615,6 +696,11 @@ $(document).ready(function () {
 
                 if (response.success && response.data) {
                     const patient = response.data;
+
+                    // Clean slate every time -- without this, a partially-filled-then-
+                    // abandoned re-referral (with prefilled vitals) could leak into the
+                    // next patient's form if the doctor opens a normal "Refer" afterward.
+                    $('#referralForm')[0].reset();
 
                     $('#modalPatientId').val(patient.id);
                     $('#modalPatientName').text(`${patient.first_name} ${patient.last_name}`);
@@ -631,7 +717,43 @@ $(document).ready(function () {
                         city: patient.city_municipality,
                         barangay: patient.barangay
                     });
+
+                    if (clinicalData) {
+                        if (clinicalData.vital_bp) {
+                            const bpParts = String(clinicalData.vital_bp).split('/');
+                            $('#modalVitalBpSystolic').val(bpParts[0] || '');
+                            $('#modalVitalBpDiastolic').val(bpParts[1] || '');
+                        }
+                        if (clinicalData.vital_hr) $('#modalVitalHr').val(clinicalData.vital_hr);
+                        if (clinicalData.vital_rr) $('#modalVitalRr').val(clinicalData.vital_rr);
+                        if (clinicalData.vital_temp_c) $('#modalVitalTemp').val(clinicalData.vital_temp_c);
+                        if (clinicalData.vital_o2sat) $('#modalVitalO2sat').val(clinicalData.vital_o2sat);
+                        if (clinicalData.vital_height_cm) $('#modalVitalHeight').val(clinicalData.vital_height_cm);
+                        if (clinicalData.vital_weight_kg) $('#modalVitalWeight').val(clinicalData.vital_weight_kg);
+
+                        $('#modalIsPwd').prop('checked', !!clinicalData.is_pwd);
+                        $('#modalIsPregnant').prop('checked', !!clinicalData.is_pregnant);
+                        $('#modalIsSeniorCitizen').prop('checked', !!clinicalData.is_senior_citizen);
+                        $('#modalHasAllergy').prop('checked', !!clinicalData.has_allergy);
+                        if (clinicalData.has_allergy && clinicalData.allergy_details) {
+                            $('#modalAllergyDetails').val(clinicalData.allergy_details);
+                        }
+
+                        if (clinicalData.disease_severity) $('#modalSeverity').val(clinicalData.disease_severity);
+
+                        // Vitals are a reading from a point in time, not a static fact like
+                        // PWD/pregnant status -- flag prominently that they may be stale
+                        // instead of letting them look like a just-taken measurement.
+                        if (clinicalData.vitalsAsOf) {
+                            $('#modalVitalsPrefillTimestamp').text(formatReferralTimestamp(clinicalData.vitalsAsOf));
+                            $('#modalVitalsPrefillNotice').removeClass('hidden');
+                        }
+                    } else {
+                        $('#modalVitalsPrefillNotice').addClass('hidden');
+                    }
+
                     toggleReferralReasonOther();
+                    toggleAllergyDetails();
                 } else {
                     Swal.fire({
                         icon: 'error',
@@ -680,11 +802,74 @@ $(document).ready(function () {
     }
     $('#modalHasAllergy').on('change', toggleAllergyDetails);
 
+    // Shared invalid-field highlight, applied/cleared by the validation pass below
+    // and by the live input/change listener that clears it once a field is fixed.
+    const REQUIRED_FIELD_ERROR_CLASSES = 'border-red-600 ring-2 ring-red-600/20 bg-red-50/40';
+
+    /**
+     * Highlights every empty required field in the referral form in red (instead
+     * of the browser's default one-at-a-time validation UI, which #referralForm's
+     * novalidate attribute disables) and returns whether the form is valid overall.
+     */
+    function validateReferralForm() {
+        let isValid = true;
+        let $firstInvalid = null;
+
+        function markField($field, invalid) {
+            $field.toggleClass(REQUIRED_FIELD_ERROR_CLASSES, invalid);
+            if (invalid) {
+                isValid = false;
+                if (!$firstInvalid) $firstInvalid = $field;
+            }
+        }
+
+        // Generic required fields, excluding the hidden reason-text proxy -- that
+        // one's handled specially below since it's not the control the user
+        // actually sees/interacts with once a real (non-"Others") reason is picked.
+        $('#referralForm [required]').not(':disabled').not('#modalReasonText').each(function () {
+            const $field = $(this);
+            markField($field, !String($field.val() || '').trim());
+        });
+
+        // Referral Reason: validate whichever control is actually visible --
+        // the dropdown itself, or the free-text field once "Others" is selected.
+        const reasonSelected = $('#modalReasonSelect').val();
+        if (!reasonSelected) {
+            markField($('#modalReasonSelect'), true);
+        } else if (reasonSelected === 'Others') {
+            markField($('#modalReasonText'), !String($('#modalReasonText').val() || '').trim());
+        }
+
+        if ($firstInvalid) {
+            $firstInvalid[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            $firstInvalid.focus();
+        }
+
+        return isValid;
+    }
+
+    // Clear the red highlight on a required field as soon as it's fixed, rather
+    // than making the doctor resubmit to find out it's no longer invalid.
+    // #modalReasonSelect is included even though it has no [required] attribute --
+    // it's flagged manually above since the real requirement lives on its hidden
+    // proxy field.
+    $(document).on('input change', '#referralForm [required], #modalReasonSelect', function () {
+        const $field = $(this);
+        if (String($field.val() || '').trim()) {
+            $field.removeClass(REQUIRED_FIELD_ERROR_CLASSES);
+        }
+    });
+
     /**
      * Handle Referral Form Submit
      */
     $('#referralForm').on('submit', function (e) {
         e.preventDefault();
+
+        if (!validateReferralForm()) {
+            showToast('error', 'Please fill in all required fields highlighted in red.', 3500);
+            return;
+        }
 
         const $submitBtn = $('#btnSubmitReferral');
         const originalBtnHtml = $submitBtn.html();
@@ -731,6 +916,12 @@ $(document).ready(function () {
 
                 if (response.success) {
                     switchTab('patients');
+                    // switchTab() only handles the UI/tab-switch -- it doesn't refresh
+                    // table data (unlike switchTab('referrals'), which does). Without
+                    // this, a patient just re-referred onward would still show the
+                    // stale pre-referral state (e.g. "Mark as Out") until a manual
+                    // refresh, even though the table underneath it just changed.
+                    loadPatients();
                     let refId = response.referral_id || null;
                     if (!refId && response.iol_response) {
                         if (typeof response.iol_response === 'object') {
@@ -810,14 +1001,7 @@ $(document).ready(function () {
     $('#btnCopyApiKey').on('click', function () {
         const apiKeyText = $('#displayApiKey').text();
         navigator.clipboard.writeText(apiKeyText).then(function () {
-            Swal.fire({
-                toast: true,
-                position: 'top-end',
-                icon: 'success',
-                title: 'API Key copied to clipboard!',
-                showConfirmButton: false,
-                timer: 2000
-            });
+            showToast('success', 'API Key copied to clipboard!', 2000);
         });
     });
 
@@ -849,77 +1033,312 @@ $(document).ready(function () {
     };
 
     function loadAcceptedPatients() {
-        if (!currentHospital) return;
+        const isClinicalUser = currentUser && (currentUser.role === 'doctor' || currentUser.role === 'nurse');
+        if (!currentHospital || !isClinicalUser) return;
 
-        const apiKey = currentHospital.api_key || '';
         const $list = $('#acceptedPatientsList');
 
-        $.ajax({
-            url: `${API_V1_REFERRAL}/outcomes`,
-            type: 'GET',
-            headers: { 'X-API-Key': apiKey },
-            dataType: 'json',
-            success: function (data) {
-                const all = Array.isArray(data) ? data : [];
-                const chosen = all.filter(o => o.outcome === 'CHOSEN');
-                const bypassed = all.filter(o => o.outcome === 'BYPASSED');
+        $.when(
+            $.ajax({ url: `${API_BASE}/get_referral_outcomes.php`, type: 'GET', dataType: 'json' }),
+            $.ajax({ url: `${API_BASE}/get_onward_referred_referral_ids.php`, type: 'GET', dataType: 'json' })
+        ).done(function (outcomesRes, onwardRes) {
+            const data = outcomesRes[0];
+            const onwardData = onwardRes[0];
+            // Referral IDs already referred onward through the system -- these should
+            // never offer "Mark as Out" too, since the two facts would contradict each
+            // other (mark_patient_departed.php enforces this server-side either way).
+            const onwardReferredIds = new Set(
+                (onwardData && onwardData.success && Array.isArray(onwardData.data)) ? onwardData.data : []
+            );
 
-                $('#statTransferredToUs').text(chosen.length);
-                $('#statRedirectedElsewhere').text(bypassed.length);
+            const all = Array.isArray(data) ? data : [];
+            const chosen = all.filter(o => o.outcome === 'CHOSEN');
+            const bypassed = all.filter(o => o.outcome === 'BYPASSED');
+            // Discharged is its own count, not lumped with Deceased/Left AMA -- those
+            // are meaningfully different outcomes and collapsing them would hide it.
+            // Mutually exclusive with "referred onward" by design: mark_patient_departed.php
+            // already refuses to record a departure once a patient's been referred onward.
+            const dischargedCount = chosen.filter(o => o.departure_outcome === 'DISCHARGED').length;
+            const referredOnwardCount = chosen.filter(o => onwardReferredIds.has(o.referral_id)).length;
 
-                if (chosen.length === 0) {
-                    $list.html('<div class="px-6 py-6 text-center text-xs text-slate-400">No finalized referrals yet.</div>');
-                    return;
+            $('#statTransferredToUs').text(chosen.length);
+            $('#statRedirectedElsewhere').text(bypassed.length);
+            $('#statDischarged').text(dischargedCount);
+            $('#statReferredOnward').text(referredOnwardCount);
+
+            if (chosen.length === 0) {
+                $list.html('<div class="px-6 py-6 text-center text-xs text-slate-400">No finalized referrals yet.</div>');
+                return;
+            }
+
+            $list.html(chosen.map(function (o) {
+                const arrivalControl = o.arrived_at
+                    ? `<span class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200">
+                           <i class="bi bi-check-circle-fill"></i> Arrived ${formatReferralTimestamp(o.arrived_at)}
+                       </span>`
+                    : `<button type="button" data-referral-id="${escapeHtml(o.referral_id)}"
+                           class="btn-mark-arrived inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold transition-all">
+                           <i class="bi bi-box-arrow-in-down"></i> Mark as Arrived
+                       </button>`;
+
+                let departureControl = '';
+                if (o.arrived_at) {
+                    if (o.departed_at) {
+                        const label = DEPARTURE_OUTCOME_LABEL[o.departure_outcome] || o.departure_outcome || 'Out';
+                        departureControl = `
+                            <span class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
+                                <i class="bi bi-box-arrow-right"></i> ${escapeHtml(label)} ${formatReferralTimestamp(o.departed_at)}
+                            </span>`;
+                    } else if (onwardReferredIds.has(o.referral_id)) {
+                        departureControl = `
+                            <span class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-semibold border border-indigo-200">
+                                <i class="bi bi-arrow-right-circle"></i> Referred Onward
+                            </span>`;
+                    } else {
+                        departureControl = `
+                            <button type="button" data-referral-id="${escapeHtml(o.referral_id)}"
+                                class="btn-mark-departed inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-600 hover:bg-slate-700 text-white text-xs font-semibold transition-all">
+                                <i class="bi bi-box-arrow-right"></i> Mark as Out
+                            </button>`;
+                    }
                 }
 
-                $list.html(chosen.map(function (o) {
-                    const arrivalControl = o.arrived_at
-                        ? `<span class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200">
-                               <i class="bi bi-check-circle-fill"></i> Arrived ${formatReferralTimestamp(o.arrived_at)}
-                           </span>`
-                        : `<button type="button" data-referral-id="${escapeHtml(o.referral_id)}"
-                               class="btn-mark-arrived inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold transition-all">
-                               <i class="bi bi-box-arrow-in-down"></i> Mark as Arrived
-                           </button>`;
-
-                    let departureControl = '';
-                    if (o.arrived_at) {
-                        if (o.departed_at) {
-                            const label = DEPARTURE_OUTCOME_LABEL[o.departure_outcome] || o.departure_outcome || 'Out';
-                            departureControl = `
-                                <span class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
-                                    <i class="bi bi-box-arrow-right"></i> ${escapeHtml(label)} ${formatReferralTimestamp(o.departed_at)}
-                                </span>`;
-                        } else {
-                            departureControl = `
-                                <button type="button" data-referral-id="${escapeHtml(o.referral_id)}"
-                                    class="btn-mark-departed inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-600 hover:bg-slate-700 text-white text-xs font-semibold transition-all">
-                                    <i class="bi bi-box-arrow-right"></i> Mark as Out
-                                </button>`;
-                        }
-                    }
-
-                    return `
-                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-4">
-                            <div class="min-w-0 flex-1">
-                                <p class="text-sm font-semibold text-slate-900">${escapeHtml(o.clinical_reason || 'Referral')}</p>
-                                <p class="text-xs text-slate-500 mt-0.5 break-words">From <strong>${escapeHtml(o.referring_facility)}</strong></p>
-                                <p class="text-xs text-slate-500 mt-0.5">${formatReferralTimestamp(o.created_at)}</p>
-                            </div>
-                            <div class="flex flex-wrap items-center gap-2 flex-shrink-0">
-                                ${arrivalControl}
-                                ${departureControl}
-                                <button type="button" data-referral-id="${escapeHtml(o.referral_id)}"
-                                    class="btn-view-patient-details inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-all">
-                                    <i class="bi bi-person-lines-fill"></i> View Full Patient Details
-                                </button>
-                            </div>
+                return `
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-4">
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-semibold text-slate-900">${escapeHtml(o.clinical_reason || 'Referral')}</p>
+                            <p class="text-xs text-slate-500 mt-0.5 break-words">From <strong>${escapeHtml(o.referring_facility)}</strong></p>
+                            <p class="text-xs text-slate-500 mt-0.5">${formatReferralTimestamp(o.created_at)}</p>
                         </div>
-                    `;
-                }).join(''));
+                        <div class="flex flex-wrap items-center gap-2 flex-shrink-0">
+                            ${arrivalControl}
+                            ${departureControl}
+                            <button type="button" data-referral-id="${escapeHtml(o.referral_id)}"
+                                class="btn-view-patient-details inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-all">
+                                <i class="bi bi-person-lines-fill"></i> View Full Patient Details
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join(''));
+        }).fail(function () {
+            $list.html('<div class="px-6 py-6 text-center text-xs text-red-500">Could not load finalized referrals.</div>');
+        });
+    }
+
+    /**
+     * Facility Admin Analytics tab -- reuses the same two endpoints Incoming Patients
+     * uses for its outcome counters (so the numbers can never drift apart between the
+     * doctor/nurse view and the admin view), plus a dedicated aggregation endpoint for
+     * top reasons/senders/receivers and monthly referral volume.
+     */
+    let analyticsCharts = {};
+
+    function loadFacilityAnalytics() {
+        if (!currentUser || currentUser.role !== 'facility_admin') return;
+
+        $.when(
+            $.ajax({ url: `${API_BASE}/get_referral_outcomes.php`, type: 'GET', dataType: 'json' }),
+            $.ajax({ url: `${API_BASE}/get_onward_referred_referral_ids.php`, type: 'GET', dataType: 'json' }),
+            $.ajax({ url: `${API_BASE}/get_facility_analytics.php`, type: 'GET', dataType: 'json' })
+        ).done(function (outcomesRes, onwardRes, analyticsRes) {
+            const outcomes = Array.isArray(outcomesRes[0]) ? outcomesRes[0] : [];
+            const onwardData = onwardRes[0];
+            const onwardReferredIds = new Set(
+                (onwardData && onwardData.success && Array.isArray(onwardData.data)) ? onwardData.data : []
+            );
+
+            const chosen = outcomes.filter(o => o.outcome === 'CHOSEN');
+            const bypassed = outcomes.filter(o => o.outcome === 'BYPASSED');
+            const dischargedCount = chosen.filter(o => o.departure_outcome === 'DISCHARGED').length;
+            const referredOnwardCount = chosen.filter(o => onwardReferredIds.has(o.referral_id)).length;
+
+            $('#analyticsStatTransferredToUs').text(chosen.length);
+            $('#analyticsStatRedirectedElsewhere').text(bypassed.length);
+            $('#analyticsStatDischarged').text(dischargedCount);
+            $('#analyticsStatReferredOnward').text(referredOnwardCount);
+
+            const analytics = (analyticsRes[0] && typeof analyticsRes[0] === 'object') ? analyticsRes[0] : {};
+            renderAnalyticsCharts(analytics);
+        }).fail(function () {
+            showToast('error', 'Could not load facility analytics.', 3500);
+        });
+    }
+
+    function renderAnalyticsCharts(analytics) {
+        const monthly = Array.isArray(analytics.monthly_volume) ? analytics.monthly_volume : [];
+        const reasons = Array.isArray(analytics.top_reasons) ? analytics.top_reasons : [];
+        const senders = Array.isArray(analytics.top_senders) ? analytics.top_senders : [];
+        const receivers = Array.isArray(analytics.top_receivers) ? analytics.top_receivers : [];
+
+        $('#analyticsVolumeEmpty').toggle(monthly.length === 0);
+        $('#analyticsReasonsEmpty').toggle(reasons.length === 0);
+        $('#analyticsSendersEmpty').toggle(senders.length === 0);
+        $('#analyticsReceiversEmpty').toggle(receivers.length === 0);
+
+        Object.values(analyticsCharts).forEach(chart => chart && chart.destroy());
+        analyticsCharts = {};
+
+        if (monthly.length && typeof Chart !== 'undefined') {
+            analyticsCharts.volume = new Chart($('#analyticsVolumeChart')[0], {
+                type: 'line',
+                data: {
+                    labels: monthly.map(m => m.month),
+                    datasets: [
+                        { label: 'Sent', data: monthly.map(m => m.sent), borderColor: '#dc2626', backgroundColor: 'rgba(220,38,38,0.1)', tension: 0.3, fill: true },
+                        { label: 'Received', data: monthly.map(m => m.received), borderColor: '#4f46e5', backgroundColor: 'rgba(79,70,229,0.1)', tension: 0.3, fill: true }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+                }
+            });
+        }
+
+        renderRankedBlockList('#analyticsReasonsList', reasons, { bg: 'bg-purple-100', text: 'text-purple-700', bar: 'bg-purple-500' });
+        renderRankedBlockList('#analyticsSendersList', senders, { bg: 'bg-emerald-100', text: 'text-emerald-700', bar: 'bg-emerald-500' });
+        renderRankedBlockList('#analyticsReceiversList', receivers, { bg: 'bg-amber-100', text: 'text-amber-700', bar: 'bg-amber-500' });
+    }
+
+    /**
+     * Renders a "top N" ranked list as stacked blocks (rank badge + label + count +
+     * a proportional bar relative to the #1 entry) instead of an axis-based chart --
+     * reads better than a bar chart when there are only a handful of rows.
+     */
+    function renderRankedBlockList(containerSelector, rows, palette) {
+        const $container = $(containerSelector);
+        if (!rows.length) {
+            $container.empty();
+            return;
+        }
+
+        const maxCount = Math.max(...rows.map(r => r.count));
+        $container.html(rows.map((r, i) => `
+            <div class="flex items-center gap-3">
+                <div class="w-7 h-7 rounded-lg ${palette.bg} ${palette.text} text-xs font-bold flex items-center justify-center flex-shrink-0">${i + 1}</div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between gap-2 mb-1">
+                        <p class="text-sm font-medium text-slate-800 truncate" title="${escapeHtml(r.label)}">${escapeHtml(r.label)}</p>
+                        <span class="text-xs font-bold text-slate-900 flex-shrink-0">${r.count}</span>
+                    </div>
+                    <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div class="h-full ${palette.bar} rounded-full" style="width: ${maxCount ? (r.count / maxCount * 100) : 0}%"></div>
+                    </div>
+                </div>
+            </div>
+        `).join(''));
+    }
+
+    /**
+     * Facility Admin System Logs tab -- reads the local audit_logs table (never
+     * proxied through IOL, since IOL only authenticates at the facility level and
+     * has no concept of individual staff users).
+     */
+    const AUDIT_ACTION_LABEL = {
+        REFERRAL_SENT: { text: 'Sent Referral', badge: 'bg-red-50 text-red-700' },
+        REFERRAL_ACCEPTED: { text: 'Accepted Referral', badge: 'bg-emerald-50 text-emerald-700' },
+        REFERRAL_REJECTED: { text: 'Rejected Referral', badge: 'bg-slate-100 text-slate-700' },
+        REFERRAL_FINALIZED: { text: 'Finalized Referral', badge: 'bg-indigo-50 text-indigo-700' },
+        REFERRAL_CANCELLED: { text: 'Cancelled Referral', badge: 'bg-rose-50 text-rose-700' },
+        PATIENT_ARRIVED: { text: 'Marked Arrived', badge: 'bg-amber-50 text-amber-700' },
+        PATIENT_DEPARTED: { text: 'Marked Departed', badge: 'bg-purple-50 text-purple-700' }
+    };
+
+    function loadSystemLogs() {
+        const $tableBody = $('#logsTableBody');
+        $tableBody.html(`
+            <tr>
+                <td colspan="7" class="text-center py-8 text-slate-400 font-normal">
+                    <div class="inline-block animate-spin rounded-full h-5 w-5 border-2 border-red-600 border-t-transparent mr-2"></div>
+                    Loading activity log...
+                </td>
+            </tr>
+        `);
+
+        $.ajax({
+            url: `${API_BASE}/get_audit_logs.php`,
+            type: 'GET',
+            dataType: 'json',
+            success: function (response) {
+                if (response.success && Array.isArray(response.data)) {
+                    renderLogsTable(response.data);
+                } else {
+                    $tableBody.html(`
+                        <tr>
+                            <td colspan="7" class="text-center py-8 text-red-500 font-normal">
+                                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                                ${response.message || 'Failed to load activity log.'}
+                            </td>
+                        </tr>
+                    `);
+                }
             },
             error: function () {
-                $list.html('<div class="px-6 py-6 text-center text-xs text-red-500">Could not load finalized referrals.</div>');
+                $tableBody.html(`
+                    <tr>
+                        <td colspan="7" class="text-center py-8 text-red-500 font-normal">
+                            <i class="bi bi-wifi-off me-1"></i>
+                            Error connecting to backend API.
+                        </td>
+                    </tr>
+                `);
+            }
+        });
+    }
+
+    function renderLogsTable(logs) {
+        if ($.fn.DataTable.isDataTable('#logsTable')) {
+            $('#logsTable').DataTable().destroy();
+        }
+
+        const $tableBody = $('#logsTableBody');
+        $tableBody.empty();
+
+        if (logs.length === 0) {
+            $tableBody.html(`
+                <tr>
+                    <td colspan="7" class="text-center py-8 text-slate-400 font-normal">
+                        No activity recorded yet.
+                    </td>
+                </tr>
+            `);
+            return;
+        }
+
+        logs.forEach(function (log) {
+            const meta = AUDIT_ACTION_LABEL[log.action] || { text: log.action, badge: 'bg-slate-100 text-slate-700' };
+            const row = `
+                <tr class="hover:bg-slate-100/60 transition-colors">
+                    <td class="py-3.5 px-6 text-xs text-slate-600 border-b border-slate-200/70">${formatReferralTimestamp(log.created_at)}</td>
+                    <td class="py-3.5 px-6 text-xs font-medium text-slate-800 border-b border-slate-200/70">${escapeHtml(log.user_full_name)}</td>
+                    <td class="py-3.5 px-6 text-xs text-slate-500 capitalize border-b border-slate-200/70">${escapeHtml(log.user_role)}</td>
+                    <td class="py-3.5 px-6 border-b border-slate-200/70"><span class="px-2.5 py-1 rounded-full text-xs font-bold ${meta.badge}">${escapeHtml(meta.text)}</span></td>
+                    <td class="py-3.5 px-6 text-xs text-slate-600 border-b border-slate-200/70">${log.patient_name ? escapeHtml(log.patient_name) : '—'}</td>
+                    <td class="py-3.5 px-6 text-xs font-mono text-slate-500 border-b border-slate-200/70">${log.referral_id ? escapeHtml(log.referral_id) : '—'}</td>
+                    <td class="py-3.5 px-6 text-xs text-slate-600 border-b border-slate-200/70">${log.details ? escapeHtml(log.details) : '—'}</td>
+                </tr>
+            `;
+            $tableBody.append(row);
+        });
+
+        $('#logsTable').DataTable({
+            paging: true,
+            searching: true,
+            ordering: true,
+            // order: [] -- logs already arrive newest-first from the backend; without
+            // this DataTables would silently re-sort by column 0 on render (same
+            // gotcha as the referrals table).
+            order: [],
+            info: true,
+            responsive: true,
+            pageLength: 15,
+            lengthMenu: [15, 25, 50, 100],
+            language: {
+                lengthMenu: "Show _MENU_ records",
+                info: "Showing _START_ to _END_ of _TOTAL_ activity entries",
+                search: "Search:"
             }
         });
     }
@@ -989,14 +1408,7 @@ $(document).ready(function () {
             dataType: 'json',
             success: function (response) {
                 if (response.success) {
-                    Swal.fire({
-                        toast: true,
-                        position: 'top-end',
-                        icon: 'success',
-                        title: response.message || 'Patient marked as arrived.',
-                        showConfirmButton: false,
-                        timer: 3000
-                    });
+                    showToast('success', response.message || 'Patient marked as arrived.', 3000);
                     loadAcceptedPatients();
                     if (typeof loadPatients === 'function') loadPatients();
                 } else {
@@ -1079,7 +1491,26 @@ $(document).ready(function () {
                     dataType: 'json',
                     success: function (d) {
                         if (d && d.local_patient_id) {
-                            openReferralFormForPatientId(d.local_patient_id, null);
+                            // Prefer arrival vitals (more recent) over the original
+                            // referral-time vitals when both exist; either way, flagged
+                            // as "last recorded" in the form rather than treated as current.
+                            const clinicalData = {
+                                vital_bp: d.arrival_vital_bp || d.vital_bp || '',
+                                vital_hr: d.arrival_vital_hr || d.vital_hr || '',
+                                vital_rr: d.arrival_vital_rr || d.vital_rr || '',
+                                vital_temp_c: d.arrival_vital_temp_c || d.vital_temp_c || '',
+                                vital_o2sat: d.arrival_vital_o2sat || d.vital_o2sat || '',
+                                vital_height_cm: d.vital_height_cm || '',
+                                vital_weight_kg: d.vital_weight_kg || '',
+                                is_pwd: !!d.is_pwd,
+                                is_pregnant: !!d.is_pregnant,
+                                is_senior_citizen: !!d.is_senior_citizen,
+                                has_allergy: !!d.has_allergy,
+                                allergy_details: d.allergy_details || '',
+                                disease_severity: d.disease_severity || '',
+                                vitalsAsOf: d.arrived_at || null
+                            };
+                            openReferralFormForPatientId(d.local_patient_id, null, clinicalData);
                         } else {
                             Swal.fire({ icon: 'error', title: 'Error', text: "Could not find this patient's local record.", confirmButtonColor: '#dc3545' });
                         }
@@ -1101,14 +1532,7 @@ $(document).ready(function () {
                 dataType: 'json',
                 success: function (response) {
                     if (response.success) {
-                        Swal.fire({
-                            toast: true,
-                            position: 'top-end',
-                            icon: 'success',
-                            title: response.message || 'Patient departure recorded.',
-                            showConfirmButton: false,
-                            timer: 3000
-                        });
+                        showToast('success', response.message || 'Patient departure recorded.', 3000);
                         loadAcceptedPatients();
                         if (typeof loadPatients === 'function') loadPatients();
                     } else {
@@ -1138,6 +1562,8 @@ $(document).ready(function () {
             type: 'GET',
             dataType: 'json',
             success: function (d) {
+                const ageDisplay = formatAgeDisplay(d.age, d.age_months, d.age_days);
+
                 const vitalTile = function (label, value, unit) {
                     const displayValue = (value != null && value !== '') ? `${escapeHtml(String(value))}${unit ? ' ' + unit : ''}` : '—';
                     return `
@@ -1188,7 +1614,7 @@ $(document).ready(function () {
                                     <div class="grid grid-cols-2 gap-y-2 gap-x-3">
                                         <p><span class="text-slate-500">DOB:</span> <span class="font-semibold text-slate-800">${escapeHtml(d.date_of_birth || '—')}</span></p>
                                         <p><span class="text-slate-500">Gender:</span> <span class="font-semibold text-slate-800">${escapeHtml(d.gender || '—')}</span></p>
-                                        <p><span class="text-slate-500">Age:</span> <span class="font-semibold text-slate-800">${d.age ?? '—'}</span></p>
+                                        <p><span class="text-slate-500">Age:</span> <span class="font-semibold text-slate-800">${escapeHtml(String(ageDisplay))}</span></p>
                                         <p><span class="text-slate-500">Civil Status:</span> <span class="font-semibold text-slate-800">${escapeHtml(d.civil_status || '—')}</span></p>
                                         <p class="col-span-2"><span class="text-slate-500">Phone:</span> <span class="font-semibold text-slate-800">${escapeHtml(d.phone || '—')}</span></p>
                                         <p class="col-span-2"><span class="text-slate-500">PhilHealth ID:</span> <span class="font-semibold text-slate-800">${escapeHtml(d.philhealth_status || '—')}${d.philhealth_number ? ' (' + escapeHtml(d.philhealth_number) + ')' : ''}</span></p>
@@ -1290,9 +1716,8 @@ $(document).ready(function () {
         // logout wiped it) -- fall back to server truth: find the most recent referral
         // this facility sent that has an acceptance still awaiting finalization.
         $.ajax({
-            url: `${API_V1_REFERRAL}/mine`,
+            url: `${API_BASE}/get_my_referrals.php`,
             type: 'GET',
-            headers: { 'X-API-Key': currentHospital.api_key || '' },
             dataType: 'json',
             success: function (data) {
                 const awaitingFinalization = (Array.isArray(data) ? data : [])
@@ -1321,12 +1746,11 @@ $(document).ready(function () {
     }
 
     function fetchRecommendationsForReferral(referralId, apiKey) {
+        // Unauthenticated on IOL's side (no get_current_hospital dependency on this
+        // endpoint) -- called directly, no signing/API key needed or sent.
         $.ajax({
             url: `${API_V1_REFERRAL}/${encodeURIComponent(referralId)}/recommendations`,
             type: 'GET',
-            headers: {
-                'X-API-Key': apiKey
-            },
             dataType: 'json',
             xhrFields: {
                 withCredentials: false
@@ -1584,10 +2008,10 @@ $(document).ready(function () {
                     window.activeInitiatedReferralId = null;
                     try { localStorage.removeItem('active_initiated_referral'); } catch (e) {}
 
-                    // Refresh accepted hospitals list to show updated statuses (other hospitals now REJECTED/BYPASSED)
-                    setTimeout(() => {
-                        fetchRecommendationsForReferral(targetRefId, currentHospital.api_key || '');
-                    }, 1000);
+                    // Hide the card immediately -- it's finalized, there's nothing left to
+                    // decide on. checkAndPollRecommendations() would only clear this itself
+                    // on its next poll, which left it sitting there stale for up to 30s.
+                    $('#acceptedHospitalsCard').hide();
                 },
                 error: function (xhr) {
                     if ($btn) $btn.html(originalBtnHtml).prop('disabled', false);
@@ -1736,6 +2160,35 @@ $(document).ready(function () {
             .replace(/'/g, "&#039;");
     }
 
+    /**
+     * Three-tier age display: years, falling back to whole months under a year,
+     * falling back to whole days under a month -- so a newborn a few weeks old
+     * doesn't show as "0 months old" (indistinguishable from missing/broken data)
+     * the same way "0 years old" would've been indistinguishable from an infant.
+     *
+     * @param {number|null|undefined} age - years
+     * @param {number|null|undefined} ageMonths - completed months since birth
+     * @param {number|null|undefined} ageDays - completed days since birth
+     * @param {boolean} [withSuffix=false] - append " old" (years/months) for prose use
+     * @returns {string}
+     */
+    function formatAgeDisplay(age, ageMonths, ageDays, withSuffix) {
+        const hasAge = typeof age === 'number';
+        const hasMonths = ageMonths !== null && ageMonths !== undefined;
+        const hasDays = ageDays !== null && ageDays !== undefined;
+
+        if (hasAge && age < 1 && hasMonths && ageMonths < 1 && hasDays) {
+            return `${ageDays} day${ageDays === 1 ? '' : 's'}${withSuffix ? ' old' : ''}`;
+        }
+        if (hasAge && age < 1 && hasMonths) {
+            return `${ageMonths} month${ageMonths === 1 ? '' : 's'}${withSuffix ? ' old' : ''}`;
+        }
+        if (hasAge) {
+            return withSuffix ? `${age} years old` : String(age);
+        }
+        return '—';
+    }
+
     // ============================================================
     // MY REFERRALS PAGE (list, filter, cancel)
     // ============================================================
@@ -1763,13 +2216,11 @@ $(document).ready(function () {
     function loadMyReferrals() {
         if (!currentHospital) return;
 
-        const apiKey = currentHospital.api_key || '';
         const $tableBody = $('#referralsTableBody');
 
         $.ajax({
-            url: `${API_V1_REFERRAL}/mine`,
+            url: `${API_BASE}/get_my_referrals.php`,
             type: 'GET',
-            headers: { 'X-API-Key': apiKey },
             dataType: 'json',
             success: function (data) {
                 $('#referralsConnectionAlert').slideUp(200);
@@ -1905,6 +2356,11 @@ $(document).ready(function () {
             paging: true,
             searching: false,
             ordering: true,
+            // order: [] -- without this, DataTables silently re-sorts by column 0
+            // (Referral ID, alphabetically) on every render, discarding the
+            // newest-first sort already applied above in applyReferralFilters().
+            // Column headers stay clickable for a manual re-sort either way.
+            order: [],
             info: true,
             responsive: true,
             pageLength: 10,
@@ -2056,7 +2512,6 @@ $(document).ready(function () {
      */
     $(document).on('click', '.btn-cancel-referral', function () {
         const referralId = $(this).data('ref-id');
-        const apiKey = currentHospital ? (currentHospital.api_key || '') : '';
 
         Swal.fire({
             icon: 'warning',
@@ -2072,19 +2527,13 @@ $(document).ready(function () {
             if (!result.isConfirmed) return;
 
             $.ajax({
-                url: `${API_V1_REFERRAL}/${referralId}/cancel`,
+                url: `${API_BASE}/cancel_referral.php`,
                 type: 'PATCH',
-                headers: { 'X-API-Key': apiKey },
+                contentType: 'application/json',
+                data: JSON.stringify({ referral_id: referralId }),
                 dataType: 'json',
                 success: function () {
-                    Swal.fire({
-                        toast: true,
-                        position: 'top-end',
-                        icon: 'success',
-                        title: 'Referral cancelled',
-                        showConfirmButton: false,
-                        timer: 2000
-                    });
+                    showToast('success', 'Referral cancelled', 2000);
                     loadMyReferrals();
                 },
                 error: function (xhr) {
@@ -2121,15 +2570,11 @@ $(document).ready(function () {
         const isClinicalUser = currentUser && (currentUser.role === 'doctor' || currentUser.role === 'nurse');
         if (!currentHospital || !isClinicalUser || isPollingInProgress) return;
 
-        const apiKey = currentHospital.api_key || '';
         isPollingInProgress = true;
 
         $.ajax({
-            url: `${API_V1_REFERRAL}/incoming`,
+            url: `${API_BASE}/get_incoming_referrals.php`,
             type: 'GET',
-            headers: {
-                'X-API-Key': apiKey
-            },
             dataType: 'json',
             success: function (res) {
                 isPollingInProgress = false;
@@ -2489,13 +2934,10 @@ $(document).ready(function () {
 
         const referringFacility = incomingAlert.referring_facility || incomingAlert.referring_hospital || (incomingAlert.serviceProvider && incomingAlert.serviceProvider.display) || 'Unknown Hospital';
         const patientId = incomingAlert.patient_id || (incomingAlert.subject && incomingAlert.subject.reference) || 'N/A';
-        const age = incomingAlert.patient_age !== undefined ? incomingAlert.patient_age : (incomingAlert.age !== undefined ? incomingAlert.age : 'N/A');
+        const age = incomingAlert.patient_age !== undefined ? incomingAlert.patient_age : incomingAlert.age;
         const ageMonths = incomingAlert.patient_age_months !== undefined ? incomingAlert.patient_age_months : null;
-        // Under a year old, "0 years old" is meaningless -- show months instead
-        // (e.g. a 6-month-old baby reads as "6 months old", not "0 years old")
-        const ageDisplay = (typeof age === 'number' && age < 1 && ageMonths !== null)
-            ? `${ageMonths} month${ageMonths === 1 ? '' : 's'} old`
-            : `${age} years old`;
+        const ageDays = incomingAlert.patient_age_days !== undefined ? incomingAlert.patient_age_days : null;
+        const ageDisplay = formatAgeDisplay(age, ageMonths, ageDays, true);
         const gender = incomingAlert.patient_gender || incomingAlert.gender || 'N/A';
         const patientInfo = `${ageDisplay} (${gender})`;
         const severity = incomingAlert.disease_severity !== undefined ? incomingAlert.disease_severity : (incomingAlert.severity !== undefined ? incomingAlert.severity : '3');
@@ -2689,8 +3131,6 @@ $(document).ready(function () {
         if (!currentHospital || isSubmittingDecision) return;
         isSubmittingDecision = true;
 
-        const apiKey = currentHospital.api_key || '';
-
         Swal.fire({
             title: 'Submitting Decision...',
             text: `Transmitting ${decision} decision to central IOL...`,
@@ -2698,15 +3138,12 @@ $(document).ready(function () {
             didOpen: () => { Swal.showLoading(); }
         });
 
-        const payload = JSON.stringify({ status: decision, decision: decision, action: decision });
+        const payload = JSON.stringify({ referral_id: referralId, decision: decision });
 
         $.ajax({
-            url: `${API_V1_REFERRAL}/${encodeURIComponent(referralId)}/respond`,
+            url: `${API_BASE}/respond_to_referral.php`,
             type: 'PATCH',
-            headers: {
-                'X-API-Key': apiKey,
-                'Content-Type': 'application/json'
-            },
+            contentType: 'application/json',
             data: payload,
             dataType: 'json',
             success: function (res) {
@@ -2815,14 +3252,7 @@ $(document).ready(function () {
                     $('#patientForm')[0].reset();
                     switchTab('patients');
                     loadPatients();
-                    Swal.fire({
-                        toast: true,
-                        position: 'top-end',
-                        icon: 'success',
-                        title: 'Patient registered successfully.',
-                        showConfirmButton: false,
-                        timer: 2500
-                    });
+                    showToast('success', 'Patient registered successfully.', 2500);
                 } else {
                     Swal.fire({
                         icon: 'error',
@@ -2914,6 +3344,11 @@ $(document).ready(function () {
                     <td class="py-3.5 px-6 border-b border-slate-300/60">${statusBadge}</td>
                     <td class="py-3.5 px-6 text-right border-b border-slate-300/60">
                         <div class="flex items-center justify-end gap-2">
+                            <button class="px-3 py-1.5 bg-white/50 hover:bg-white text-blue-600 border border-blue-300 text-xs font-medium rounded-lg shadow-sm transition-all btn-edit-user"
+                                data-id="${user.id}" data-full-name="${escapeHtml(user.full_name)}" data-role="${escapeHtml(user.role)}"
+                                data-license-number="${escapeHtml(user.license_number || '')}" data-trainings="${escapeHtml(user.trainings || '')}">
+                                Edit
+                            </button>
                             <button class="px-3 py-1.5 bg-white/50 hover:bg-white text-slate-600 border border-slate-600/50 text-xs font-medium rounded-lg shadow-sm transition-all btn-toggle-user" data-id="${user.id}" ${isSelf ? 'disabled' : ''}>
                                 ${user.is_active ? 'Deactivate' : 'Activate'}
                             </button>
@@ -2966,14 +3401,7 @@ $(document).ready(function () {
                     $('#addUserForm')[0].reset();
                     toggleUserClinicalFields();
                     loadUsers();
-                    Swal.fire({
-                        toast: true,
-                        position: 'top-end',
-                        icon: 'success',
-                        title: 'Staff account created.',
-                        showConfirmButton: false,
-                        timer: 2500
-                    });
+                    showToast('success', 'Staff account created.', 2500);
                 } else {
                     Swal.fire({
                         icon: 'error',
@@ -2993,6 +3421,109 @@ $(document).ready(function () {
                     confirmButtonColor: '#dc3545'
                 });
             }
+        });
+    });
+
+    /**
+     * Lets a facility_admin edit one of their own facility's staff accounts --
+     * full name, role, clinical credentials, and optionally a new password (left
+     * blank to keep the current one). Scoped server-side to the admin's own
+     * facility_id, same as every other manage_users.php action.
+     */
+    $(document).on('click', '.btn-edit-user', function () {
+        const $btn = $(this);
+        const userId = $btn.data('id');
+        const currentFullName = $btn.data('full-name');
+        const currentRole = $btn.data('role');
+        const currentLicenseNumber = $btn.data('license-number');
+        const currentTrainings = $btn.data('trainings');
+
+        Swal.fire({
+            title: 'Edit Staff Account',
+            html: `
+                <div class="text-start">
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Full Name</label>
+                    <input type="text" id="editUserFullName" class="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500 mb-3" value="${escapeHtml(currentFullName)}">
+
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Role</label>
+                    <select id="editUserRole" class="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500 mb-3">
+                        <option value="facility_admin" ${currentRole === 'facility_admin' ? 'selected' : ''}>Facility Admin</option>
+                        <option value="doctor" ${currentRole === 'doctor' ? 'selected' : ''}>Doctor</option>
+                        <option value="nurse" ${currentRole === 'nurse' ? 'selected' : ''}>Nurse</option>
+                    </select>
+
+                    <div id="editUserClinicalFields">
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">License Number</label>
+                        <input type="text" id="editUserLicenseNumber" class="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500 mb-3" value="${escapeHtml(currentLicenseNumber)}">
+
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">Trainings</label>
+                        <input type="text" id="editUserTrainings" class="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500 mb-3" value="${escapeHtml(currentTrainings)}">
+                    </div>
+
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">New Password</label>
+                    <input type="password" id="editUserNewPassword" class="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500" placeholder="Leave blank to keep current password">
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'Save Changes',
+            cancelButtonText: 'Cancel',
+            confirmButtonColor: '#2563eb',
+            reverseButtons: true,
+            focusConfirm: false,
+            didOpen: function () {
+                const toggleClinicalFields = function () {
+                    $('#editUserClinicalFields').toggle($('#editUserRole').val() !== 'facility_admin');
+                };
+                $('#editUserRole').on('change', toggleClinicalFields);
+                toggleClinicalFields();
+            },
+            preConfirm: function () {
+                const fullName = $('#editUserFullName').val().trim();
+                const role = $('#editUserRole').val();
+                if (!fullName) {
+                    Swal.showValidationMessage('Full name is required.');
+                    return false;
+                }
+                const newPassword = $('#editUserNewPassword').val();
+                if (newPassword && newPassword.length < 6) {
+                    Swal.showValidationMessage('Password must be at least 6 characters.');
+                    return false;
+                }
+                return {
+                    full_name: fullName,
+                    role: role,
+                    license_number: $('#editUserLicenseNumber').val(),
+                    trainings: $('#editUserTrainings').val(),
+                    new_password: newPassword
+                };
+            }
+        }).then(function (result) {
+            if (!result.isConfirmed) return;
+
+            $.ajax({
+                url: `${API_BASE}/manage_users.php`,
+                type: 'PATCH',
+                contentType: 'application/json',
+                data: JSON.stringify(Object.assign({ id: userId, action: 'edit' }, result.value)),
+                dataType: 'json',
+                success: function (response) {
+                    if (response.success) {
+                        showToast('success', response.message || 'Staff account updated.', 2500);
+                        loadUsers();
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Could Not Update Account', text: response.message, confirmButtonColor: '#dc3545' });
+                    }
+                },
+                error: function (xhr) {
+                    const errData = xhr.responseJSON || {};
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Could Not Update Account',
+                        text: errData.message || `Request failed (${xhr.status}).`,
+                        confirmButtonColor: '#dc3545'
+                    });
+                }
+            });
         });
     });
 
@@ -3507,14 +4038,7 @@ $(document).ready(function () {
                 break;
 
             case 'REFERRAL_FINALIZED_TO_YOU':
-                Swal.fire({
-                    toast: true,
-                    position: 'top-end',
-                    icon: 'success',
-                    title: 'A referral has been finalized to your facility!',
-                    showConfirmButton: false,
-                    timer: 4000
-                });
+                showToast('success', 'A referral has been finalized to your facility!', 4000);
                 playNotificationSound();
                 if ($('#tabIncomingContent').is(':visible')) loadAcceptedPatients();
                 break;
@@ -3607,10 +4131,13 @@ $(document).ready(function () {
     // this just guards against a missed push (e.g. reconnect race, backgrounded tab)
     setInterval(pollIncomingReferrals, 45000);
     setInterval(checkAndPollRecommendations, 30000);
+    setInterval(loadAcceptedPatients, 45000);
 
     // Exposed so service_assessment.js (a separate script/closure) can navigate back
-    // to the facility admin's home tab after a successful DOH Assessment submission.
+    // to the facility admin's home tab after a successful DOH Assessment submission,
+    // and so any script can raise a toast in the shared design.
     window.switchTab = switchTab;
+    window.showToast = showToast;
 
     // Initialize session check
     checkSession();

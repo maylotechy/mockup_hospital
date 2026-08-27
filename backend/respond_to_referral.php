@@ -1,24 +1,18 @@
 <?php
 // ========================================================
-// API Endpoint: Finalize Referral Selection
-// Route: Backend proxy for PATCH /api/v1/referral/{id}/finalize
+// API Endpoint: Accept or Redirect an Incoming Referral
+// Route: Backend proxy for PATCH /api/v1/referral/{id}/respond
 // ========================================================
 
 require_once __DIR__ . '/config.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'PATCH') {
-    sendJsonResponse([
-        'success' => false,
-        'message' => 'Invalid request method. Only PATCH is allowed.'
-    ], 405);
+    sendJsonResponse(['success' => false, 'message' => 'Invalid request method. Only PATCH is allowed.'], 405);
 }
 
 $loggedInUser = getLoggedInUser();
 if (!$loggedInUser) {
-    sendJsonResponse([
-        'success' => false,
-        'message' => 'Unauthorized. Please log in again.'
-    ], 401);
+    sendJsonResponse(['success' => false, 'message' => 'Unauthorized. Please log in again.'], 401);
 }
 
 $input = $_POST;
@@ -31,20 +25,17 @@ if (empty($input) && !empty($rawInput)) {
 }
 
 $referralId = isset($input['referral_id']) ? trim((string)$input['referral_id']) : '';
-$hospitalName = isset($input['hospital_name']) ? trim((string)$input['hospital_name']) : '';
+$decision = isset($input['decision']) ? trim((string)$input['decision']) : '';
 
-if (empty($referralId) || empty($hospitalName)) {
-    sendJsonResponse([
-        'success' => false,
-        'message' => 'Missing required fields: referral_id, hospital_name.'
-    ], 400);
+if (empty($referralId) || !in_array($decision, ['ACCEPTED', 'REDIRECTED'], true)) {
+    sendJsonResponse(['success' => false, 'message' => "Missing or invalid required fields: referral_id, decision (must be 'ACCEPTED' or 'REDIRECTED')."], 400);
 }
 
-$payloadJson = json_encode(['hospital_name' => $hospitalName], JSON_UNESCAPED_SLASHES);
+$payloadJson = json_encode(['decision' => $decision], JSON_UNESCAPED_SLASHES);
 
 [$httpCode, $response, $curlErrno, $curlError] = sendSignedIolRequest(
     'PATCH',
-    "/api/v1/referral/{$referralId}/finalize",
+    "/api/v1/referral/{$referralId}/respond",
     $payloadJson,
     $loggedInUser['facility']['code'],
     $loggedInUser['facility']['name']
@@ -60,12 +51,16 @@ if ($curlErrno) {
 $isSuccess = ($httpCode >= 200 && $httpCode < 300);
 
 if ($isSuccess) {
-    logAuditEvent($loggedInUser, 'REFERRAL_FINALIZED', $referralId, null, "Chose {$hospitalName}");
+    logAuditEvent(
+        $loggedInUser,
+        $decision === 'ACCEPTED' ? 'REFERRAL_ACCEPTED' : 'REFERRAL_REJECTED',
+        $referralId
+    );
 }
 
 sendJsonResponse([
     'success' => $isSuccess,
     'http_status' => $httpCode,
-    'message' => $isSuccess ? 'Referral finalized successfully.' : 'Failed to finalize referral.',
+    'message' => $isSuccess ? "Referral successfully {$decision}." : ($response['detail'] ?? 'Failed to submit referral decision.'),
     'iol_response' => $response
 ], $isSuccess ? 200 : $httpCode);

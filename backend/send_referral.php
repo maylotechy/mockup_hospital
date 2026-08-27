@@ -326,6 +326,10 @@ try {
         // transmitted to IOL by this point.
     }
 
+    if ($isSuccess) {
+        logAuditEvent($user, 'REFERRAL_SENT', $referralId, $fullName, $reasonText);
+    }
+
     // Return actual HTTP status code: 200/201 on success, error code on failure
     $responseStatusCode = $isSuccess ? 200 : $httpCode;
 
