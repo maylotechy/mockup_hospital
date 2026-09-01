@@ -619,7 +619,7 @@ $(document).ready(function () {
 
             const row = `
                 <tr class="!bg-slate-200/40 hover:!bg-slate-300/40 transition-colors">
-                    <td class="py-3.5 px-6 font-mono text-xs font-semibold text-slate-500 border-b border-slate-300/60">#${patient.id}</td>
+                    <td class="py-3.5 px-6 font-mono text-xs font-semibold text-slate-500 border-b border-slate-300/60">#${String(patient.id).padStart(5, '0')}</td>
                     <td class="py-3.5 px-6 font-semibold text-slate-900 border-b border-slate-300/60">${escapeHtml(patient.first_name)} ${escapeHtml(patient.last_name)}</td>
                     <td class="py-3.5 px-6 text-slate-600 text-xs border-b border-slate-300/60">${escapeHtml(patient.dob)}</td>
                     <td class="py-3.5 px-6 border-b border-slate-300/60"><span class="px-2.5 py-1 rounded-full text-xs font-medium ${genderBadgeClass}">${escapeHtml(patient.gender)}</span></td>
@@ -656,7 +656,13 @@ $(document).ready(function () {
                     next: '<i class="bi bi-chevron-right"></i>',
                     previous: '<i class="bi bi-chevron-left"></i>'
                 }
-            }
+            },
+            columnDefs: [
+                {
+                    targets: [4, 6],
+                    orderable: false
+                }
+            ]
         });
     }
 
