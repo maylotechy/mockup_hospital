@@ -620,7 +620,7 @@ $(document).ready(function () {
             const row = `
                 <tr class="!bg-slate-200/40 hover:!bg-slate-300/40 transition-colors">
                     <td class="py-3.5 px-6 font-mono text-xs font-semibold text-slate-500 border-b border-slate-300/60">#${patient.id}</td>
-                    <td class="py-3.5 px-6 font-semibold text-slate-900 border-b border-slate-300/60">${escapeHtml(patient.first_name)} ${escapeHtml(patient.last_name)}</td>
+                    <td class="py-3.5 px-6 font-semibold text-slate-900 border-b border-slate-300/60">${escapeHtml(formatPatientName(patient))}</td>
                     <td class="py-3.5 px-6 text-slate-600 text-xs border-b border-slate-300/60">${escapeHtml(patient.dob)}</td>
                     <td class="py-3.5 px-6 border-b border-slate-300/60"><span class="px-2.5 py-1 rounded-full text-xs font-medium ${genderBadgeClass}">${escapeHtml(patient.gender)}</span></td>
                     <td class="py-3.5 px-6 text-slate-600 text-xs font-mono border-b border-slate-300/60">${escapeHtml(patient.phone)}</td>
@@ -703,7 +703,7 @@ $(document).ready(function () {
                     $('#referralForm')[0].reset();
 
                     $('#modalPatientId').val(patient.id);
-                    $('#modalPatientName').text(`${patient.first_name} ${patient.last_name}`);
+                    $('#modalPatientName').text(formatPatientName(patient));
                     $('#modalPatientDob').text(patient.dob);
                     $('#modalPatientGender').text(patient.gender);
                     $('#modalPatientPhone').text(patient.phone || 'N/A');
@@ -1318,7 +1318,9 @@ $(document).ready(function () {
         REFERRAL_FINALIZED: { text: 'Finalized Referral', badge: 'bg-indigo-50 text-indigo-700' },
         REFERRAL_CANCELLED: { text: 'Cancelled Referral', badge: 'bg-rose-50 text-rose-700' },
         PATIENT_ARRIVED: { text: 'Marked Arrived', badge: 'bg-amber-50 text-amber-700' },
-        PATIENT_DEPARTED: { text: 'Marked Departed', badge: 'bg-purple-50 text-purple-700' }
+        PATIENT_ARRIVED_LINKED: { text: 'Linked Arrival to Existing Patient', badge: 'bg-teal-50 text-teal-700' },
+        PATIENT_DEPARTED: { text: 'Marked Departed', badge: 'bg-purple-50 text-purple-700' },
+        PATIENT_ADDED: { text: 'Added Patient', badge: 'bg-sky-50 text-sky-700' }
     };
 
     function loadSystemLogs() {
@@ -1486,6 +1488,29 @@ $(document).ready(function () {
                     showToast('success', response.message || 'Patient marked as arrived.', 3000);
                     loadAcceptedPatients();
                     if (typeof loadPatients === 'function') loadPatients();
+                } else if (response.possible_duplicate) {
+                    const ep = response.existing_patient;
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Possible Existing Patient',
+                        html: `<p class="text-sm text-slate-600 text-start">A patient named <strong>${ep.full_name}</strong> (DOB ${ep.dob}) is already on file at your facility, registered ${formatDateTime12h(ep.registered_at)}. Link this arrival to that record, or create a new one?</p>`,
+                        showDenyButton: true,
+                        showCancelButton: true,
+                        confirmButtonText: 'Link to Existing',
+                        denyButtonText: 'Create New Anyway',
+                        cancelButtonText: 'Cancel',
+                        confirmButtonColor: '#16a34a',
+                        denyButtonColor: '#f59e0b',
+                        reverseButtons: true
+                    }).then(function (choice) {
+                        if (choice.isConfirmed) {
+                            submitMarkArrived($btn, referralId, originalHtml, Object.assign({}, arrivalVitals, { duplicate_choice: 'link', link_patient_id: ep.id }));
+                        } else if (choice.isDenied) {
+                            submitMarkArrived($btn, referralId, originalHtml, Object.assign({}, arrivalVitals, { duplicate_choice: 'new' }));
+                        } else {
+                            $btn.prop('disabled', false).html(originalHtml);
+                        }
+                    });
                 } else {
                     $btn.prop('disabled', false).html(originalHtml);
                     Swal.fire({ icon: 'error', title: 'Could Not Mark as Arrived', text: response.message, confirmButtonColor: '#dc3545' });
@@ -2225,6 +2250,23 @@ $(document).ready(function () {
     /**
      * Escape HTML special characters
      */
+    function formatPatientName(patient) {
+        return [patient.first_name, patient.middle_name, patient.last_name].filter(Boolean).join(' ');
+    }
+
+    // MySQL DATETIME strings ("2026-09-01 14:22:10") aren't reliably parsed by `new Date()`
+    // across browsers unless the space is swapped for a "T" -- falls back to the raw string
+    // if parsing fails rather than showing "Invalid Date".
+    function formatDateTime12h(dtString) {
+        if (!dtString) return '';
+        const d = new Date(String(dtString).replace(' ', 'T'));
+        if (isNaN(d.getTime())) return dtString;
+        return d.toLocaleString('en-US', {
+            year: 'numeric', month: 'short', day: 'numeric',
+            hour: 'numeric', minute: '2-digit', hour12: true
+        });
+    }
+
     function escapeHtml(text) {
         if (text === null || text === undefined) return '';
         return String(text)
@@ -3316,20 +3358,48 @@ $(document).ready(function () {
             is_4ps_member: $('#pat4psMember').val()
         };
 
+        submitPatientForm($submitBtn, originalBtnHtml, formData);
+    });
+
+    function submitPatientForm($submitBtn, originalBtnHtml, formData) {
         $.ajax({
             url: `${API_BASE}/save_patient.php`,
             type: 'POST',
             data: formData,
             dataType: 'json',
             success: function (response) {
-                $submitBtn.html(originalBtnHtml).prop('disabled', false);
-
                 if (response.success) {
+                    $submitBtn.html(originalBtnHtml).prop('disabled', false);
                     $('#patientForm')[0].reset();
                     switchTab('patients');
                     loadPatients();
-                    showToast('success', 'Patient registered successfully.', 2500);
+                    showToast('success', response.data && response.data.linked ? 'Using existing patient record.' : 'Patient registered successfully.', 2500);
+                } else if (response.possible_duplicate) {
+                    $submitBtn.html(originalBtnHtml).prop('disabled', false);
+                    const ep = response.existing_patient;
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Possible Existing Patient',
+                        html: `<p class="text-sm text-slate-600 text-start">A patient named <strong>${ep.full_name}</strong> (DOB ${ep.dob}) is already on file at your facility, registered ${formatDateTime12h(ep.registered_at)}. Link to that record, or create a new one?</p>`,
+                        showDenyButton: true,
+                        showCancelButton: true,
+                        confirmButtonText: 'Link to Existing',
+                        denyButtonText: 'Create New Anyway',
+                        cancelButtonText: 'Cancel',
+                        confirmButtonColor: '#16a34a',
+                        denyButtonColor: '#f59e0b',
+                        reverseButtons: true
+                    }).then(function (choice) {
+                        if (choice.isConfirmed) {
+                            $submitBtn.prop('disabled', true);
+                            submitPatientForm($submitBtn, originalBtnHtml, Object.assign({}, formData, { duplicate_choice: 'link', link_patient_id: ep.id }));
+                        } else if (choice.isDenied) {
+                            $submitBtn.prop('disabled', true);
+                            submitPatientForm($submitBtn, originalBtnHtml, Object.assign({}, formData, { duplicate_choice: 'new' }));
+                        }
+                    });
                 } else {
+                    $submitBtn.html(originalBtnHtml).prop('disabled', false);
                     Swal.fire({
                         icon: 'error',
                         title: 'Could Not Register Patient',
@@ -3348,7 +3418,7 @@ $(document).ready(function () {
                 });
             }
         });
-    });
+    }
 
     /**
      * Load facility staff accounts (Facility Admin only)
@@ -3451,6 +3521,15 @@ $(document).ready(function () {
     }
     $('#inputUserRole').on('change', toggleUserClinicalFields);
     toggleUserClinicalFields();
+
+    $('#btnGenerateUserPassword').on('click', function () {
+        const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+        let pwd = '';
+        for (let i = 0; i < 8; i++) {
+            pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        $('#inputUserPassword').val(pwd).attr('type', 'text');
+    });
 
     $('#addUserForm').on('submit', function (e) {
         e.preventDefault();

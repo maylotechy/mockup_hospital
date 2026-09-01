@@ -69,8 +69,38 @@ if (!empty($errors)) {
     ], 400);
 }
 
+$duplicateChoice = inVal($input, 'duplicate_choice');
+$linkPatientId = inVal($input, 'link_patient_id');
+
 try {
     $pdo = getDbConnection();
+    $facilityId = (int)$loggedInUser['facility']['id'];
+
+    if ($duplicateChoice === null) {
+        $match = findPossibleDuplicatePatient($pdo, $facilityId, $firstName, $lastName, $dob);
+        if ($match) {
+            sendJsonResponse([
+                'success' => false,
+                'possible_duplicate' => true,
+                'existing_patient' => [
+                    'id' => (int)$match['id'],
+                    'full_name' => trim($match['first_name'] . ' ' . $match['last_name']),
+                    'dob' => $match['dob'],
+                    'registered_at' => $match['created_at']
+                ],
+                'message' => 'A similar patient record already exists at your facility.'
+            ], 200);
+        }
+    }
+
+    if ($duplicateChoice === 'link' && $linkPatientId) {
+        sendJsonResponse([
+            'success' => true,
+            'message' => 'Using existing patient record.',
+            'data' => ['id' => (int)$linkPatientId, 'linked' => true]
+        ]);
+    }
+
     $stmt = $pdo->prepare('
         INSERT INTO patients (
             facility_id, first_name, middle_name, last_name, suffix, dob, gender, civil_status, phone,
@@ -107,6 +137,8 @@ try {
     ]);
 
     $newPatientId = (int)$pdo->lastInsertId();
+
+    logAuditEvent($loggedInUser, 'PATIENT_ADDED', null, "{$firstName} {$lastName}");
 
     sendJsonResponse([
         'success' => true,

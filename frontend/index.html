@@ -1079,8 +1079,15 @@
                                         </div>
                                         <div>
                                             <label for="inputUserPassword" class="block text-xs font-bold text-slate-700 mb-1.5">Temporary Password</label>
-                                            <input type="text" id="inputUserPassword" name="password" required minlength="6"
-                                                class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                            <div class="flex gap-2">
+                                                <input type="text" id="inputUserPassword" name="password" required minlength="6"
+                                                    class="w-full h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                                <button type="button" id="btnGenerateUserPassword" title="Generate password"
+                                                    class="shrink-0 h-10 px-3 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-600 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 whitespace-nowrap">
+                                                    <i class="bi bi-magic"></i>
+                                                    <span>Generate Password</span>
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -1348,7 +1355,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <!-- Application JS -->
     <script src="js/service_assessment.js"></script>
-    <script src="js/app.js?v=20260806e"></script>
+    <script src="js/app.js?v=20260901e"></script>
 
 
 </body>

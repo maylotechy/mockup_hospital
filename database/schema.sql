@@ -86,6 +86,10 @@ CREATE TABLE `patients` (
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
+  -- Speeds up the identity lookup used to prompt "possible duplicate patient?" on
+  -- registration/arrival -- not unique, since staff can still choose "create new anyway".
+  KEY `idx_patients_identity` (`facility_id`, `last_name`, `first_name`, `dob`),
+
   CONSTRAINT `fk_patients_facility` FOREIGN KEY (`facility_id`) REFERENCES `facilities` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_patients_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

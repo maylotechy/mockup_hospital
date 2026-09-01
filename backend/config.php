@@ -218,6 +218,29 @@ function hasPatientBeenReferredOnward($pdo, $facilityId, $localPatientId) {
 }
 
 /**
+ * Looks for an existing patient at this facility with the same first name, last name,
+ * and DOB (case-insensitive on names). Used to prompt staff with a "link or create new?"
+ * choice instead of silently creating a duplicate patient record for the same person.
+ * Not a hard uniqueness rule -- callers still allow "create new anyway".
+ *
+ * @return array|null the matching row (id, first_name, last_name, dob, created_at), or null
+ */
+function findPossibleDuplicatePatient($pdo, $facilityId, $firstName, $lastName, $dob) {
+    $stmt = $pdo->prepare('
+        SELECT id, first_name, last_name, dob, created_at
+        FROM patients
+        WHERE facility_id = :fid
+          AND LOWER(first_name) = LOWER(:fn)
+          AND LOWER(last_name) = LOWER(:ln)
+          AND dob = :dob
+        LIMIT 1
+    ');
+    $stmt->execute([':fid' => $facilityId, ':fn' => $firstName, ':ln' => $lastName, ':dob' => $dob]);
+    $row = $stmt->fetch();
+    return $row ?: null;
+}
+
+/**
  * Best-effort write to the facility-scoped audit trail -- records which staff account
  * (doctor/nurse/facility_admin) performed a referral-lifecycle action, since IOL only
  * authenticates at the facility level and has no concept of individual staff users.
