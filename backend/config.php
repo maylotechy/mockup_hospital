@@ -62,7 +62,10 @@ function sendSignedIolRequest($method, $path, $bodyJson, $facilityCode, $facilit
     $timestamp = (int)time();
     $nonce = bin2hex(random_bytes(16));
     $bodyHash = hash('sha256', $bodyJson, false);
-    $signingStr = "{$method}\n{$path}\n" . IOL_SYSTEM_CODE . "\n" . IOL_KEY_ID . "\n{$timestamp}\n{$nonce}\n{$bodyHash}";
+    // IRDSS signs only the URL path (not its query string). Keep the full value in
+    // the request URL below, but strip ?start_date=... while building the signature.
+    $signaturePath = parse_url($path, PHP_URL_PATH) ?: $path;
+    $signingStr = "{$method}\n{$signaturePath}\n" . IOL_SYSTEM_CODE . "\n" . IOL_KEY_ID . "\n{$timestamp}\n{$nonce}\n{$bodyHash}";
 
     $signature = '';
     $signResult = openssl_sign($signingStr, $signature, $privateKey, OPENSSL_ALGO_SHA256);
@@ -108,6 +111,68 @@ function sendSignedIolRequest($method, $path, $bodyJson, $facilityCode, $facilit
 
     $decoded = json_decode($rawResponse, true);
     return [$httpCode, $decoded !== null ? $decoded : $rawResponse, 0, null];
+}
+
+/**
+ * Sends an RSA-signed raw request. Used for protected binary attachments where
+ * hashing a JSON representation or a generated multipart boundary would not
+ * match the exact bytes received by IOL.
+ */
+function sendSignedIolBinaryRequest($method, $path, $bodyBytes, $contentType, $facilityCode, $facilityName, array $extraHeaders = []) {
+    if ($method === 'GET') {
+        $bodyBytes = '';
+    }
+
+    $privateKeyPem = @file_get_contents(__DIR__ . '/../storage/keys/private_key.pem');
+    $privateKey = $privateKeyPem ? openssl_pkey_get_private($privateKeyPem) : false;
+    if (!$privateKey) {
+        return [0, null, -1, 'RSA private key is missing or invalid.'];
+    }
+
+    $timestamp = (int)time();
+    $nonce = bin2hex(random_bytes(16));
+    $signaturePath = parse_url($path, PHP_URL_PATH) ?: $path;
+    $bodyHash = hash('sha256', $bodyBytes, false);
+    $signingStr = strtoupper($method) . "\n{$signaturePath}\n" . IOL_SYSTEM_CODE . "\n" . IOL_KEY_ID . "\n{$timestamp}\n{$nonce}\n{$bodyHash}";
+
+    $signature = '';
+    if (!openssl_sign($signingStr, $signature, $privateKey, OPENSSL_ALGO_SHA256)) {
+        return [0, null, -1, 'RSA signing failed.'];
+    }
+
+    $headers = [
+        'Content-Type: ' . $contentType,
+        'Content-Length: ' . strlen($bodyBytes),
+        'X-System-Code: ' . IOL_SYSTEM_CODE,
+        'X-Key-ID: ' . IOL_KEY_ID,
+        'X-Signature-Timestamp: ' . $timestamp,
+        'X-Request-Nonce: ' . $nonce,
+        'X-System-Signature: ' . base64_encode($signature),
+        'X-Facility-Code: ' . $facilityCode,
+        'X-Facility-Name: ' . $facilityName,
+    ];
+    if (!empty($_SESSION['user']['username'])) {
+        $headers[] = 'X-User-ID: ' . $_SESSION['user']['username'];
+    }
+    $headers = array_merge($headers, $extraHeaders);
+
+    $iolHost = $_ENV['IOL_HOST'] ?? 'localhost';
+    $ch = curl_init('http://' . $iolHost . ':8081' . $path);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
+    if (strtoupper($method) !== 'GET') {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $bodyBytes);
+    }
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErrno = curl_errno($ch);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+
+    return [$httpCode, $response, $curlErrno, $curlError];
 }
 
 /**

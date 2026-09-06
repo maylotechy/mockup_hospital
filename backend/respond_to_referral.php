@@ -26,12 +26,32 @@ if (empty($input) && !empty($rawInput)) {
 
 $referralId = isset($input['referral_id']) ? trim((string)$input['referral_id']) : '';
 $decision = isset($input['decision']) ? trim((string)$input['decision']) : '';
+$redirectReasonCode = strtoupper(trim((string)($input['redirect_reason_code'] ?? '')));
+$redirectReasonText = trim((string)($input['redirect_reason_text'] ?? ''));
 
 if (empty($referralId) || !in_array($decision, ['ACCEPTED', 'REDIRECTED'], true)) {
     sendJsonResponse(['success' => false, 'message' => "Missing or invalid required fields: referral_id, decision (must be 'ACCEPTED' or 'REDIRECTED')."], 400);
 }
 
-$payloadJson = json_encode(['decision' => $decision], JSON_UNESCAPED_SLASHES);
+$validRedirectReasons = [
+    'NO_AVAILABLE_BED', 'SPECIALIST_UNAVAILABLE', 'SERVICE_UNAVAILABLE',
+    'EQUIPMENT_UNAVAILABLE', 'OUTSIDE_CAPABILITY', 'TEMPORARY_CLOSURE', 'OTHER'
+];
+if ($decision === 'REDIRECTED') {
+    if (!in_array($redirectReasonCode, $validRedirectReasons, true)) {
+        sendJsonResponse(['success' => false, 'message' => 'A valid redirect reason is required.'], 422);
+    }
+    if ($redirectReasonCode === 'OTHER' && $redirectReasonText === '') {
+        sendJsonResponse(['success' => false, 'message' => 'Please describe the other redirect reason.'], 422);
+    }
+}
+
+$payload = ['decision' => $decision];
+if ($decision === 'REDIRECTED') {
+    $payload['redirect_reason_code'] = $redirectReasonCode;
+    $payload['redirect_reason_text'] = $redirectReasonText !== '' ? $redirectReasonText : null;
+}
+$payloadJson = json_encode($payload, JSON_UNESCAPED_SLASHES);
 
 [$httpCode, $response, $curlErrno, $curlError] = sendSignedIolRequest(
     'PATCH',
@@ -54,7 +74,9 @@ if ($isSuccess) {
     logAuditEvent(
         $loggedInUser,
         $decision === 'ACCEPTED' ? 'REFERRAL_ACCEPTED' : 'REFERRAL_REJECTED',
-        $referralId
+        $referralId,
+        null,
+        $decision === 'REDIRECTED' ? trim($redirectReasonCode . ($redirectReasonText !== '' ? ': ' . $redirectReasonText : '')) : null
     );
 }
 

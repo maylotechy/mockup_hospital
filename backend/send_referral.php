@@ -42,7 +42,42 @@ $severity      = isset($input['severity']) && $input['severity'] !== '' ? (float
 $reasonText    = !empty($input['reason_text']) ? trim((string)$input['reason_text']) : 'Severe Pneumonia';
 $reasonCode    = !empty($input['reason_code']) ? trim((string)$input['reason_code']) : '233604007';
 $diagnosis     = !empty($input['diagnosis']) ? trim((string)$input['diagnosis']) : 'Pneumonia';
-$reasonDisplay = $diagnosis;
+$reasonDisplay = $reasonText;
+
+$additionalReasonsRaw = $input['additional_reasons'] ?? [];
+if (is_string($additionalReasonsRaw)) {
+    $decodedAdditional = json_decode($additionalReasonsRaw, true);
+    $additionalReasonsRaw = is_array($decodedAdditional) ? $decodedAdditional : [];
+}
+$referralReasons = [[
+    'code' => $reasonCode,
+    'label' => $reasonText,
+    'is_primary' => true,
+]];
+foreach (is_array($additionalReasonsRaw) ? $additionalReasonsRaw : [] as $item) {
+    $label = trim((string)(is_array($item) ? ($item['label'] ?? $item['text'] ?? '') : $item));
+    $code = trim((string)(is_array($item) ? ($item['code'] ?? '') : ''));
+    if ($label === '') continue;
+    if ($code === '') {
+        $code = strtoupper(trim(preg_replace('/[^A-Za-z0-9]+/', '_', $label), '_'));
+    }
+    $referralReasons[] = ['code' => $code, 'label' => $label, 'is_primary' => false];
+}
+
+if ($reasonText === '' || mb_strlen($reasonText) > 255 || count($referralReasons) > 4) {
+    sendJsonResponse(['success' => false, 'message' => 'Choose one primary referral reason and no more than three additional reasons.'], 422);
+}
+$seenReasons = [];
+foreach ($referralReasons as $reason) {
+    if (mb_strlen($reason['label']) > 255) {
+        sendJsonResponse(['success' => false, 'message' => 'Each referral reason must be 255 characters or fewer.'], 422);
+    }
+    $key = mb_strtolower($reason['label']);
+    if (isset($seenReasons[$key])) {
+        sendJsonResponse(['success' => false, 'message' => 'Referral reasons must be unique.'], 422);
+    }
+    $seenReasons[$key] = true;
+}
 
 // Clinical info entered by the referring doctor/nurse -- all optional
 $chiefComplaint = isset($input['chief_complaint']) ? trim((string)$input['chief_complaint']) : '';
@@ -67,6 +102,15 @@ if ($patientId <= 0) {
         'success' => false,
         'message' => 'Missing or invalid required field: patient_id.'
     ], 400);
+}
+
+if (isset($_FILES['referral_attachments'])) {
+    $uploadNames = $_FILES['referral_attachments']['name'] ?? [];
+    $uploadNames = is_array($uploadNames) ? $uploadNames : [$uploadNames];
+    $nonEmptyUploadCount = count(array_filter($uploadNames, fn($name) => trim((string)$name) !== ''));
+    if ($nonEmptyUploadCount > 5) {
+        sendJsonResponse(['success' => false, 'message' => 'A maximum of 5 referral attachments is allowed.'], 422);
+    }
 }
 
 try {
@@ -128,6 +172,7 @@ try {
     if ($chiefComplaint !== '') {
         $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/chiefComplaint", "valueString" => $chiefComplaint];
     }
+    $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/diagnosis", "valueString" => $diagnosis];
 
     // Patient identity fields -- only ever decrypted centrally by the facility this
     // referral is finalized to (GET /api/v1/referral/{id}/patient-details)
@@ -200,18 +245,18 @@ try {
             ],
             "resourceType" => "Patient"
         ],
-        "reasonCode" => [
-            [
+        "reasonCode" => array_map(function ($reason) {
+            return [
                 "coding" => [
                     [
-                        "code" => $reasonCode,
-                        "display" => $reasonDisplay,
-                        "system" => "http://snomed.info/sct"
+                        "code" => $reason['code'],
+                        "display" => $reason['label'],
+                        "system" => "http://irdss.gov.ph/fhir/CodeSystem/referral-reason"
                     ]
                 ],
-                "text" => $reasonText
-            ]
-        ],
+                "text" => $reason['label']
+            ];
+        }, $referralReasons),
         "resourceType" => "Encounter",
         "status" => "planned",
         "subject" => [
@@ -292,6 +337,7 @@ try {
     // Keep a local MySQL copy of every initiated referral regardless of whether the
     // central IOL transmission succeeded, so the referring facility always has a
     // record of what was sent even if the central server was unreachable.
+    $localReferralId = null;
     try {
         $localStmt = $pdo->prepare('
             INSERT INTO initiated_referrals
@@ -320,6 +366,21 @@ try {
             ':sync_status'     => $isSuccess ? 'SENT' : 'FAILED',
             ':http_status'     => $httpCode
         ]);
+        $localReferralId = (int)$pdo->lastInsertId();
+        $reasonStmt = $pdo->prepare('
+            INSERT INTO initiated_referral_reasons
+                (initiated_referral_id, reason_code, reason_label, is_primary, sort_order)
+            VALUES (:referral_id, :code, :label, :is_primary, :sort_order)
+        ');
+        foreach ($referralReasons as $index => $reason) {
+            $reasonStmt->execute([
+                ':referral_id' => $localReferralId,
+                ':code' => $reason['code'],
+                ':label' => $reason['label'],
+                ':is_primary' => $reason['is_primary'] ? 1 : 0,
+                ':sort_order' => $index,
+            ]);
+        }
     } catch (Exception $e) {
         // Local persistence is a best-effort record -- never block the referral
         // response on it, since the actual referral has already been (or failed to be)
@@ -330,6 +391,51 @@ try {
         logAuditEvent($user, 'REFERRAL_SENT', $referralId, $fullName, $reasonText);
     }
 
+    $attachmentUploads = [];
+    if ($isSuccess && $referralId && isset($_FILES['referral_attachments'])) {
+        $files = $_FILES['referral_attachments'];
+        $names = is_array($files['name'] ?? null) ? $files['name'] : [$files['name'] ?? ''];
+        $tmpNames = is_array($files['tmp_name'] ?? null) ? $files['tmp_name'] : [$files['tmp_name'] ?? ''];
+        $errors = is_array($files['error'] ?? null) ? $files['error'] : [$files['error'] ?? UPLOAD_ERR_NO_FILE];
+        $sizes = is_array($files['size'] ?? null) ? $files['size'] : [$files['size'] ?? 0];
+
+        foreach (array_slice(array_keys($names), 0, 5) as $i) {
+            if (($errors[$i] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) continue;
+            $fileName = basename((string)$names[$i]);
+            if (($errors[$i] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file($tmpNames[$i] ?? '')) {
+                $attachmentUploads[] = ['filename' => $fileName, 'success' => false, 'message' => 'Upload was not received correctly.'];
+                continue;
+            }
+            if (($sizes[$i] ?? 0) > 5 * 1024 * 1024) {
+                $attachmentUploads[] = ['filename' => $fileName, 'success' => false, 'message' => 'File exceeds 5 MB.'];
+                continue;
+            }
+            $bytes = file_get_contents($tmpNames[$i]);
+            $mime = (new finfo(FILEINFO_MIME_TYPE))->file($tmpNames[$i]) ?: 'application/octet-stream';
+            [$uploadCode, $uploadRaw, $uploadErrno] = sendSignedIolBinaryRequest(
+                'POST',
+                "/api/v1/referral/{$referralId}/attachments",
+                $bytes,
+                $mime,
+                $patient['facility_code'],
+                $patient['facility_name'],
+                [
+                    'X-Workflow-Stage: REFERRAL',
+                    'X-Attachment-Type: PHILHEALTH_MDR',
+                    'X-Original-Filename: ' . rawurlencode($fileName),
+                ]
+            );
+            $uploadBody = json_decode((string)$uploadRaw, true);
+            $attachmentUploads[] = [
+                'filename' => $fileName,
+                'success' => !$uploadErrno && $uploadCode >= 200 && $uploadCode < 300,
+                'message' => $uploadBody['detail'] ?? ($uploadErrno ? 'Could not reach the attachment service.' : null),
+            ];
+        }
+    }
+
+    $failedAttachmentCount = count(array_filter($attachmentUploads, fn($item) => !$item['success']));
+
     // Return actual HTTP status code: 200/201 on success, error code on failure
     $responseStatusCode = $isSuccess ? 200 : $httpCode;
 
@@ -338,6 +444,9 @@ try {
         'http_status'  => $httpCode,
         'message'      => $errorMessage,
         'referral_id'  => $referralId,
+        'referral_reasons' => $referralReasons,
+        'attachment_uploads' => $attachmentUploads,
+        'attachment_warning' => $failedAttachmentCount > 0 ? "{$failedAttachmentCount} attachment(s) could not be uploaded. The referral was still sent." : null,
         'iol_response' => $iolResponseData,
         'payload_sent' => $payload
     ], $responseStatusCode);

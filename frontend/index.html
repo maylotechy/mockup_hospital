@@ -672,9 +672,35 @@
                                         </select>
                                     </div>
 
-                                    <input type="text" id="modalReasonText" name="reason_text" required
+                                    <input type="text" id="modalReasonText" name="reason_text" maxlength="255" required
                                         class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all disabled:bg-slate-100 disabled:text-slate-400 hidden"
                                         placeholder="Please specify the referral reason">
+
+                                    <div class="sm:col-span-2">
+                                        <label class="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer">
+                                            <input type="checkbox" id="enableAdditionalReasons" class="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500">
+                                            Add additional referral reasons
+                                            <span class="text-xs text-slate-400 font-normal">(maximum 3)</span>
+                                        </label>
+                                        <div id="additionalReasonsFields" class="hidden mt-3 space-y-2">
+                                            <div class="additional-reason-row flex items-center gap-2">
+                                                <select class="additional-reason-select flex-1 h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none">
+                                                    <option value="">-- Select Additional Reason --</option>
+                                                </select>
+                                            </div>
+                                            <button type="button" id="btnAddAdditionalReason" class="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700">
+                                                <i class="bi bi-plus-circle"></i> Add another reason
+                                            </button>
+                                            <p class="text-[11px] text-slate-400">The primary reason above remains the main reason used in analytics.</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="sm:col-span-2">
+                                        <label for="referralAttachments" class="block text-xs font-semibold text-slate-500 mb-1.5">PhilHealth MDR / Clinical Documents <span class="text-slate-400 font-normal">(optional)</span></label>
+                                        <input type="file" id="referralAttachments" multiple accept="application/pdf,image/jpeg,image/png"
+                                            class="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-red-50 file:px-4 file:py-2 file:font-semibold file:text-red-700 hover:file:bg-red-100">
+                                        <p class="mt-1 text-[11px] text-slate-400">Up to 5 PDF, JPEG, or PNG files; maximum 5 MB each. Files are protected and shared only with the finalized receiving hospital.</p>
+                                    </div>
                                 </div>
 
                                 <label class="block text-xs font-semibold text-slate-500 mt-5 mb-1.5">Patient Status</label>
@@ -1164,6 +1190,42 @@
 
                     <!-- TAB 7: FACILITY ANALYTICS (Facility Admin only) -->
                     <div id="tabAnalyticsContent" style="display: none;">
+                        <!-- Date range and export controls -->
+                        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 mb-6">
+                            <div class="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
+                                <div>
+                                    <h3 class="font-bold text-slate-900 text-sm">Reporting Period</h3>
+                                    <p id="analyticsPeriodLabel" class="text-xs text-slate-500 mt-1">Showing all available referral history</p>
+                                </div>
+                                <div class="flex flex-col sm:flex-row sm:items-end gap-3">
+                                    <label class="block">
+                                        <span class="block text-xs font-semibold text-slate-600 mb-1.5">Start date</span>
+                                        <input id="analyticsStartDate" type="date"
+                                            class="h-10 px-3 rounded-lg border border-slate-200 bg-slate-50 text-sm text-slate-700 focus:bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/10 outline-none">
+                                    </label>
+                                    <label class="block">
+                                        <span class="block text-xs font-semibold text-slate-600 mb-1.5">End date</span>
+                                        <input id="analyticsEndDate" type="date"
+                                            class="h-10 px-3 rounded-lg border border-slate-200 bg-slate-50 text-sm text-slate-700 focus:bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/10 outline-none">
+                                    </label>
+                                    <div class="flex flex-wrap gap-2">
+                                        <button id="btnApplyAnalyticsDates" type="button"
+                                            class="h-10 px-4 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors inline-flex items-center gap-2">
+                                            <i class="bi bi-funnel"></i> Apply
+                                        </button>
+                                        <button id="btnClearAnalyticsDates" type="button"
+                                            class="h-10 px-4 rounded-lg border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold transition-colors">
+                                            All time
+                                        </button>
+                                        <button id="btnExportAnalyticsCsv" type="button" disabled
+                                            class="h-10 px-4 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-sm font-semibold transition-colors inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                                            <i class="bi bi-filetype-csv"></i> Export CSV
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Outcome Counters (mirrors Incoming Patients, same numbers) -->
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                             <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 flex items-center gap-4">
@@ -1212,7 +1274,7 @@
                                 </div>
                                 <div>
                                     <h3 class="font-bold text-slate-900 text-base">Referral Volume Over Time</h3>
-                                    <p class="text-xs text-slate-500">Referrals sent by your facility vs. referrals received, by month, all-time</p>
+                                    <p id="analyticsVolumeSubtitle" class="text-xs text-slate-500">Referrals sent by your facility vs. referrals received, by month, all-time</p>
                                 </div>
                             </div>
                             <div id="analyticsVolumeEmpty" class="px-6 py-10 text-center text-xs text-slate-400" style="display: none;">No referral history yet.</div>
@@ -1221,8 +1283,8 @@
                             </div>
                         </div>
 
-                        <!-- Top Reason / Sender / Receiver -->
-                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- Top outgoing/incoming reasons and facilities -->
+                        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
                             <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
                                 <div class="flex items-center gap-3 mb-4">
                                     <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-purple-50 text-purple-600">
@@ -1230,8 +1292,23 @@
                                     </div>
                                     <h3 class="font-bold text-slate-900 text-sm">Top Reasons You Refer Out</h3>
                                 </div>
-                                <div id="analyticsReasonsList" class="space-y-3"></div>
+                                <div id="analyticsReasonsChartWrap" class="h-72">
+                                    <canvas id="analyticsReasonsChart" role="img" aria-label="Top reasons your facility refers patients out"></canvas>
+                                </div>
                                 <div id="analyticsReasonsEmpty" class="px-2 py-6 text-center text-xs text-slate-400" style="display: none;">No outgoing referrals yet.</div>
+                            </div>
+
+                            <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
+                                <div class="flex items-center gap-3 mb-4">
+                                    <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-50 text-blue-600">
+                                        <i class="bi bi-clipboard2-check text-lg"></i>
+                                    </div>
+                                    <h3 class="font-bold text-slate-900 text-sm">Top Reasons Referred to You</h3>
+                                </div>
+                                <div id="analyticsIncomingReasonsChartWrap" class="h-72">
+                                    <canvas id="analyticsIncomingReasonsChart" role="img" aria-label="Top reasons patients are referred to your facility"></canvas>
+                                </div>
+                                <div id="analyticsIncomingReasonsEmpty" class="px-2 py-6 text-center text-xs text-slate-400" style="display: none;">No incoming referrals yet.</div>
                             </div>
 
                             <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
@@ -1241,7 +1318,9 @@
                                     </div>
                                     <h3 class="font-bold text-slate-900 text-sm">Top Facilities Sending To You</h3>
                                 </div>
-                                <div id="analyticsSendersList" class="space-y-3"></div>
+                                <div id="analyticsSendersChartWrap" class="h-72">
+                                    <canvas id="analyticsSendersChart" role="img" aria-label="Top facilities sending patients to your facility"></canvas>
+                                </div>
                                 <div id="analyticsSendersEmpty" class="px-2 py-6 text-center text-xs text-slate-400" style="display: none;">No incoming referrals yet.</div>
                             </div>
 
@@ -1252,7 +1331,9 @@
                                     </div>
                                     <h3 class="font-bold text-slate-900 text-sm">Top Facilities You Refer To</h3>
                                 </div>
-                                <div id="analyticsReceiversList" class="space-y-3"></div>
+                                <div id="analyticsReceiversChartWrap" class="h-72">
+                                    <canvas id="analyticsReceiversChart" role="img" aria-label="Top facilities your facility refers patients to"></canvas>
+                                </div>
                                 <div id="analyticsReceiversEmpty" class="px-2 py-6 text-center text-xs text-slate-400" style="display: none;">No finalized outgoing referrals yet.</div>
                             </div>
                         </div>
@@ -1355,7 +1436,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <!-- Application JS -->
     <script src="js/service_assessment.js"></script>
-    <script src="js/app.js?v=20260901e"></script>
+    <script src="js/app.js?v=20260906c"></script>
 
 
 </body>

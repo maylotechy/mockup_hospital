@@ -374,6 +374,19 @@ $(document).ready(function () {
         switchTab('analytics');
     });
 
+    $(document).on('click', '#btnApplyAnalyticsDates', function () {
+        loadFacilityAnalytics();
+    });
+
+    $(document).on('click', '#btnClearAnalyticsDates', function () {
+        $('#analyticsStartDate, #analyticsEndDate').val('');
+        loadFacilityAnalytics();
+    });
+
+    $(document).on('click', '#btnExportAnalyticsCsv', function () {
+        exportFacilityAnalyticsCsv();
+    });
+
     $('#navTabLogs').on('click', function (e) {
         e.preventDefault();
         switchTab('logs');
@@ -707,6 +720,7 @@ $(document).ready(function () {
                     // abandoned re-referral (with prefilled vitals) could leak into the
                     // next patient's form if the doctor opens a normal "Refer" afterward.
                     $('#referralForm')[0].reset();
+                    resetAdditionalReferralReasons();
 
                     $('#modalPatientId').val(patient.id);
                     $('#modalPatientName').text(formatPatientName(patient));
@@ -837,6 +851,87 @@ $(document).ready(function () {
         ]
     };
 
+    function referralReasonCode(label) {
+        return String(label || '').toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 100);
+    }
+
+    function referralReasonsText(data) {
+        const reasons = Array.isArray(data?.referral_reasons) ? data.referral_reasons : [];
+        if (!reasons.length) return data?.clinical_reason || data?.reason_text || data?.reason || 'Referral Request';
+        return reasons.map((reason, index) => `${index === 0 || reason.is_primary ? 'Primary: ' : 'Additional: '}${reason.label || reason.text || reason.code}`).join(' • ');
+    }
+
+    function attachmentLinksHtml(referralId, attachments) {
+        if (!Array.isArray(attachments) || !attachments.length) return '<p class="text-xs text-slate-400">No clinical attachments.</p>';
+        return attachments.map(file => {
+            const stage = file.workflow_stage === 'DEPARTURE' ? 'Departure result' : 'Referral document';
+            return `<button type="button" class="btn-preview-referral-attachment w-full flex items-center justify-between gap-3 py-2 text-left text-sm text-blue-700 hover:underline border-b border-slate-100 last:border-0" data-referral-id="${escapeHtml(referralId)}" data-attachment-id="${escapeHtml(file.id)}" data-filename="${escapeHtml(file.original_filename || 'Attachment')}" data-mime-type="${escapeHtml(file.mime_type || '')}"><span><i class="bi bi-paperclip me-1"></i>${escapeHtml(file.original_filename || 'Attachment')}</span><span class="text-[10px] text-slate-400">${escapeHtml(stage)} · Preview</span></button>`;
+        }).join('');
+    }
+
+    $(document).on('click', '.btn-preview-referral-attachment', function () {
+        const referralId = String($(this).data('referral-id'));
+        const attachmentId = String($(this).data('attachment-id'));
+        const filename = String($(this).data('filename') || 'Attachment');
+        const mimeType = String($(this).data('mime-type') || '');
+        const baseUrl = `${API_BASE}/download_referral_attachment.php?referral_id=${encodeURIComponent(referralId)}&attachment_id=${encodeURIComponent(attachmentId)}`;
+        const previewUrl = `${baseUrl}&preview=1`;
+        const previewHtml = mimeType === 'application/pdf'
+            ? `<iframe src="${previewUrl}" title="${escapeHtml(filename)}" class="w-full h-[65vh] rounded-lg border border-slate-200"></iframe>`
+            : `<div class="flex justify-center bg-slate-100 rounded-lg p-3 max-h-[65vh] overflow-auto"><img src="${previewUrl}" alt="${escapeHtml(filename)}" class="max-w-full h-auto object-contain rounded"></div>`;
+
+        Swal.fire({
+            title: escapeHtml(filename),
+            width: '64rem',
+            html: `${previewHtml}<div class="mt-3 text-center"><a href="${baseUrl}" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold"><i class="bi bi-download"></i> Download File</a></div>`,
+            confirmButtonText: 'Close',
+            confirmButtonColor: '#64748b',
+            customClass: { popup: 'rounded-3xl shadow-xl' }
+        });
+    });
+
+    function populateAdditionalReferralReasonSelect($select) {
+        $select.empty().append('<option value="">-- Select Additional Reason --</option>');
+        Object.keys(REFERRAL_REASONS).forEach(category => {
+            const $group = $('<optgroup>').attr('label', category.replaceAll('_', ' '));
+            REFERRAL_REASONS[category].forEach(label => $('<option>').val(label).text(label).appendTo($group));
+            $select.append($group);
+        });
+    }
+
+    function getAdditionalReferralReasons() {
+        if (!$('#enableAdditionalReasons').is(':checked')) return [];
+        return $('.additional-reason-select').map(function () { return $(this).val(); }).get().filter(Boolean);
+    }
+
+    function resetAdditionalReferralReasons() {
+        $('#enableAdditionalReasons').prop('checked', false);
+        $('#additionalReasonsFields').addClass('hidden');
+        $('.additional-reason-row').slice(1).remove();
+        populateAdditionalReferralReasonSelect($('.additional-reason-select').first().val(''));
+        $('#btnAddAdditionalReason').prop('disabled', false).removeClass('opacity-40 cursor-not-allowed');
+    }
+
+    populateAdditionalReferralReasonSelect($('.additional-reason-select').first());
+    $('#enableAdditionalReasons').on('change', function () {
+        $('#additionalReasonsFields').toggleClass('hidden', !this.checked);
+        if (!this.checked) resetAdditionalReferralReasons();
+    });
+    $('#btnAddAdditionalReason').on('click', function () {
+        const count = $('.additional-reason-row').length;
+        if (count >= 3) return;
+        const $row = $('<div class="additional-reason-row flex items-center gap-2"></div>');
+        const $select = $('<select class="additional-reason-select flex-1 h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none"></select>');
+        populateAdditionalReferralReasonSelect($select);
+        $row.append($select).append('<button type="button" class="btn-remove-additional-reason w-10 h-10 rounded-lg text-red-600 hover:bg-red-50" aria-label="Remove additional reason"><i class="bi bi-trash"></i></button>');
+        $(this).before($row);
+        if (count + 1 >= 3) $(this).prop('disabled', true).addClass('opacity-40 cursor-not-allowed');
+    });
+    $(document).on('click', '.btn-remove-additional-reason', function () {
+        $(this).closest('.additional-reason-row').remove();
+        $('#btnAddAdditionalReason').prop('disabled', false).removeClass('opacity-40 cursor-not-allowed');
+    });
+
     function updateReasonDropdown() {
         const category = $('#modalReasonCategory').val();
         const $reasonSelect = $('#modalReasonSelect');
@@ -922,6 +1017,26 @@ $(document).ready(function () {
             markField($('#modalReasonSelect'), !reasonSelected);
         }
 
+        const additionalReasons = getAdditionalReferralReasons();
+        const primaryReason = String($('#modalReasonText').val() || '').trim().toLowerCase();
+        const normalizedAdditional = additionalReasons.map(reason => String(reason).trim().toLowerCase());
+        if ($('#enableAdditionalReasons').is(':checked')) {
+            $('.additional-reason-select').each(function () { markField($(this), !$(this).val()); });
+            const invalidAdditional = additionalReasons.length > 3
+                || normalizedAdditional.includes(primaryReason)
+                || new Set(normalizedAdditional).size !== normalizedAdditional.length;
+            if (invalidAdditional) {
+                markField($('.additional-reason-select').first(), true);
+            }
+        }
+
+        const files = Array.from($('#referralAttachments')[0]?.files || []);
+        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+        markField(
+            $('#referralAttachments'),
+            files.length > 5 || files.some(file => file.size > 5 * 1024 * 1024 || !allowedTypes.includes(file.type))
+        );
+
         if ($firstInvalid) {
             $firstInvalid[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
             $firstInvalid.focus();
@@ -934,7 +1049,7 @@ $(document).ready(function () {
     // than making the doctor resubmit to find out it's no longer invalid.
     // #modalReasonCategory and #modalReasonSelect are included even though they don't have [required] attributes --
     // they're flagged manually above since the real requirement lives on the reason dropdowns.
-    $(document).on('input change', '#referralForm [required], #modalReasonCategory, #modalReasonSelect', function () {
+    $(document).on('input change', '#referralForm [required], #modalReasonCategory, #modalReasonSelect, .additional-reason-select, #referralAttachments', function () {
         const $field = $(this);
         if (String($field.val() || '').trim()) {
             $field.removeClass(REQUIRED_FIELD_ERROR_CLASSES);
@@ -964,13 +1079,20 @@ $(document).ready(function () {
         const bpDiastolic = $('#modalVitalBpDiastolic').val();
         const vitalBp = (bpSystolic && bpDiastolic) ? `${bpSystolic}/${bpDiastolic}` : '';
 
-        const formData = {
+        const primaryReason = $('#modalReasonText').val() || 'Severe Pneumonia';
+        const additionalReasons = getAdditionalReferralReasons().map(label => ({
+            code: referralReasonCode(label),
+            label: label
+        }));
+        const formData = new FormData();
+        const fields = {
             patient_id: parseInt($('#modalPatientId').val(), 10) || 1,
             latitude: parseFloat($('#modalLatitude').val()) || 7.1907,
             longitude: parseFloat($('#modalLongitude').val()) || 125.4553,
             severity: parseFloat($('#modalSeverity').val()) || 3,
-            reason_text: $('#modalReasonText').val() || 'Severe Pneumonia',
-            reason_code: '233604007',
+            reason_text: primaryReason,
+            reason_code: referralReasonCode(primaryReason),
+            additional_reasons: JSON.stringify(additionalReasons),
             diagnosis: $('#modalDiagnosis').val() || 'Pneumonia',
             chief_complaint: $('#modalChiefComplaint').val() || '',
             vital_bp: vitalBp,
@@ -986,11 +1108,15 @@ $(document).ready(function () {
             has_allergy: $('#modalHasAllergy').is(':checked') ? 1 : 0,
             allergy_details: $('#modalHasAllergy').is(':checked') ? ($('#modalAllergyDetails').val() || '') : ''
         };
+        Object.entries(fields).forEach(([key, value]) => formData.append(key, value));
+        Array.from($('#referralAttachments')[0]?.files || []).forEach(file => formData.append('referral_attachments[]', file));
 
         $.ajax({
             url: `${API_BASE}/send_referral.php`,
             type: 'POST',
             data: formData,
+            processData: false,
+            contentType: false,
             dataType: 'json',
             success: function (response) {
                 $submitBtn.html(originalBtnHtml).prop('disabled', false);
@@ -1034,7 +1160,7 @@ $(document).ready(function () {
                             <div class="p-4 rounded-2xl text-start shadow-sm border" style="background-color: #dbeafe; color: #1e3a8a; border-color: #bfdbfe;">
                                 <div class="flex items-start gap-2.5">
                                     <i class="bi bi-info-circle-fill text-red-600 text-lg leading-none mt-0.5 flex-shrink-0"></i>
-                                    <span class="text-xs font-semibold leading-relaxed">Please wait for receiving hospitals to accept your referral. Accepting facilities will appear on the "My Referrals" page.</span>
+                                    <span class="text-xs font-semibold leading-relaxed">Please wait for receiving hospitals to accept your referral. Accepting facilities will appear on the "My Referrals" page.${response.attachment_warning ? '<br><span class="text-amber-700">' + escapeHtml(response.attachment_warning) + '</span>' : ''}</span>
                                 </div>
                             </div>
                         `,
@@ -1214,16 +1340,37 @@ $(document).ready(function () {
      * top reasons/senders/receivers and monthly referral volume.
      */
     let analyticsCharts = {};
+    let latestAnalyticsExport = null;
 
     function loadFacilityAnalytics() {
         if (!currentUser || currentUser.role !== 'facility_admin') return;
 
+        const startDate = $('#analyticsStartDate').val();
+        const endDate = $('#analyticsEndDate').val();
+        if (startDate && endDate && startDate > endDate) {
+            showToast('error', 'Start date must be on or before end date.', 3500);
+            return;
+        }
+
+        const analyticsQuery = {};
+        if (startDate) analyticsQuery.start_date = startDate;
+        if (endDate) analyticsQuery.end_date = endDate;
+
+        $('#btnApplyAnalyticsDates, #btnClearAnalyticsDates').prop('disabled', true);
+        $('#btnExportAnalyticsCsv').prop('disabled', true);
+
         $.when(
             $.ajax({ url: `${API_BASE}/get_referral_outcomes.php`, type: 'GET', dataType: 'json' }),
             $.ajax({ url: `${API_BASE}/get_onward_referred_referral_ids.php`, type: 'GET', dataType: 'json' }),
-            $.ajax({ url: `${API_BASE}/get_facility_analytics.php`, type: 'GET', dataType: 'json' })
+            $.ajax({ url: `${API_BASE}/get_facility_analytics.php`, type: 'GET', data: analyticsQuery, dataType: 'json' })
         ).done(function (outcomesRes, onwardRes, analyticsRes) {
-            const outcomes = Array.isArray(outcomesRes[0]) ? outcomesRes[0] : [];
+            const allOutcomes = Array.isArray(outcomesRes[0]) ? outcomesRes[0] : [];
+            const outcomes = allOutcomes.filter(outcome => {
+                if (!startDate && !endDate) return true;
+                const createdDate = String(outcome.created_at || '').slice(0, 10);
+                if (!createdDate) return false;
+                return (!startDate || createdDate >= startDate) && (!endDate || createdDate <= endDate);
+            });
             const onwardData = onwardRes[0];
             const onwardReferredIds = new Set(
                 (onwardData && onwardData.success && Array.isArray(onwardData.data)) ? onwardData.data : []
@@ -1241,21 +1388,126 @@ $(document).ready(function () {
 
             const analytics = (analyticsRes[0] && typeof analyticsRes[0] === 'object') ? analyticsRes[0] : {};
             renderAnalyticsCharts(analytics);
+            updateAnalyticsPeriodLabel(startDate, endDate);
+            latestAnalyticsExport = {
+                analytics,
+                period: { startDate, endDate },
+                counters: {
+                    transferredToUs: chosen.length,
+                    redirectedElsewhere: bypassed.length,
+                    discharged: dischargedCount,
+                    referredOnward: referredOnwardCount
+                }
+            };
+            $('#btnExportAnalyticsCsv').prop('disabled', false);
         }).fail(function () {
             showToast('error', 'Could not load facility analytics.', 3500);
+            latestAnalyticsExport = null;
+        }).always(function () {
+            $('#btnApplyAnalyticsDates, #btnClearAnalyticsDates').prop('disabled', false);
         });
+    }
+
+    function updateAnalyticsPeriodLabel(startDate, endDate) {
+        const formatDate = value => new Intl.DateTimeFormat('en-PH', {
+            year: 'numeric', month: 'short', day: 'numeric'
+        }).format(new Date(`${value}T00:00:00`));
+
+        let label = 'Showing all available referral history';
+        let shortLabel = 'all-time';
+        if (startDate && endDate) {
+            label = `Showing ${formatDate(startDate)} to ${formatDate(endDate)}`;
+            shortLabel = `${formatDate(startDate)} to ${formatDate(endDate)}`;
+        } else if (startDate) {
+            label = `Showing referrals from ${formatDate(startDate)} onward`;
+            shortLabel = `from ${formatDate(startDate)}`;
+        } else if (endDate) {
+            label = `Showing referrals through ${formatDate(endDate)}`;
+            shortLabel = `through ${formatDate(endDate)}`;
+        }
+
+        $('#analyticsPeriodLabel').text(label);
+        $('#analyticsVolumeSubtitle').text(`Referrals sent by your facility vs. referrals received, by month, ${shortLabel}`);
+    }
+
+    function exportFacilityAnalyticsCsv() {
+        if (!latestAnalyticsExport) return;
+
+        const { analytics, period, counters } = latestAnalyticsExport;
+        const monthly = Array.isArray(analytics.monthly_volume) ? analytics.monthly_volume : [];
+        const reasons = Array.isArray(analytics.top_reasons) ? analytics.top_reasons : [];
+        const incomingReasons = Array.isArray(analytics.top_incoming_reasons) ? analytics.top_incoming_reasons : [];
+        const senders = Array.isArray(analytics.top_senders) ? analytics.top_senders : [];
+        const receivers = Array.isArray(analytics.top_receivers) ? analytics.top_receivers : [];
+        const rows = [
+            ['Facility Analytics Report'],
+            ['Start date', period.startDate || 'All time'],
+            ['End date', period.endDate || 'All time'],
+            [],
+            ['Outcome', 'Count'],
+            ['Transferred To Us', counters.transferredToUs],
+            ['Accepted But Sent Elsewhere', counters.redirectedElsewhere],
+            ['Discharged', counters.discharged],
+            ['Referred Onward', counters.referredOnward],
+            [],
+            ['Monthly Referral Volume'],
+            ['Month', 'Sent', 'Received'],
+            ...monthly.map(row => [row.month, row.sent, row.received]),
+            [],
+            ['Top Reasons You Refer Out'],
+            ['Rank', 'Reason', 'Count'],
+            ...reasons.map((row, index) => [index + 1, row.label, row.count]),
+            [],
+            ['Top Reasons Patients Are Referred to You'],
+            ['Rank', 'Reason', 'Count'],
+            ...incomingReasons.map((row, index) => [index + 1, row.label, row.count]),
+            [],
+            ['Top Facilities Sending To You'],
+            ['Rank', 'Facility', 'Count'],
+            ...senders.map((row, index) => [index + 1, row.label, row.count]),
+            [],
+            ['Top Facilities You Refer To'],
+            ['Rank', 'Facility', 'Count'],
+            ...receivers.map((row, index) => [index + 1, row.label, row.count])
+        ];
+
+        const csvCell = value => {
+            let text = String(value ?? '');
+            // Prevent spreadsheet applications from treating labels as formulas.
+            if (/^[=+\-@]/.test(text)) text = `'${text}`;
+            return `"${text.replace(/"/g, '""')}"`;
+        };
+        const csv = '\uFEFF' + rows.map(row => row.map(csvCell).join(',')).join('\r\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        const suffix = period.startDate || period.endDate
+            ? `${period.startDate || 'beginning'}_to_${period.endDate || 'present'}`
+            : 'all_time';
+        link.href = url;
+        link.download = `facility_analytics_${suffix}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
     }
 
     function renderAnalyticsCharts(analytics) {
         const monthly = Array.isArray(analytics.monthly_volume) ? analytics.monthly_volume : [];
         const reasons = Array.isArray(analytics.top_reasons) ? analytics.top_reasons : [];
+        const incomingReasons = Array.isArray(analytics.top_incoming_reasons) ? analytics.top_incoming_reasons : [];
         const senders = Array.isArray(analytics.top_senders) ? analytics.top_senders : [];
         const receivers = Array.isArray(analytics.top_receivers) ? analytics.top_receivers : [];
 
         $('#analyticsVolumeEmpty').toggle(monthly.length === 0);
         $('#analyticsReasonsEmpty').toggle(reasons.length === 0);
+        $('#analyticsIncomingReasonsEmpty').toggle(incomingReasons.length === 0);
         $('#analyticsSendersEmpty').toggle(senders.length === 0);
         $('#analyticsReceiversEmpty').toggle(receivers.length === 0);
+        $('#analyticsReasonsChartWrap').toggle(reasons.length > 0);
+        $('#analyticsIncomingReasonsChartWrap').toggle(incomingReasons.length > 0);
+        $('#analyticsSendersChartWrap').toggle(senders.length > 0);
+        $('#analyticsReceiversChartWrap').toggle(receivers.length > 0);
 
         Object.values(analyticsCharts).forEach(chart => chart && chart.destroy());
         analyticsCharts = {};
@@ -1278,38 +1530,51 @@ $(document).ready(function () {
             });
         }
 
-        renderRankedBlockList('#analyticsReasonsList', reasons, { bg: 'bg-purple-100', text: 'text-purple-700', bar: 'bg-purple-500' });
-        renderRankedBlockList('#analyticsSendersList', senders, { bg: 'bg-emerald-100', text: 'text-emerald-700', bar: 'bg-emerald-500' });
-        renderRankedBlockList('#analyticsReceiversList', receivers, { bg: 'bg-amber-100', text: 'text-amber-700', bar: 'bg-amber-500' });
+        renderAnalyticsDoughnut('reasons', '#analyticsReasonsChart', reasons, ['#9333ea', '#a855f7', '#c084fc', '#d8b4fe', '#e9d5ff']);
+        renderAnalyticsDoughnut('incomingReasons', '#analyticsIncomingReasonsChart', incomingReasons, ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe']);
+        renderAnalyticsDoughnut('senders', '#analyticsSendersChart', senders, ['#059669', '#10b981', '#34d399', '#6ee7b7', '#a7f3d0']);
+        renderAnalyticsDoughnut('receivers', '#analyticsReceiversChart', receivers, ['#d97706', '#f59e0b', '#fbbf24', '#fcd34d', '#fde68a']);
     }
 
-    /**
-     * Renders a "top N" ranked list as stacked blocks (rank badge + label + count +
-     * a proportional bar relative to the #1 entry) instead of an axis-based chart --
-     * reads better than a bar chart when there are only a handful of rows.
-     */
-    function renderRankedBlockList(containerSelector, rows, palette) {
-        const $container = $(containerSelector);
-        if (!rows.length) {
-            $container.empty();
-            return;
-        }
+    function renderAnalyticsDoughnut(chartKey, canvasSelector, rows, colors) {
+        if (!rows.length || typeof Chart === 'undefined') return;
 
-        const maxCount = Math.max(...rows.map(r => r.count));
-        $container.html(rows.map((r, i) => `
-            <div class="flex items-center gap-3">
-                <div class="w-7 h-7 rounded-lg ${palette.bg} ${palette.text} text-xs font-bold flex items-center justify-center flex-shrink-0">${i + 1}</div>
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center justify-between gap-2 mb-1">
-                        <p class="text-sm font-medium text-slate-800 truncate" title="${escapeHtml(r.label)}">${escapeHtml(r.label)}</p>
-                        <span class="text-xs font-bold text-slate-900 flex-shrink-0">${r.count}</span>
-                    </div>
-                    <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div class="h-full ${palette.bar} rounded-full" style="width: ${maxCount ? (r.count / maxCount * 100) : 0}%"></div>
-                    </div>
-                </div>
-            </div>
-        `).join(''));
+        const visibleRows = rows.slice(0, 5);
+        analyticsCharts[chartKey] = new Chart($(canvasSelector)[0], {
+            type: 'doughnut',
+            data: {
+                labels: visibleRows.map(row => row.label),
+                datasets: [{
+                    data: visibleRows.map(row => row.count),
+                    backgroundColor: colors,
+                    borderColor: '#ffffff',
+                    borderWidth: 3,
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '58%',
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            boxWidth: 12,
+                            boxHeight: 12,
+                            padding: 14,
+                            usePointStyle: true,
+                            font: { size: 11 }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: context => `${context.label}: ${context.parsed}`
+                        }
+                    }
+                }
+            }
+        });
     }
 
     /**
@@ -1540,6 +1805,18 @@ $(document).ready(function () {
      * (discharged, transferred onward, deceased, or left against medical advice) so
      * the original referring hospital's tracker doesn't go dark after "Arrived".
      */
+    function uploadDepartureAttachments(referralId, attachmentType, files) {
+        const uploads = Array.from(files || []).map(file => {
+            const body = new FormData();
+            body.append('referral_id', referralId);
+            body.append('workflow_stage', 'DEPARTURE');
+            body.append('attachment_type', attachmentType);
+            body.append('attachment', file);
+            return $.ajax({ url: `${API_BASE}/upload_referral_attachment.php`, type: 'POST', data: body, processData: false, contentType: false, dataType: 'json' });
+        });
+        return Promise.allSettled(uploads);
+    }
+
     $(document).on('click', '.btn-mark-departed', function () {
         const $btn = $(this);
         const referralId = $btn.data('referral-id');
@@ -1560,6 +1837,12 @@ $(document).ready(function () {
                     <div id="departureRemarksWrap">
                         <label class="block text-xs font-semibold text-slate-500 mb-1">Remarks (optional)</label>
                         <textarea id="departureRemarks" rows="3" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-slate-500" placeholder="Any additional notes..."></textarea>
+                        <label class="block text-xs font-semibold text-slate-500 mt-3 mb-1">Clinical result type (optional)</label>
+                        <select id="departureAttachmentType" class="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm mb-2">
+                            <option value="DISCHARGE_SUMMARY">Discharge Summary</option><option value="LAB_RESULT">Laboratory Result</option><option value="XRAY">X-ray / Imaging</option><option value="PRESCRIPTION">Prescription</option><option value="OTHER">Other Clinical Document</option>
+                        </select>
+                        <input id="departureAttachments" type="file" multiple accept="application/pdf,image/jpeg,image/png" class="block w-full text-xs text-slate-600">
+                        <p class="text-[10px] text-slate-400 mt-1">Up to 5 PDF, JPEG, or PNG files; maximum 5 MB each.</p>
                     </div>
                     <p id="departureTransferNote" class="text-xs text-slate-500 mt-2 hidden">This opens the Refer Patient form for this patient instead of just saving a note -- actually referring them is what notifies the original hospital.</p>
                 </div>
@@ -1578,9 +1861,16 @@ $(document).ready(function () {
                 });
             },
             preConfirm: function () {
+                const files = Array.from($('#departureAttachments')[0]?.files || []);
+                const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+                if (files.length > 5 || files.some(file => file.size > 5 * 1024 * 1024 || !allowedTypes.includes(file.type))) {
+                    return Swal.showValidationMessage('Choose up to 5 valid PDF, JPEG, or PNG files, no larger than 5 MB each.');
+                }
                 return {
                     outcome: $('#departureOutcome').val(),
-                    remarks: $('#departureRemarks').val() || ''
+                    remarks: $('#departureRemarks').val() || '',
+                    attachment_type: $('#departureAttachmentType').val(),
+                    attachment_files: files
                 };
             }
         }).then(function (result) {
@@ -1630,15 +1920,26 @@ $(document).ready(function () {
 
             $btn.prop('disabled', true).html('<span class="inline-block animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></span> Saving...');
 
+            const departureFiles = result.value.attachment_files || [];
+            const departureAttachmentType = result.value.attachment_type || 'OTHER';
+            const departurePayload = { outcome: result.value.outcome, remarks: result.value.remarks };
+
             $.ajax({
                 url: `${API_BASE}/mark_patient_departed.php`,
                 type: 'PATCH',
                 contentType: 'application/json',
-                data: JSON.stringify(Object.assign({ referral_id: referralId }, result.value)),
+                data: JSON.stringify(Object.assign({ referral_id: referralId }, departurePayload)),
                 dataType: 'json',
                 success: function (response) {
                     if (response.success) {
-                        showToast('success', response.message || 'Patient departure recorded.', 3000);
+                        if (departureFiles.length) {
+                            uploadDepartureAttachments(referralId, departureAttachmentType, departureFiles).then(results => {
+                                const failed = results.filter(item => item.status === 'rejected').length;
+                                showToast(failed ? 'warning' : 'success', failed ? `Departure saved, but ${failed} attachment(s) failed to upload.` : `Departure saved with ${departureFiles.length} attachment(s).`, 4000);
+                            });
+                        } else {
+                            showToast('success', response.message || 'Patient departure recorded.', 3000);
+                        }
                         loadAcceptedPatients();
                         if (typeof loadPatients === 'function') loadPatients();
                     } else {
@@ -1731,7 +2032,7 @@ $(document).ready(function () {
                                     <p class="text-xs text-slate-500 mb-0.5">Diagnosis</p>
                                     <p class="text-base font-bold text-slate-900 mb-3">${escapeHtml(d.diagnosis || '—')}</p>
                                     <p class="mb-2"><span class="text-slate-500">Chief Complaint:</span> <span class="font-semibold text-slate-800">${escapeHtml(d.chief_complaint || '—')}</span></p>
-                                    <p class="mb-2"><span class="text-slate-500">Referral Reason:</span> <span class="font-semibold text-slate-800">${escapeHtml(d.reason_text || '—')}</span></p>
+                                    <p class="mb-2"><span class="text-slate-500">Referral Reasons:</span> <span class="font-semibold text-slate-800">${escapeHtml(referralReasonsText(d))}</span></p>
                                     <p class="mb-3"><span class="text-slate-500">Severity:</span> <span class="${severityClass} px-2.5 py-1 rounded-full text-xs font-bold ml-1">${severityText}</span></p>
                                     <p><span class="text-slate-500">Referring Facility:</span> <span class="font-semibold text-slate-800">${escapeHtml(d.referring_facility || '—')}</span></p>
                                     ${tagsRow}
@@ -1739,6 +2040,11 @@ $(document).ready(function () {
                             </div>
 
                             ${allergyBanner}
+
+                            <div class="mb-4 border border-slate-200 rounded-xl p-4">
+                                <p class="font-semibold text-slate-800 mb-1">Clinical Attachments</p>
+                                ${attachmentLinksHtml(referralId, d.attachments)}
+                            </div>
 
                             <p class="mb-4"><strong class="text-slate-800">Address:</strong> <span class="text-slate-700">${escapeHtml(d.address || '—')}</span></p>
 
@@ -2603,9 +2909,12 @@ $(document).ready(function () {
                 // doctor can tell "no one's looked at this" apart from "someone's reviewing it".
                 const displayStatus = (r.response_status === 'PENDING' && r.seen_at) ? 'SEEN' : r.response_status;
                 const statusBadge = REFERRAL_STATUS_BADGE_CLASS[displayStatus] || 'bg-slate-100 text-slate-700';
+                const redirectReason = r.response_status === 'REDIRECTED'
+                    ? (REDIRECT_REASONS[r.redirect_reason_code] || r.redirect_reason_code || 'Reason not recorded') + (r.redirect_reason_text ? `: ${r.redirect_reason_text}` : '')
+                    : '';
                 return `
-                    <div class="flex items-center justify-between gap-3 py-2 border-b border-slate-100 last:border-0">
-                        <p class="text-xs font-medium text-slate-700">${escapeHtml(r.hospital_name)}</p>
+                    <div class="flex items-start justify-between gap-3 py-2 border-b border-slate-100 last:border-0">
+                        <div><p class="text-xs font-medium text-slate-700">${escapeHtml(r.hospital_name)}</p>${redirectReason ? `<p class="text-[10px] text-red-600 mt-0.5">${escapeHtml(redirectReason)}</p>` : ''}</div>
                         <span class="px-2 py-0.5 rounded-full text-[10px] font-bold flex-shrink-0 ${statusBadge}">${escapeHtml(displayStatus)}</span>
                     </div>
                 `;
@@ -2621,12 +2930,19 @@ $(document).ready(function () {
                     <div class="flex-1 pt-2 pb-2 border-l border-slate-200 pl-6">
                         <p class="text-xs font-bold text-slate-700 mb-2">Notified Hospitals (${responses.length})</p>
                         <div class="max-h-64 overflow-y-auto">${notifiedHtml}</div>
+                        <p class="text-xs font-bold text-slate-700 mt-4 mb-2">Clinical Attachments</p>
+                        <div id="trackerAttachments"><p class="text-xs text-slate-400">Loading attachments...</p></div>
                     </div>
                 </div>
             `,
             confirmButtonText: '<i class="bi bi-check-lg me-1"></i> Close',
             confirmButtonColor: '#0d6efd',
-            customClass: { popup: 'rounded-4 shadow-lg' }
+            customClass: { popup: 'rounded-4 shadow-lg' },
+            didOpen: function () {
+                $.getJSON(`${API_BASE}/get_referral_attachments.php?referral_id=${encodeURIComponent(referralId)}`)
+                    .done(items => $('#trackerAttachments').html(attachmentLinksHtml(referralId, items)))
+                    .fail(() => $('#trackerAttachments').html('<p class="text-xs text-slate-400">Attachments could not be loaded.</p>'));
+            }
         });
     });
 
@@ -3064,7 +3380,7 @@ $(document).ready(function () {
         const gender = incomingAlert.patient_gender || incomingAlert.gender || 'N/A';
         const patientInfo = `${ageDisplay} (${gender})`;
         const severity = incomingAlert.disease_severity !== undefined ? incomingAlert.disease_severity : (incomingAlert.severity !== undefined ? incomingAlert.severity : '3');
-        const clinicalReason = incomingAlert.clinical_reason || incomingAlert.reason_text || incomingAlert.reason || 'Referral Request';
+        const clinicalReason = referralReasonsText(incomingAlert);
         const diagnosis = incomingAlert.diagnosis || 'Not specified';
         const chiefComplaint = incomingAlert.chief_complaint || 'Not specified';
 
@@ -3216,7 +3532,7 @@ $(document).ready(function () {
                         if (cancelBtn) cancelBtn.disabled = true;
                         const refId = window.currentActiveReferralId;
                         Swal.close();
-                        submitReferralDecision(refId, 'REDIRECTED');
+                        promptRedirectReason(refId);
                     }, { capture: true });
                 }
 
@@ -3247,10 +3563,42 @@ $(document).ready(function () {
 
     let isSubmittingDecision = false;
 
+    const REDIRECT_REASONS = {
+        NO_AVAILABLE_BED: 'No available bed',
+        SPECIALIST_UNAVAILABLE: 'Required specialist unavailable',
+        SERVICE_UNAVAILABLE: 'Required service unavailable',
+        EQUIPMENT_UNAVAILABLE: 'Required equipment unavailable',
+        OUTSIDE_CAPABILITY: 'Case is outside facility capability',
+        TEMPORARY_CLOSURE: 'Temporary closure or service interruption',
+        OTHER: 'Other'
+    };
+
+    function promptRedirectReason(referralId) {
+        const options = Object.entries(REDIRECT_REASONS).map(([code, label]) => `<option value="${code}">${escapeHtml(label)}</option>`).join('');
+        Swal.fire({
+            icon: 'warning',
+            title: 'Reason for Redirecting',
+            html: `<div class="text-start"><label class="block text-xs font-semibold text-slate-600 mb-1">Redirect reason <span class="text-red-600">*</span></label><select id="redirectReasonCode" class="w-full h-11 px-3 border border-slate-200 rounded-lg mb-3"><option value="">-- Select a reason --</option>${options}</select><div id="redirectReasonTextWrap" class="hidden"><label class="block text-xs font-semibold text-slate-600 mb-1">Please specify <span class="text-red-600">*</span></label><textarea id="redirectReasonText" maxlength="500" rows="3" class="w-full px-3 py-2 border border-slate-200 rounded-lg" placeholder="Explain why the referral is being redirected"></textarea></div></div>`,
+            showCancelButton: true,
+            confirmButtonText: 'Redirect Referral',
+            confirmButtonColor: '#dc2626',
+            didOpen: () => $('#redirectReasonCode').on('change', function () { $('#redirectReasonTextWrap').toggleClass('hidden', this.value !== 'OTHER'); }),
+            preConfirm: () => {
+                const code = $('#redirectReasonCode').val();
+                const text = String($('#redirectReasonText').val() || '').trim();
+                if (!code) return Swal.showValidationMessage('Choose a redirect reason.');
+                if (code === 'OTHER' && !text) return Swal.showValidationMessage('Describe the other redirect reason.');
+                return { redirect_reason_code: code, redirect_reason_text: text };
+            }
+        }).then(result => {
+            if (result.isConfirmed) submitReferralDecision(referralId, 'REDIRECTED', result.value);
+        });
+    }
+
     /**
      * Submit Accept / Redirect decision to PATCH /api/v1/referral/{referral_id}/respond
      */
-    function submitReferralDecision(referralId, decision) {
+    function submitReferralDecision(referralId, decision, redirectReason) {
         if (!currentHospital || isSubmittingDecision) return;
         isSubmittingDecision = true;
 
@@ -3261,7 +3609,7 @@ $(document).ready(function () {
             didOpen: () => { Swal.showLoading(); }
         });
 
-        const payload = JSON.stringify({ referral_id: referralId, decision: decision });
+        const payload = JSON.stringify(Object.assign({ referral_id: referralId, decision: decision }, redirectReason || {}));
 
         $.ajax({
             url: `${API_BASE}/respond_to_referral.php`,
@@ -3299,6 +3647,7 @@ $(document).ready(function () {
     function cancelReferPatient() {
         $('#referralForm')[0].reset();
         $('#modalReasonSelect').empty().append('<option value="" selected disabled>-- Select Reason --</option>').prop('disabled', true);
+        resetAdditionalReferralReasons();
         toggleAllergyDetails();
         switchTab('patients');
     }

@@ -43,6 +43,16 @@ try {
             // local record (e.g. "Refer to Another Facility" from Mark as Out) without
             // a second lookup.
             $snapshot['local_patient_id'] = (int)$row['id'];
+            [$attachmentCode, $attachmentResponse] = sendSignedIolRequest(
+                'GET',
+                "/api/v1/referral/{$referralId}/attachments",
+                '',
+                $user['facility']['code'],
+                $user['facility']['name']
+            );
+            $snapshot['attachments'] = ($attachmentCode >= 200 && $attachmentCode < 300 && is_array($attachmentResponse))
+                ? $attachmentResponse
+                : [];
             sendJsonResponse($snapshot, 200);
         }
     }
