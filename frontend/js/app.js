@@ -891,7 +891,7 @@ $(document).ready(function () {
     });
 
     function populateAdditionalReferralReasonSelect($select) {
-        $select.empty().append('<option value="">-- Select Additional Reason --</option>');
+        $select.empty().append('<option value="" selected hidden disabled>select additional reason...</option>');
         Object.keys(REFERRAL_REASONS).forEach(category => {
             const $group = $('<optgroup>').attr('label', category.replaceAll('_', ' '));
             REFERRAL_REASONS[category].forEach(label => $('<option>').val(label).text(label).appendTo($group));
@@ -920,8 +920,8 @@ $(document).ready(function () {
     $('#btnAddAdditionalReason').on('click', function () {
         const count = $('.additional-reason-row').length;
         if (count >= 3) return;
-        const $row = $('<div class="additional-reason-row flex items-center gap-2"></div>');
-        const $select = $('<select class="additional-reason-select flex-1 h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none"></select>');
+        const $row = $('<div class="additional-reason-row flex items-center gap-2 min-w-0"></div>');
+        const $select = $('<select class="additional-reason-select flex-1 min-w-0 h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none"></select>');
         populateAdditionalReferralReasonSelect($select);
         $row.append($select).append('<button type="button" class="btn-remove-additional-reason w-10 h-10 rounded-lg text-red-600 hover:bg-red-50" aria-label="Remove additional reason"><i class="bi bi-trash"></i></button>');
         $(this).before($row);
@@ -936,7 +936,7 @@ $(document).ready(function () {
         const category = $('#modalReasonCategory').val();
         const $reasonSelect = $('#modalReasonSelect');
 
-        $reasonSelect.empty().append('<option value="" selected disabled>-- Select Reason --</option>');
+        $reasonSelect.empty().append('<option value="" selected disabled hidden>select a reason...</option>');
 
         if (!category) {
             $reasonSelect.prop('disabled', true);
@@ -3646,7 +3646,7 @@ $(document).ready(function () {
     // Returns to Patient Records without saving
     function cancelReferPatient() {
         $('#referralForm')[0].reset();
-        $('#modalReasonSelect').empty().append('<option value="" selected disabled>-- Select Reason --</option>').prop('disabled', true);
+        $('#modalReasonSelect').empty().append('<option value="" selected disabled hidden>select a reason...</option>').prop('disabled', true);
         resetAdditionalReferralReasons();
         toggleAllergyDetails();
         switchTab('patients');
