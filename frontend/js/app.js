@@ -119,7 +119,7 @@ $(document).ready(function () {
     /**
      * Update hospital logo based on hospital code
      */
-    function updateHospitalLogo(hospitalCode) {
+    function getHospitalLogoPath(hospitalCode) {
         const logoMap = {
             'HOSP-DRMC': 'assets/logos/hospitals/DRMC.png',
             'HOSP-CVPHL': 'assets/logos/hospitals/CVPHL.png',
@@ -127,8 +127,11 @@ $(document).ready(function () {
             // add more hospitals
         };
 
-        const logo = logoMap[hospitalCode] || 'assets/logos/hospitals/_default.png';
+        return logoMap[hospitalCode] || 'assets/logos/hospitals/_default.png';
+    }
 
+    function updateHospitalLogo(hospitalCode) {
+        const logo = getHospitalLogoPath(hospitalCode);
         $('#hospitalLogo').attr('src', `${logo}?v=${ASSET_CACHE_BUST}`);
     }
 
@@ -1061,6 +1064,18 @@ $(document).ready(function () {
         return escapeHtml(text || '--');
     }
 
+    function calculatePrintableAge(dateOfBirth) {
+        const match = String(dateOfBirth || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!match) return '--';
+        const birthDate = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+        const today = new Date();
+        let years = today.getFullYear() - birthDate.getFullYear();
+        const birthdayPassed = today.getMonth() > birthDate.getMonth()
+            || (today.getMonth() === birthDate.getMonth() && today.getDate() >= birthDate.getDate());
+        if (!birthdayPassed) years -= 1;
+        return `${Math.max(0, years)} year${years === 1 ? '' : 's'} old`;
+    }
+
     function printReferralConsentForm() {
         if (!validateReferralForm(false)) {
             showToast('error', 'Complete the referral details before printing the consent form.', 3500);
@@ -1077,48 +1092,70 @@ $(document).ready(function () {
         const reasons = [primaryReason, ...getAdditionalReferralReasons()].filter(Boolean);
         const severityText = $('#modalSeverity option:selected').text();
         const clinician = currentUser?.full_name || currentUser?.name || currentUser?.username || 'Clinical staff';
+        const clinicianRole = String(currentUser?.role || '').toLowerCase() === 'nurse' ? 'Referring Nurse' : 'Referring Doctor';
+        const licenseNumber = currentUser?.license_number || 'Not recorded';
         const facility = currentHospital?.name || 'Referring facility';
-        const address = $('#displayResolvedAddress').text();
+        const patientLocation = $('#displayResolvedAddress').text();
+        const hospitalAddress = [currentHospital?.barangay, currentHospital?.city_municipality, currentHospital?.province, currentHospital?.region].filter(Boolean).join(', ');
+        const hospitalCoordinates = currentHospital?.latitude != null && currentHospital?.longitude != null
+            ? `${Number(currentHospital.latitude).toFixed(6)}, ${Number(currentHospital.longitude).toFixed(6)}`
+            : '';
+        const hospitalLocation = currentHospital?.address || hospitalAddress || hospitalCoordinates || `${facility} (${currentHospital?.code || 'facility code unavailable'})`;
+        const dateOfBirth = $('#modalPatientDob').text();
+        const patientAge = calculatePrintableAge(dateOfBirth);
         const bp = `${$('#modalVitalBpSystolic').val() || '--'}/${$('#modalVitalBpDiastolic').val() || '--'}`;
         const createdAt = new Intl.DateTimeFormat('en-PH', { dateStyle: 'long', timeStyle: 'short' }).format(new Date());
         const rows = reasons.map((reason, index) => `<li>${index === 0 ? '<strong>Primary:</strong> ' : ''}${printableValue(reason)}</li>`).join('');
+        const hospitalLogoUrl = new URL(getHospitalLogoPath(currentHospital?.code), window.location.href).href;
+        const irdssLogoUrl = new URL('assets/logos/IRDSS_long.png', window.location.href).href;
 
         printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Referral Consent - ${printableValue($('#modalPatientName').text())}</title><style>
             @page { size: A4; margin: 14mm; }
-            * { box-sizing: border-box; } body { font-family: Arial, sans-serif; color: #111827; margin: 0; font-size: 12px; line-height: 1.42; }
-            h1 { font-size: 19px; margin: 0; } h2 { font-size: 13px; margin: 14px 0 6px; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; }
-            .header { display: flex; justify-content: space-between; gap: 20px; border-bottom: 2px solid #b91c1c; padding-bottom: 10px; }
-            .draft { color: #b91c1c; font-weight: 700; text-align: right; } .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 24px; }
-            .box { border: 1px solid #cbd5e1; border-radius: 6px; padding: 9px; margin-top: 8px; }
-            .label { color: #64748b; font-size: 10px; text-transform: uppercase; } ul { margin: 4px 0 0 18px; padding: 0; }
-            .choice { margin: 9px 0; } .line { display: inline-block; min-width: 210px; border-bottom: 1px solid #111827; height: 18px; vertical-align: bottom; }
-            .signature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 26px; } .sig { border-top: 1px solid #111827; padding-top: 4px; text-align: center; }
-            .footer { margin-top: 15px; color: #64748b; font-size: 9px; } .no-print { margin-bottom: 10px; padding: 8px; background: #fef3c7; border: 1px solid #f59e0b; }
+            * { box-sizing: border-box; } body { font-family: Arial, sans-serif; color: #111827; margin: 0; padding-bottom: 20mm; font-size: 11px; line-height: 1.38; }
+            h1 { font-size: 18px; margin: 0; text-align: center; } h2 { font-size: 12px; margin: 0 0 8px; text-transform: uppercase; letter-spacing: .04em; }
+            .header { display: grid; grid-template-columns: 120px 1fr 120px; align-items: center; gap: 16px; padding-bottom: 8px; }
+            .logo { display: flex; align-items: center; height: 58px; } .logo:last-child { justify-content: flex-end; }
+            .logo img { max-width: 112px; max-height: 56px; object-fit: contain; } .subtitle { text-align: center; margin-top: 3px; color: #475569; }
+            .draft { color: #b91c1c; font-weight: 700; text-align: center; margin-top: 3px; }
+            .section { border-left: 3px solid #b91c1c; padding: 2px 0 2px 12px; margin-top: 13px; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 26px; } .stack > div { margin-bottom: 5px; }
+            .field { border-left: 1px solid #cbd5e1; padding-left: 9px; min-height: 31px; }
+            .label { color: #111827; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .025em; }
+            .value { margin-top: 2px; } .value.strong { font-weight: 700; } ul { margin: 4px 0 0 16px; padding: 0; }
+            .vitals { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; } .vital { border-left: 1px solid #94a3b8; padding-left: 8px; min-height: 30px; }
+            .choice { margin: 9px 0; } .line { display: inline-block; min-width: 205px; border-bottom: 1px solid #111827; height: 17px; vertical-align: bottom; }
+            .signature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 34px; margin-top: 28px; } .sig { border-top: 1px solid #111827; padding-top: 5px; text-align: center; }
+            .sig-name { font-weight: 700; font-size: 12px; } .sig-role { font-size: 9px; font-weight: 700; text-transform: uppercase; margin-top: 2px; }
+            .sig-license { font-size: 9px; color: #475569; margin-top: 1px; }
+            .footer { position: fixed; left: 0; right: 0; bottom: 0; color: #475569; font-size: 8.5px; }
+            .footer-meta { display: flex; justify-content: space-between; gap: 16px; }
+            .no-print { margin-bottom: 10px; padding: 7px 10px; background: #fef3c7; }
             @media print { .no-print { display: none; } }
         </style></head><body>
             <div class="no-print"><strong>Prototype draft.</strong> Review the form, then use the browser print dialog. This blank generated form is not stored automatically.</div>
-            <div class="header"><div><h1>Patient Referral and Data-Sharing Consent</h1><div>${printableValue(facility)}</div></div><div class="draft">PROTOTYPE DRAFT<br><span style="font-weight:400;color:#475569">${printableValue(createdAt)}</span></div></div>
-            <h2>Patient and referral details</h2><div class="grid">
-                <div><span class="label">Patient</span><br><strong>${printableValue($('#modalPatientName').text())}</strong></div>
-                <div><span class="label">Date of birth / Sex</span><br>${printableValue($('#modalPatientDob').text())} / ${printableValue($('#modalPatientGender').text())}</div>
-                <div><span class="label">Phone</span><br>${printableValue($('#modalPatientPhone').text())}</div>
-                <div><span class="label">Referral origin</span><br>${printableValue(address)}</div>
-                <div><span class="label">Referring hospital</span><br>${printableValue(facility)}</div>
-                <div><span class="label">Receiving hospital</span><br><strong>To be determined through IRDSS</strong></div>
+            <div class="header"><div class="logo"><img src="${printableValue(irdssLogoUrl)}" alt="IRDSS logo"></div><div><h1>Patient Referral and Data-Sharing Consent</h1><div class="subtitle">${printableValue(facility)}</div><div class="draft">PROTOTYPE DRAFT</div></div><div class="logo"><img src="${printableValue(hospitalLogoUrl)}" alt="Hospital logo"></div></div>
+            <div class="section"><h2>Patient Information</h2><div class="grid">
+                <div class="field"><div class="label">Patient Name</div><div class="value strong">${printableValue($('#modalPatientName').text())}</div><div class="label" style="margin-top:7px">Phone</div><div class="value">${printableValue($('#modalPatientPhone').text())}</div></div>
+                <div class="field stack"><div><span class="label">Date of Birth:</span> <span class="value strong">${printableValue(dateOfBirth)}</span></div><div><span class="label">Age:</span> <span class="value strong">${printableValue(patientAge)}</span></div><div><span class="label">Gender:</span> <span class="value strong">${printableValue($('#modalPatientGender').text())}</span></div></div>
             </div>
-            <div class="box"><span class="label">Chief complaint / Diagnosis / Severity</span><br>${printableValue($('#modalChiefComplaint').val())} / ${printableValue($('#modalDiagnosis').val() || 'Not specified')} / ${printableValue(severityText)}<br><span class="label">Latest vital signs</span><br>BP ${printableValue(bp)} mmHg; HR ${printableValue($('#modalVitalHr').val())} bpm; RR ${printableValue($('#modalVitalRr').val())} br/min; Temp ${printableValue($('#modalVitalTemp').val())} C; O2 sat ${printableValue($('#modalVitalO2sat').val())}%</div>
-            <div class="box"><span class="label">Referral reason(s)</span><ul>${rows}</ul></div>
-            <h2>Consent</h2>
+            <div class="grid" style="margin-top:9px"><div class="field"><div class="label">Patient Location</div><div class="value">${printableValue(patientLocation)}</div></div><div class="field"><div class="label">Hospital Location</div><div class="value">${printableValue(hospitalLocation)}</div></div></div></div>
+            <div class="section"><h2>Referral Information</h2><div class="grid"><div class="field"><div class="label">Referring Hospital</div><div class="value strong">${printableValue(facility)}</div></div><div class="field"><div class="label">Receiving Hospital</div><div class="value strong">To be determined through IRDSS</div></div><div class="field"><div class="label">Chief Complaint</div><div class="value">${printableValue($('#modalChiefComplaint').val())}</div></div><div class="field"><div class="label">Diagnosis</div><div class="value">${printableValue($('#modalDiagnosis').val() || 'Not specified')}</div></div><div class="field"><div class="label">Severity</div><div class="value strong">${printableValue(severityText)}</div></div><div class="field"><div class="label">Referral Reason(s)</div><ul>${rows}</ul></div></div></div>
+            <div class="section"><h2>Vital Signs</h2><div class="vitals"><div class="vital"><div class="label">Blood Pressure</div><div class="value strong">${printableValue(bp)} mmHg</div></div><div class="vital"><div class="label">Heart Rate</div><div class="value strong">${printableValue($('#modalVitalHr').val())} bpm</div></div><div class="vital"><div class="label">Respiratory Rate</div><div class="value strong">${printableValue($('#modalVitalRr').val())} br/min</div></div><div class="vital"><div class="label">Temperature</div><div class="value strong">${printableValue($('#modalVitalTemp').val())} C</div></div><div class="vital"><div class="label">Oxygen Saturation</div><div class="value strong">${printableValue($('#modalVitalO2sat').val())}%</div></div><div class="vital"><div class="label">Height</div><div class="value strong">${printableValue($('#modalVitalHeight').val())} cm</div></div><div class="vital"><div class="label">Weight</div><div class="value strong">${printableValue($('#modalVitalWeight').val())} kg</div></div></div></div>
+            <div class="section"><h2>Consent</h2>
             <p>I have been informed why a referral is recommended and had an opportunity to ask questions. I understand that IRDSS may first share a limited clinical referral summary with candidate hospitals so they can evaluate capacity. My identity, complete clinical details, and protected attachments will be made available only to the hospital selected to receive the referral, except where disclosure is otherwise required or permitted by law.</p>
             <p>I authorize ${printableValue(facility)} and participating IRDSS facilities to collect, securely transmit, access, and use the information reasonably necessary to coordinate this referral and provide care. I understand that consent may be withdrawn before disclosure or processing where withdrawal is legally and operationally possible, without affecting processing already lawfully completed.</p>
-            <div class="choice">[ ] Patient &nbsp;&nbsp; [ ] Parent/guardian &nbsp;&nbsp; [ ] Authorized representative &nbsp;&nbsp; [ ] Emergency exception documented by clinician</div>
+            <div class="choice">[ ] Patient &nbsp;&nbsp; [ ] Parent/guardian &nbsp;&nbsp; [ ] Authorized representative</div>
             <div>Name of signer: <span class="line"></span> &nbsp; Relationship (if applicable): <span class="line" style="min-width:150px"></span></div>
-            <div class="signature-grid"><div class="sig">Patient / authorized representative signature and date</div><div class="sig">Witness signature and date</div><div class="sig">Referring clinician: ${printableValue(clinician)}</div><div class="sig">Clinician signature and date</div></div>
-            <div class="footer">Consent text version: referral-consent-2026-09-v1. This is a prototype template and must be reviewed and approved by participating hospitals, their legal/privacy teams, and Data Protection Officer before production use.</div>
+            <div class="signature-grid"><div class="sig">Patient / authorized representative signature and date</div><div class="sig">Witness signature and date</div><div class="sig"><div class="sig-name">${printableValue(clinician)}</div><div class="sig-role">${printableValue(clinicianRole)}</div><div class="sig-license">License No.: ${printableValue(licenseNumber)}</div></div><div class="sig">Clinician signature and date</div></div></div>
+            <div class="footer"><div class="footer-meta"><span><strong>Consent text version:</strong> referral-consent-2026-09-v1</span><span><strong>Generated at:</strong> ${printableValue(createdAt)}</span></div><div style="margin-top:4px">This prototype template requires review and approval by participating hospitals, their legal/privacy teams, and Data Protection Officer before production use.</div></div>
         </body></html>`);
         printWindow.document.close();
         printWindow.focus();
-        setTimeout(() => printWindow.print(), 250);
+        const printableImages = Array.from(printWindow.document.images);
+        Promise.all(printableImages.map(image => image.complete
+            ? Promise.resolve()
+            : new Promise(resolve => { image.onload = resolve; image.onerror = resolve; })))
+            .then(() => setTimeout(() => printWindow.print(), 150));
     }
 
     $('#btnPrintReferralConsent').on('click', printReferralConsentForm);
