@@ -864,7 +864,9 @@ $(document).ready(function () {
     function attachmentLinksHtml(referralId, attachments) {
         if (!Array.isArray(attachments) || !attachments.length) return '<p class="text-xs text-slate-400">No clinical attachments.</p>';
         return attachments.map(file => {
-            const stage = file.workflow_stage === 'DEPARTURE' ? 'Departure result' : 'Referral document';
+            const stage = file.attachment_type === 'CONSENT_FORM'
+                ? 'Signed consent'
+                : (file.workflow_stage === 'DEPARTURE' ? 'Departure result' : 'Referral document');
             return `<button type="button" class="btn-preview-referral-attachment w-full flex items-center justify-between gap-3 py-2 text-left text-sm text-blue-700 hover:underline border-b border-slate-100 last:border-0" data-referral-id="${escapeHtml(referralId)}" data-attachment-id="${escapeHtml(file.id)}" data-filename="${escapeHtml(file.original_filename || 'Attachment')}" data-mime-type="${escapeHtml(file.mime_type || '')}"><span><i class="bi bi-paperclip me-1"></i>${escapeHtml(file.original_filename || 'Attachment')}</span><span class="text-[10px] text-slate-400">${escapeHtml(stage)} · Preview</span></button>`;
         }).join('');
     }
@@ -986,7 +988,7 @@ $(document).ready(function () {
      * of the browser's default one-at-a-time validation UI, which #referralForm's
      * novalidate attribute disables) and returns whether the form is valid overall.
      */
-    function validateReferralForm() {
+    function validateReferralForm(requireConsent = true) {
         let isValid = true;
         let $firstInvalid = null;
 
@@ -1037,6 +1039,15 @@ $(document).ready(function () {
             files.length > 5 || files.some(file => file.size > 5 * 1024 * 1024 || !allowedTypes.includes(file.type))
         );
 
+        const consentFiles = Array.from($('#signedConsentForm')[0]?.files || []);
+        markField(
+            $('#signedConsentForm'),
+            consentFiles.length > 1 || consentFiles.some(file => file.size > 5 * 1024 * 1024 || !allowedTypes.includes(file.type))
+        );
+        if (requireConsent) {
+            markField($('#paperConsentConfirmed'), !$('#paperConsentConfirmed').is(':checked'));
+        }
+
         if ($firstInvalid) {
             $firstInvalid[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
             $firstInvalid.focus();
@@ -1045,11 +1056,78 @@ $(document).ready(function () {
         return isValid;
     }
 
+    function printableValue(value) {
+        const text = String(value || '').trim();
+        return escapeHtml(text || '--');
+    }
+
+    function printReferralConsentForm() {
+        if (!validateReferralForm(false)) {
+            showToast('error', 'Complete the referral details before printing the consent form.', 3500);
+            return;
+        }
+
+        const printWindow = window.open('', '_blank', 'width=900,height=1000');
+        if (!printWindow) {
+            showToast('error', 'The print window was blocked. Allow pop-ups for this site and try again.', 4500);
+            return;
+        }
+
+        const primaryReason = $('#modalReasonText').val() || $('#modalReasonSelect').val();
+        const reasons = [primaryReason, ...getAdditionalReferralReasons()].filter(Boolean);
+        const severityText = $('#modalSeverity option:selected').text();
+        const clinician = currentUser?.full_name || currentUser?.name || currentUser?.username || 'Clinical staff';
+        const facility = currentHospital?.name || 'Referring facility';
+        const address = $('#displayResolvedAddress').text();
+        const bp = `${$('#modalVitalBpSystolic').val() || '--'}/${$('#modalVitalBpDiastolic').val() || '--'}`;
+        const createdAt = new Intl.DateTimeFormat('en-PH', { dateStyle: 'long', timeStyle: 'short' }).format(new Date());
+        const rows = reasons.map((reason, index) => `<li>${index === 0 ? '<strong>Primary:</strong> ' : ''}${printableValue(reason)}</li>`).join('');
+
+        printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Referral Consent - ${printableValue($('#modalPatientName').text())}</title><style>
+            @page { size: A4; margin: 14mm; }
+            * { box-sizing: border-box; } body { font-family: Arial, sans-serif; color: #111827; margin: 0; font-size: 12px; line-height: 1.42; }
+            h1 { font-size: 19px; margin: 0; } h2 { font-size: 13px; margin: 14px 0 6px; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; }
+            .header { display: flex; justify-content: space-between; gap: 20px; border-bottom: 2px solid #b91c1c; padding-bottom: 10px; }
+            .draft { color: #b91c1c; font-weight: 700; text-align: right; } .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 24px; }
+            .box { border: 1px solid #cbd5e1; border-radius: 6px; padding: 9px; margin-top: 8px; }
+            .label { color: #64748b; font-size: 10px; text-transform: uppercase; } ul { margin: 4px 0 0 18px; padding: 0; }
+            .choice { margin: 9px 0; } .line { display: inline-block; min-width: 210px; border-bottom: 1px solid #111827; height: 18px; vertical-align: bottom; }
+            .signature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 26px; } .sig { border-top: 1px solid #111827; padding-top: 4px; text-align: center; }
+            .footer { margin-top: 15px; color: #64748b; font-size: 9px; } .no-print { margin-bottom: 10px; padding: 8px; background: #fef3c7; border: 1px solid #f59e0b; }
+            @media print { .no-print { display: none; } }
+        </style></head><body>
+            <div class="no-print"><strong>Prototype draft.</strong> Review the form, then use the browser print dialog. This blank generated form is not stored automatically.</div>
+            <div class="header"><div><h1>Patient Referral and Data-Sharing Consent</h1><div>${printableValue(facility)}</div></div><div class="draft">PROTOTYPE DRAFT<br><span style="font-weight:400;color:#475569">${printableValue(createdAt)}</span></div></div>
+            <h2>Patient and referral details</h2><div class="grid">
+                <div><span class="label">Patient</span><br><strong>${printableValue($('#modalPatientName').text())}</strong></div>
+                <div><span class="label">Date of birth / Sex</span><br>${printableValue($('#modalPatientDob').text())} / ${printableValue($('#modalPatientGender').text())}</div>
+                <div><span class="label">Phone</span><br>${printableValue($('#modalPatientPhone').text())}</div>
+                <div><span class="label">Referral origin</span><br>${printableValue(address)}</div>
+                <div><span class="label">Referring hospital</span><br>${printableValue(facility)}</div>
+                <div><span class="label">Receiving hospital</span><br><strong>To be determined through IRDSS</strong></div>
+            </div>
+            <div class="box"><span class="label">Chief complaint / Diagnosis / Severity</span><br>${printableValue($('#modalChiefComplaint').val())} / ${printableValue($('#modalDiagnosis').val() || 'Not specified')} / ${printableValue(severityText)}<br><span class="label">Latest vital signs</span><br>BP ${printableValue(bp)} mmHg; HR ${printableValue($('#modalVitalHr').val())} bpm; RR ${printableValue($('#modalVitalRr').val())} br/min; Temp ${printableValue($('#modalVitalTemp').val())} C; O2 sat ${printableValue($('#modalVitalO2sat').val())}%</div>
+            <div class="box"><span class="label">Referral reason(s)</span><ul>${rows}</ul></div>
+            <h2>Consent</h2>
+            <p>I have been informed why a referral is recommended and had an opportunity to ask questions. I understand that IRDSS may first share a limited clinical referral summary with candidate hospitals so they can evaluate capacity. My identity, complete clinical details, and protected attachments will be made available only to the hospital selected to receive the referral, except where disclosure is otherwise required or permitted by law.</p>
+            <p>I authorize ${printableValue(facility)} and participating IRDSS facilities to collect, securely transmit, access, and use the information reasonably necessary to coordinate this referral and provide care. I understand that consent may be withdrawn before disclosure or processing where withdrawal is legally and operationally possible, without affecting processing already lawfully completed.</p>
+            <div class="choice">[ ] Patient &nbsp;&nbsp; [ ] Parent/guardian &nbsp;&nbsp; [ ] Authorized representative &nbsp;&nbsp; [ ] Emergency exception documented by clinician</div>
+            <div>Name of signer: <span class="line"></span> &nbsp; Relationship (if applicable): <span class="line" style="min-width:150px"></span></div>
+            <div class="signature-grid"><div class="sig">Patient / authorized representative signature and date</div><div class="sig">Witness signature and date</div><div class="sig">Referring clinician: ${printableValue(clinician)}</div><div class="sig">Clinician signature and date</div></div>
+            <div class="footer">Consent text version: referral-consent-2026-09-v1. This is a prototype template and must be reviewed and approved by participating hospitals, their legal/privacy teams, and Data Protection Officer before production use.</div>
+        </body></html>`);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => printWindow.print(), 250);
+    }
+
+    $('#btnPrintReferralConsent').on('click', printReferralConsentForm);
+
     // Clear the red highlight on a required field as soon as it's fixed, rather
     // than making the doctor resubmit to find out it's no longer invalid.
     // #modalReasonCategory and #modalReasonSelect are included even though they don't have [required] attributes --
     // they're flagged manually above since the real requirement lives on the reason dropdowns.
-    $(document).on('input change', '#referralForm [required], #modalReasonCategory, #modalReasonSelect, .additional-reason-select, #referralAttachments', function () {
+    $(document).on('input change', '#referralForm [required], #modalReasonCategory, #modalReasonSelect, .additional-reason-select, #referralAttachments, #signedConsentForm, #paperConsentConfirmed', function () {
         const $field = $(this);
         if (String($field.val() || '').trim()) {
             $field.removeClass(REQUIRED_FIELD_ERROR_CLASSES);
@@ -1106,10 +1184,17 @@ $(document).ready(function () {
             is_pregnant: $('#modalIsPregnant').is(':checked') ? 1 : 0,
             is_senior_citizen: $('#modalIsSeniorCitizen').is(':checked') ? 1 : 0,
             has_allergy: $('#modalHasAllergy').is(':checked') ? 1 : 0,
-            allergy_details: $('#modalHasAllergy').is(':checked') ? ($('#modalAllergyDetails').val() || '') : ''
+            allergy_details: $('#modalHasAllergy').is(':checked') ? ($('#modalAllergyDetails').val() || '') : '',
+            consent_status: 'GRANTED',
+            consent_method: 'PAPER',
+            consent_text_version: 'referral-consent-2026-09-v1',
+            consent_recorded_at: new Date().toISOString(),
+            consent_witnessed_by: currentUser?.full_name || currentUser?.name || currentUser?.username || 'Clinical staff'
         };
         Object.entries(fields).forEach(([key, value]) => formData.append(key, value));
         Array.from($('#referralAttachments')[0]?.files || []).forEach(file => formData.append('referral_attachments[]', file));
+        const signedConsentFile = $('#signedConsentForm')[0]?.files?.[0];
+        if (signedConsentFile) formData.append('signed_consent_form', signedConsentFile);
 
         $.ajax({
             url: `${API_BASE}/send_referral.php`,
@@ -2033,6 +2118,7 @@ $(document).ready(function () {
                                     <p class="text-base font-bold text-slate-900 mb-3">${escapeHtml(d.diagnosis || '—')}</p>
                                     <p class="mb-2"><span class="text-slate-500">Chief Complaint:</span> <span class="font-semibold text-slate-800">${escapeHtml(d.chief_complaint || '—')}</span></p>
                                     <p class="mb-2"><span class="text-slate-500">Referral Reasons:</span> <span class="font-semibold text-slate-800">${escapeHtml(referralReasonsText(d))}</span></p>
+                                    <p class="mb-2"><span class="text-slate-500">Consent:</span> <span class="font-semibold ${d.consent_status === 'GRANTED' ? 'text-emerald-700' : 'text-red-700'}">${d.consent_status === 'GRANTED' ? 'Paper consent recorded' : 'Not recorded'}</span></p>
                                     <p class="mb-3"><span class="text-slate-500">Severity:</span> <span class="${severityClass} px-2.5 py-1 rounded-full text-xs font-bold ml-1">${severityText}</span></p>
                                     <p><span class="text-slate-500">Referring Facility:</span> <span class="font-semibold text-slate-800">${escapeHtml(d.referring_facility || '—')}</span></p>
                                     ${tagsRow}
@@ -3488,6 +3574,7 @@ $(document).ready(function () {
                         ${infoRow('Chief Complaint', escapeHtml(chiefComplaint), { id: 'modal-chief-complaint' })}
                         ${patientStatusText ? infoRow('Patient Status', escapeHtml(patientStatusText)) : ''}
                         ${allergyText ? infoRow('Allergy', escapeHtml(allergyText), { valueClass: 'font-bold text-red-700' }) : ''}
+                        ${infoRow('Consent', incomingAlert.consent_status === 'GRANTED' ? 'Paper consent recorded' : 'Not recorded', { valueClass: incomingAlert.consent_status === 'GRANTED' ? 'font-bold text-emerald-700' : 'font-bold text-red-700' })}
                         ${infoRow('Reason for Referral', escapeHtml(clinicalReason), { id: 'modal-reason', last: true })}
                     `, 'mt-3')}
 

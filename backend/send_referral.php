@@ -43,6 +43,26 @@ $reasonText    = !empty($input['reason_text']) ? trim((string)$input['reason_tex
 $reasonCode    = !empty($input['reason_code']) ? trim((string)$input['reason_code']) : '233604007';
 $diagnosis     = !empty($input['diagnosis']) ? trim((string)$input['diagnosis']) : 'Pneumonia';
 $reasonDisplay = $reasonText;
+$consentStatus = strtoupper(trim((string)($input['consent_status'] ?? '')));
+$consentMethod = strtoupper(trim((string)($input['consent_method'] ?? '')));
+$consentTextVersion = trim((string)($input['consent_text_version'] ?? ''));
+$consentRecordedAtRaw = trim((string)($input['consent_recorded_at'] ?? ''));
+$consentWitnessedBy = trim((string)($input['consent_witnessed_by'] ?? ''));
+
+if ($consentStatus !== 'GRANTED' || $consentMethod !== 'PAPER'
+    || $consentTextVersion === '' || $consentRecordedAtRaw === '' || $consentWitnessedBy === '') {
+    sendJsonResponse(['success' => false, 'message' => 'Signed paper referral consent must be confirmed before transmission.'], 422);
+}
+if (mb_strlen($consentTextVersion) > 50 || mb_strlen($consentWitnessedBy) > 255) {
+    sendJsonResponse(['success' => false, 'message' => 'Consent audit information is invalid.'], 422);
+}
+try {
+    $consentRecordedAtValue = new DateTimeImmutable($consentRecordedAtRaw);
+    $consentRecordedAtIso = $consentRecordedAtValue->format(DateTimeInterface::ATOM);
+    $consentRecordedAtMysql = $consentRecordedAtValue->format('Y-m-d H:i:s');
+} catch (Exception $e) {
+    sendJsonResponse(['success' => false, 'message' => 'Consent timestamp is invalid.'], 422);
+}
 
 $additionalReasonsRaw = $input['additional_reasons'] ?? [];
 if (is_string($additionalReasonsRaw)) {
@@ -113,6 +133,19 @@ if (isset($_FILES['referral_attachments'])) {
     }
 }
 
+if (isset($_FILES['signed_consent_form']) && ($_FILES['signed_consent_form']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+    $consentUpload = $_FILES['signed_consent_form'];
+    if (($consentUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK
+        || !is_uploaded_file($consentUpload['tmp_name'] ?? '')
+        || ($consentUpload['size'] ?? 0) > 5 * 1024 * 1024) {
+        sendJsonResponse(['success' => false, 'message' => 'The signed consent copy must be a valid file no larger than 5 MB.'], 422);
+    }
+    $consentMime = (new finfo(FILEINFO_MIME_TYPE))->file($consentUpload['tmp_name']);
+    if (!in_array($consentMime, ['application/pdf', 'image/jpeg', 'image/png'], true)) {
+        sendJsonResponse(['success' => false, 'message' => 'The signed consent copy must be a PDF, JPEG, or PNG file.'], 422);
+    }
+}
+
 try {
     $pdo = getDbConnection();
     
@@ -173,6 +206,11 @@ try {
         $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/chiefComplaint", "valueString" => $chiefComplaint];
     }
     $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/diagnosis", "valueString" => $diagnosis];
+    $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/consentStatus", "valueString" => $consentStatus];
+    $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/consentMethod", "valueString" => $consentMethod];
+    $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/consentTextVersion", "valueString" => $consentTextVersion];
+    $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/consentRecordedAt", "valueString" => $consentRecordedAtIso];
+    $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/consentWitnessedBy", "valueString" => $consentWitnessedBy];
 
     // Patient identity fields -- only ever decrypted centrally by the facility this
     // referral is finalized to (GET /api/v1/referral/{id}/patient-details)
@@ -381,6 +419,23 @@ try {
                 ':sort_order' => $index,
             ]);
         }
+        $consentStmt = $pdo->prepare('
+            INSERT INTO referral_consents
+                (initiated_referral_id, central_referral_id, status, method, consent_text_version,
+                 witnessed_by, recorded_at, signed_copy_uploaded)
+            VALUES
+                (:local_referral_id, :central_referral_id, :status, :method, :text_version,
+                 :witnessed_by, :recorded_at, 0)
+        ');
+        $consentStmt->execute([
+            ':local_referral_id' => $localReferralId,
+            ':central_referral_id' => $referralId,
+            ':status' => $consentStatus,
+            ':method' => $consentMethod,
+            ':text_version' => $consentTextVersion,
+            ':witnessed_by' => $consentWitnessedBy,
+            ':recorded_at' => $consentRecordedAtMysql,
+        ]);
     } catch (Exception $e) {
         // Local persistence is a best-effort record -- never block the referral
         // response on it, since the actual referral has already been (or failed to be)
@@ -431,6 +486,51 @@ try {
                 'success' => !$uploadErrno && $uploadCode >= 200 && $uploadCode < 300,
                 'message' => $uploadBody['detail'] ?? ($uploadErrno ? 'Could not reach the attachment service.' : null),
             ];
+        }
+    }
+
+    if ($isSuccess && $referralId && isset($_FILES['signed_consent_form'])
+        && ($_FILES['signed_consent_form']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+        $file = $_FILES['signed_consent_form'];
+        $fileName = basename((string)$file['name']);
+        $bytes = file_get_contents($file['tmp_name']);
+        $mime = (new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']) ?: 'application/octet-stream';
+        [$uploadCode, $uploadRaw, $uploadErrno] = sendSignedIolBinaryRequest(
+            'POST',
+            "/api/v1/referral/{$referralId}/attachments",
+            $bytes,
+            $mime,
+            $patient['facility_code'],
+            $patient['facility_name'],
+            [
+                'X-Workflow-Stage: REFERRAL',
+                'X-Attachment-Type: CONSENT_FORM',
+                'X-Original-Filename: ' . rawurlencode($fileName),
+            ]
+        );
+        $uploadBody = json_decode((string)$uploadRaw, true);
+        $uploadSucceeded = !$uploadErrno && $uploadCode >= 200 && $uploadCode < 300;
+        $attachmentUploads[] = [
+            'filename' => $fileName,
+            'type' => 'CONSENT_FORM',
+            'success' => $uploadSucceeded,
+            'message' => $uploadBody['detail'] ?? ($uploadErrno ? 'Could not reach the attachment service.' : null),
+        ];
+        if ($localReferralId && $uploadSucceeded) {
+            try {
+                $attachmentId = $uploadBody['id'] ?? $uploadBody['attachment_id'] ?? null;
+                $updateConsentStmt = $pdo->prepare('
+                    UPDATE referral_consents
+                    SET signed_copy_uploaded = 1, central_attachment_id = :attachment_id
+                    WHERE initiated_referral_id = :local_referral_id
+                ');
+                $updateConsentStmt->execute([
+                    ':attachment_id' => $attachmentId,
+                    ':local_referral_id' => $localReferralId,
+                ]);
+            } catch (Exception $e) {
+                // The central protected copy is authoritative; local audit update is best effort.
+            }
         }
     }
 
