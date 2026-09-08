@@ -2159,6 +2159,10 @@ $(document).ready(function () {
                     `
                     : '';
 
+                const allAttachments = Array.isArray(d.attachments) ? d.attachments : [];
+                const consentAttachments = allAttachments.filter(file => file.attachment_type === 'CONSENT_FORM');
+                const clinicalAttachments = allAttachments.filter(file => file.attachment_type !== 'CONSENT_FORM');
+
                 Swal.fire({
                     title: 'Patient Details',
                     width: '48rem',
@@ -2193,9 +2197,18 @@ $(document).ready(function () {
                             ${allergyBanner}
 
                             <div class="mb-4 border border-slate-200 rounded-xl p-4">
-                                <p class="font-semibold text-slate-800 mb-1">Clinical Attachments</p>
-                                ${attachmentLinksHtml(referralId, d.attachments)}
+                                <p class="font-semibold text-slate-800 mb-1">Patient Consent</p>
+                                ${consentAttachments.length
+                                    ? attachmentLinksHtml(referralId, consentAttachments)
+                                    : '<p class="text-xs text-slate-400">No signed patient consent copy uploaded.</p>'}
                             </div>
+
+                            ${clinicalAttachments.length ? `
+                                <div class="mb-4 border border-slate-200 rounded-xl p-4">
+                                    <p class="font-semibold text-slate-800 mb-1">Clinical Attachments</p>
+                                    ${attachmentLinksHtml(referralId, clinicalAttachments)}
+                                </div>
+                            ` : ''}
 
                             <p class="mb-4"><strong class="text-slate-800">Address:</strong> <span class="text-slate-700">${escapeHtml(d.address || '—')}</span></p>
 

@@ -492,9 +492,16 @@ try {
     if ($isSuccess && $referralId && isset($_FILES['signed_consent_form'])
         && ($_FILES['signed_consent_form']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
         $file = $_FILES['signed_consent_form'];
-        $fileName = basename((string)$file['name']);
         $bytes = file_get_contents($file['tmp_name']);
         $mime = (new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']) ?: 'application/octet-stream';
+        $extensionByMime = [
+            'application/pdf' => 'pdf',
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+        ];
+        $safePatientName = trim((string)preg_replace('/[^\p{L}\p{N}]+/u', '_', $fullName), '_');
+        $safePatientName = mb_substr($safePatientName !== '' ? $safePatientName : 'Patient', 0, 150);
+        $fileName = 'consent_' . $safePatientName . '.' . ($extensionByMime[$mime] ?? 'bin');
         [$uploadCode, $uploadRaw, $uploadErrno] = sendSignedIolBinaryRequest(
             'POST',
             "/api/v1/referral/{$referralId}/attachments",
