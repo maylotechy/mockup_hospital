@@ -1067,6 +1067,11 @@ $(document).ready(function () {
         return escapeHtml(text || '--');
     }
 
+    function printableWithUnit(value, unit) {
+        const text = printableValue(value);
+        return (text === '--' || text === '--/--') ? text : `${text} ${unit}`;
+    }
+
     function calculatePrintableAge(dateOfBirth) {
         const match = String(dateOfBirth || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
         if (!match) return '--';
@@ -1164,11 +1169,49 @@ $(document).ready(function () {
             <div class="header"><div class="logo"><img src="${printableValue(irdssLogoUrl)}" alt="IRDSS logo"></div><div><h1>Patient Referral and Data-Sharing Consent</h1><div class="subtitle">${printableValue(facility)}</div></div><div class="logo"><img src="${printableValue(hospitalLogoUrl)}" alt="Hospital logo"></div></div>
             <div class="section"><h2>Patient Information</h2><div class="grid">
                 <div class="field"><div class="label">Patient Name</div><div class="value strong">${printableValue($('#modalPatientName').text())}</div><div class="label" style="margin-top:7px">Phone</div><div class="value">${printableValue($('#modalPatientPhone').text())}</div></div>
-                <div class="field stack"><div><span class="label">Date of Birth:</span> <span class="value strong">${printableValue(dateOfBirth)}</span></div><div><span class="label">Age:</span> <span class="value strong">${printableValue(patientAge)}</span></div><div><span class="label">Gender:</span> <span class="value strong">${printableValue($('#modalPatientGender').text())}</span></div></div>
+                <div class="field stack"><div><span class="label">Date of Birth:</span> <span class="value strong">${printableValue(dateOfBirth)}</span></div><div><span class="label">Age:</span> <span class="value strong">${printableValue(patientAge)}${parseInt(patientAge) > 60 ? ' (Senior Citizen)' : ''}</span></div><div><span class="label">Gender:</span> <span class="value strong">${printableValue($('#modalPatientGender').text())}</span></div></div>
             </div>
-            <div class="grid" style="margin-top:13px"><div class="field"><div class="label">Patient Location</div><div class="value">${printableValue(patientLocation)}</div><div class="grid" style="grid-template-columns: repeat(4, 1fr); gap:12px; margin-top:9px"><div><div class="label">Has Allergy</div><div class="value">${printableValue(allergyStatus)}</div></div><div><div class="label">Allergy Details</div><div class="value">${printableValue(allergyDetails)}</div></div><div><div class="label">PWD</div><div class="value">${printableValue(pwdStatus)}</div></div><div><div class="label">Pregnant</div><div class="value">${printableValue(pregnancyStatus)}</div></div></div></div><div class="field"><div class="label">PhilHealth Member</div><div class="value">${printableValue(philHealthMembership)}</div><div class="label" style="margin-top:9px">Membership Type</div><div class="value">${printableValue(philHealthType)}</div>${philHealthNumber ? `<div class="label" style="margin-top:9px">PhilHealth Number</div><div class="value">${printableValue(philHealthNumber)}</div>` : ''}</div></div></div>
+            <div class="grid" style="margin-top:13px"><div class="field"><div class="label">Patient Location</div><div class="value">${printableValue(patientLocation)}</div><div class="grid" style="grid-template-columns: repeat(2, 1fr); gap:12px; margin-top:9px"><div><div class="label">PWD</div><div class="value">${printableValue(pwdStatus)}</div></div><div>${printableValue($('#modalPatientGender').text()).trim().toLowerCase() === 'male' ? '' : `<div class="label">Pregnant</div><div class="value">${printableValue(pregnancyStatus)}</div>`}</div><div><div class="label">Has Allergy</div><div class="value">${printableValue(allergyStatus)}</div></div><div><div class="label">Allergy Details</div><div class="value">${printableValue(allergyDetails)}</div></div></div></div><div class="field"><div class="label">PhilHealth Member</div><div class="value">${printableValue(philHealthMembership)}</div><div class="label" style="margin-top:9px">Membership Type</div><div class="value">${printableValue(philHealthType)}</div>${philHealthNumber ? `<div class="label" style="margin-top:9px">PhilHealth Number</div><div class="value">${printableValue(philHealthNumber)}</div>` : ''}</div></div></div>
             <div class="section"><h2>Referral Information</h2><div class="grid"><div class="field"><div class="label">Referring Hospital</div><div class="value strong">${printableValue(facility)}</div></div><div class="field"><div class="label">Receiving Hospital</div><div class="value strong">To be determined through IRDSS</div></div><div class="field"><div class="label">Chief Complaint</div><div class="value">${printableValue($('#modalChiefComplaint').val())}</div></div><div class="field"><div class="label">Diagnosis</div><div class="value">${printableValue($('#modalDiagnosis').val() || 'Not specified')}</div></div><div class="field"><div class="label">Severity</div><div class="value strong">${printableValue(severityText)}</div></div><div class="field"><div class="label">Referral Reason(s)</div><ul>${rows}</ul></div></div></div>
-            <div class="section"><h2>Vital Signs</h2><div class="vitals"><div class="vital"><div class="label">Blood Pressure</div><div class="value strong">${printableValue(bp)} mmHg</div></div><div class="vital"><div class="label">Heart Rate</div><div class="value strong">${printableValue($('#modalVitalHr').val())} bpm</div></div><div class="vital"><div class="label">Respiratory Rate</div><div class="value strong">${printableValue($('#modalVitalRr').val())} br/min</div></div><div class="vital"><div class="label">Temperature</div><div class="value strong">${printableValue($('#modalVitalTemp').val())} C</div></div><div class="vital"><div class="label">Oxygen Saturation</div><div class="value strong">${printableValue($('#modalVitalO2sat').val())}%</div></div><div class="vital"><div class="label">Height</div><div class="value strong">${printableValue($('#modalVitalHeight').val())} cm</div></div><div class="vital"><div class="label">Weight</div><div class="value strong">${printableValue($('#modalVitalWeight').val())} kg</div></div></div></div>
+            <div class="section">
+                <h2>Vital Signs</h2>
+                <div class="vitals">
+                    <div class="vital">
+                        <div class="label">Blood Pressure</div>
+                        <div class="value strong">${printableWithUnit(bp, 'mmHg')}</div>
+                    </div>
+
+                    <div class="vital">
+                        <div class="label">Heart Rate</div>
+                        <div class="value strong">${printableWithUnit($('#modalVitalHr').val(), 'bpm')}</div>
+                    </div>
+
+                    <div class="vital">
+                        <div class="label">Respiratory Rate</div>
+                        <div class="value strong">${printableWithUnit($('#modalVitalRr').val(), 'br/min')}</div>
+                    </div>
+
+                    <div class="vital">
+                        <div class="label">Temperature</div>
+                        <div class="value strong">${printableWithUnit($('#modalVitalTemp').val(), '°C')}</div>
+                    </div>
+
+                    <div class="vital">
+                        <div class="label">Oxygen Saturation</div>
+                        <div class="value strong">${printableWithUnit($('#modalVitalO2sat').val(), '%')}</div>
+                    </div>
+
+                    <div class="vital">
+                        <div class="label">Height</div>
+                        <div class="value strong">${printableWithUnit($('#modalVitalHeight').val(), 'cm')}</div>
+                    </div>
+
+                    <div class="vital">
+                        <div class="label">Weight</div>
+                        <div class="value strong">${printableWithUnit($('#modalVitalWeight').val(), 'kg')}</div>
+                    </div>
+                </div>
+            </div>
             <div class="section"><h2>Consent</h2>
             <p class="consent-text">I have been informed why a referral is recommended and had an opportunity to ask questions. I understand that IRDSS may first share a limited clinical referral summary with candidate hospitals so they can evaluate capacity. My identity, complete clinical details, and protected attachments will be made available only to the hospital selected to receive the referral, except where disclosure is otherwise required or permitted by law.</p>
             <p class="consent-text">I authorize ${printableValue(facility)} and participating IRDSS facilities to collect, securely transmit, access, and use the information reasonably necessary to coordinate this referral and provide care. I understand that consent may be withdrawn before disclosure or processing where withdrawal is legally and operationally possible, without affecting processing already lawfully completed.</p>
