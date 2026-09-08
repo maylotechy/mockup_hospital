@@ -29,11 +29,28 @@ if ($referralId === '') {
     sendJsonResponse(['success' => false, 'message' => 'Missing required field: referral_id.'], 400);
 }
 
+// Vitals taken by the receiving facility at the moment of arrival -- all optional,
+// never blocks marking the patient as arrived if left blank
+$arrivalVitals = [
+    'vital_bp'      => isset($input['arrival_vital_bp']) ? trim((string)$input['arrival_vital_bp']) : '',
+    'vital_hr'      => isset($input['arrival_vital_hr']) ? trim((string)$input['arrival_vital_hr']) : '',
+    'vital_rr'      => isset($input['arrival_vital_rr']) ? trim((string)$input['arrival_vital_rr']) : '',
+    'vital_temp_c'  => isset($input['arrival_vital_temp_c']) ? trim((string)$input['arrival_vital_temp_c']) : '',
+    'vital_o2sat'   => isset($input['arrival_vital_o2sat']) ? trim((string)$input['arrival_vital_o2sat']) : ''
+];
+$arrivalVitals = array_filter($arrivalVitals, fn($v) => $v !== '');
+
+$duplicateChoice = isset($input['duplicate_choice']) ? trim((string)$input['duplicate_choice']) : null;
+$linkPatientId = isset($input['link_patient_id']) ? (int)$input['link_patient_id'] : null;
+
 $iolHost = $_ENV['IOL_HOST'] ?? '127.0.0.1';
 $portsToTry = [8081, 8000, 8001];
 
 function callCentralReferralApi($method, $path, $body, $user, $iolHost, $portsToTry) {
-    $bodyJson = $body !== null ? json_encode($body) : '';
+    // JSON_FORCE_OBJECT ensures an empty PHP array (e.g. no arrival vitals entered)
+    // still encodes as "{}" rather than "[]" -- the IOL endpoint expects a JSON object
+    // matching its Pydantic schema, and an empty array fails that validation.
+    $bodyJson = $body !== null ? json_encode($body, JSON_FORCE_OBJECT) : '';
 
     foreach ($portsToTry as $port) {
         $url = "http://{$iolHost}:{$port}" . $path;
@@ -67,10 +84,15 @@ function callCentralReferralApi($method, $path, $body, $user, $iolHost, $portsTo
 try {
     // Step 1: stamp arrival centrally. This also re-verifies (server-side) that this
     // referral was actually finalized to this facility -- can't be spoofed client-side.
-    $arriveRes = callCentralReferralApi('PATCH', "/api/v1/referral/{$referralId}/arrive", [], $user, $iolHost, $portsToTry);
-    if ($arriveRes['code'] < 200 || $arriveRes['code'] >= 300) {
-        $detail = $arriveRes['data']['detail'] ?? "Can't reach the central server to confirm arrival.";
-        sendJsonResponse(['success' => false, 'message' => $detail], $arriveRes['code'] ?: 502);
+    // Only run on the first pass ($duplicateChoice absent) -- a resubmission after the
+    // staff answers the "possible duplicate" prompt means arrival was already stamped.
+    $arriveRes = null;
+    if ($duplicateChoice === null) {
+        $arriveRes = callCentralReferralApi('PATCH', "/api/v1/referral/{$referralId}/arrive", $arrivalVitals, $user, $iolHost, $portsToTry);
+        if ($arriveRes['code'] < 200 || $arriveRes['code'] >= 300) {
+            $detail = $arriveRes['data']['detail'] ?? "Can't reach the central server to confirm arrival.";
+            sendJsonResponse(['success' => false, 'message' => $detail], $arriveRes['code'] ?: 502);
+        }
     }
 
     // Step 2: pull the decrypted patient identity -- gated the same way centrally
@@ -104,7 +126,8 @@ try {
     $genderMap = ['male' => 'Male', 'female' => 'Female'];
     $gender = $genderMap[strtolower((string)($details['gender'] ?? ''))] ?? 'Other';
 
-    $dob = !empty($details['date_of_birth']) ? $details['date_of_birth'] : date('Y-m-d');
+    $dobSuppliedByCentral = !empty($details['date_of_birth']);
+    $dob = $dobSuppliedByCentral ? $details['date_of_birth'] : date('Y-m-d');
     $phone = !empty($details['phone']) ? $details['phone'] : '';
     $civilStatus = !empty($details['civil_status']) ? $details['civil_status'] : null;
     $philhealthNumber = !empty($details['philhealth_number']) ? $details['philhealth_number'] : null;
@@ -112,41 +135,87 @@ try {
     $philhealthMember = ($philhealthNumber || $philhealthStatus) ? 'Yes' : 'No';
     $address = !empty($details['address']) ? $details['address'] : null;
 
-    // Snapshot the full central response (including clinical fields that aren't part of
-    // the local patient schema -- diagnosis, vitals, reason) so future "View Full Patient
-    // Details" clicks can be served local-to-local instead of re-hitting central every time.
-    $insertStmt = $pdo->prepare('
-        INSERT INTO patients
-            (facility_id, first_name, last_name, dob, gender, civil_status, phone,
-             philhealth_member, philhealth_number, philhealth_status_type,
-             source_referral_id, source_facility, transferred_address, transferred_details_snapshot, created_by_user_id)
-        VALUES
-            (:facility_id, :first_name, :last_name, :dob, :gender, :civil_status, :phone,
-             :philhealth_member, :philhealth_number, :philhealth_status_type,
-             :source_referral_id, :source_facility, :transferred_address, :transferred_details_snapshot, :created_by_user_id)
-    ');
-    $insertStmt->execute([
-        ':facility_id' => $facilityId,
-        ':first_name' => $firstName,
-        ':last_name' => $lastName,
-        ':dob' => $dob,
-        ':gender' => $gender,
-        ':civil_status' => $civilStatus,
-        ':phone' => $phone,
-        ':philhealth_member' => $philhealthMember,
-        ':philhealth_number' => $philhealthNumber,
-        ':philhealth_status_type' => $philhealthStatus,
-        ':source_referral_id' => $referralId,
-        ':source_facility' => $details['referring_facility'] ?? null,
-        ':transferred_address' => $address,
-        ':transferred_details_snapshot' => json_encode($details),
-        ':created_by_user_id' => (int)($user['id'] ?? 0)
-    ]);
+    // Only prompt on the first pass, and only when central actually supplied a real DOB --
+    // a fabricated "today" DOB (see $dobSuppliedByCentral above) would false-positive-match
+    // every other patient arriving the same day with an unknown birthdate.
+    if ($duplicateChoice === null && $dobSuppliedByCentral) {
+        $match = findPossibleDuplicatePatient($pdo, $facilityId, $firstName, $lastName, $dob);
+        if ($match) {
+            sendJsonResponse([
+                'success' => false,
+                'possible_duplicate' => true,
+                'existing_patient' => [
+                    'id' => (int)$match['id'],
+                    'full_name' => trim($match['first_name'] . ' ' . $match['last_name']),
+                    'dob' => $match['dob'],
+                    'registered_at' => $match['created_at']
+                ],
+                'message' => 'A similar patient record already exists at your facility.'
+            ], 200);
+        }
+    }
+
+    if ($duplicateChoice === 'link' && $linkPatientId) {
+        $linkStmt = $pdo->prepare('
+            UPDATE patients SET
+                source_referral_id = :source_referral_id,
+                source_facility = :source_facility,
+                transferred_address = :transferred_address,
+                transferred_details_snapshot = :transferred_details_snapshot,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :pid AND facility_id = :fid
+        ');
+        $linkStmt->execute([
+            ':source_referral_id' => $referralId,
+            ':source_facility' => $details['referring_facility'] ?? null,
+            ':transferred_address' => $address,
+            ':transferred_details_snapshot' => json_encode($details),
+            ':pid' => $linkPatientId,
+            ':fid' => $facilityId
+        ]);
+
+        $newPatientId = $linkPatientId;
+        logAuditEvent($user, 'PATIENT_ARRIVED_LINKED', $referralId, $fullName, "Linked to existing patient #{$linkPatientId}");
+    } else {
+        // Snapshot the full central response (including clinical fields that aren't part of
+        // the local patient schema -- diagnosis, vitals, reason) so future "View Full Patient
+        // Details" clicks can be served local-to-local instead of re-hitting central every time.
+        $insertStmt = $pdo->prepare('
+            INSERT INTO patients
+                (facility_id, first_name, last_name, dob, gender, civil_status, phone,
+                 philhealth_member, philhealth_number, philhealth_status_type,
+                 source_referral_id, source_facility, transferred_address, transferred_details_snapshot, created_by_user_id)
+            VALUES
+                (:facility_id, :first_name, :last_name, :dob, :gender, :civil_status, :phone,
+                 :philhealth_member, :philhealth_number, :philhealth_status_type,
+                 :source_referral_id, :source_facility, :transferred_address, :transferred_details_snapshot, :created_by_user_id)
+        ');
+        $insertStmt->execute([
+            ':facility_id' => $facilityId,
+            ':first_name' => $firstName,
+            ':last_name' => $lastName,
+            ':dob' => $dob,
+            ':gender' => $gender,
+            ':civil_status' => $civilStatus,
+            ':phone' => $phone,
+            ':philhealth_member' => $philhealthMember,
+            ':philhealth_number' => $philhealthNumber,
+            ':philhealth_status_type' => $philhealthStatus,
+            ':source_referral_id' => $referralId,
+            ':source_facility' => $details['referring_facility'] ?? null,
+            ':transferred_address' => $address,
+            ':transferred_details_snapshot' => json_encode($details),
+            ':created_by_user_id' => (int)($user['id'] ?? 0)
+        ]);
+
+        $newPatientId = (int)$pdo->lastInsertId();
+        logAuditEvent($user, 'PATIENT_ARRIVED', $referralId, $fullName);
+    }
 
     sendJsonResponse([
         'success' => true,
         'message' => 'Patient marked as arrived and added to your local patient records.',
-        'patient_id' => (int)$pdo->lastInsertId(),
+        'patient_id' => $newPatientId,
         'arrived_at' => $arriveRes['data']['arrived_at'] ?? null
     ], 200);
 

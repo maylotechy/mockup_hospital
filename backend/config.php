@@ -24,6 +24,157 @@ define('DB_USER', 'root');
 define('DB_PASS', '');
 define('DB_CHARSET', 'utf8mb4');
 
+define('IOL_SYSTEM_CODE', 'SYSTEM-001');
+define('IOL_KEY_ID', 'KEY-2026-001');
+
+/**
+ * Signs a request per the IOL 3-layer RSA authentication scheme and sends it,
+ * centralizing the crypto boilerplate shared by every backend endpoint that
+ * talks to IOL. Returns [httpCode, decodedResponseOrRaw, curlErrno, curlError].
+ *
+ * @param string $method       HTTP method (GET, POST, PATCH, ...)
+ * @param string $path         IOL URL path, e.g. '/api/v1/referral/initiate'
+ * @param string $bodyJson     Raw JSON request body (use '{}' for bodyless requests)
+ * @param string $facilityCode
+ * @param string $facilityName
+ * @return array [int $httpCode, mixed $response, int $curlErrno, ?string $curlError]
+ */
+function sendSignedIolRequest($method, $path, $bodyJson, $facilityCode, $facilityName) {
+    // A GET request never actually carries a body over the wire (no CURLOPT_POSTFIELDS
+    // below), so IOL's signature check hashes zero bytes regardless of what's passed in
+    // here. Force it to '' so the signed hash always matches what's actually sent --
+    // signing hash('{}') for a GET would fail verification against hash('').
+    if ($method === 'GET') {
+        $bodyJson = '';
+    }
+
+    $privKeyPath = __DIR__ . '/../storage/keys/private_key.pem';
+    if (!file_exists($privKeyPath)) {
+        return [0, null, -1, 'RSA private key not found at ' . $privKeyPath];
+    }
+
+    $privateKeyPem = file_get_contents($privKeyPath);
+    $privateKey = openssl_pkey_get_private($privateKeyPem);
+    if (!$privateKey) {
+        return [0, null, -1, 'Failed to load RSA private key: ' . openssl_error_string()];
+    }
+
+    $timestamp = (int)time();
+    $nonce = bin2hex(random_bytes(16));
+    $bodyHash = hash('sha256', $bodyJson, false);
+    // IRDSS signs only the URL path (not its query string). Keep the full value in
+    // the request URL below, but strip ?start_date=... while building the signature.
+    $signaturePath = parse_url($path, PHP_URL_PATH) ?: $path;
+    $signingStr = "{$method}\n{$signaturePath}\n" . IOL_SYSTEM_CODE . "\n" . IOL_KEY_ID . "\n{$timestamp}\n{$nonce}\n{$bodyHash}";
+
+    $signature = '';
+    $signResult = openssl_sign($signingStr, $signature, $privateKey, OPENSSL_ALGO_SHA256);
+    if (!$signResult) {
+        return [0, null, -1, 'RSA signing failed: ' . openssl_error_string()];
+    }
+    $signatureB64 = base64_encode($signature);
+
+    $requestHeaders = [
+        'Content-Type: application/json',
+        'Content-Length: ' . strlen($bodyJson),
+        'X-System-Code: ' . IOL_SYSTEM_CODE,
+        'X-Key-ID: ' . IOL_KEY_ID,
+        'X-Signature-Timestamp: ' . $timestamp,
+        'X-Request-Nonce: ' . $nonce,
+        'X-System-Signature: ' . $signatureB64,
+        'X-Facility-Code: ' . $facilityCode,
+        'X-Facility-Name: ' . $facilityName
+    ];
+
+    $iolHost = $_ENV['IOL_HOST'] ?? 'localhost';
+    $iolUrl = 'http://' . $iolHost . ':8081' . $path;
+
+    $ch = curl_init($iolUrl);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+    if ($method !== 'GET') {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $bodyJson);
+    }
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $requestHeaders);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+
+    $rawResponse = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErrno = curl_errno($ch);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+
+    if ($curlErrno) {
+        return [503, null, $curlErrno, $curlError];
+    }
+
+    $decoded = json_decode($rawResponse, true);
+    return [$httpCode, $decoded !== null ? $decoded : $rawResponse, 0, null];
+}
+
+/**
+ * Sends an RSA-signed raw request. Used for protected binary attachments where
+ * hashing a JSON representation or a generated multipart boundary would not
+ * match the exact bytes received by IOL.
+ */
+function sendSignedIolBinaryRequest($method, $path, $bodyBytes, $contentType, $facilityCode, $facilityName, array $extraHeaders = []) {
+    if ($method === 'GET') {
+        $bodyBytes = '';
+    }
+
+    $privateKeyPem = @file_get_contents(__DIR__ . '/../storage/keys/private_key.pem');
+    $privateKey = $privateKeyPem ? openssl_pkey_get_private($privateKeyPem) : false;
+    if (!$privateKey) {
+        return [0, null, -1, 'RSA private key is missing or invalid.'];
+    }
+
+    $timestamp = (int)time();
+    $nonce = bin2hex(random_bytes(16));
+    $signaturePath = parse_url($path, PHP_URL_PATH) ?: $path;
+    $bodyHash = hash('sha256', $bodyBytes, false);
+    $signingStr = strtoupper($method) . "\n{$signaturePath}\n" . IOL_SYSTEM_CODE . "\n" . IOL_KEY_ID . "\n{$timestamp}\n{$nonce}\n{$bodyHash}";
+
+    $signature = '';
+    if (!openssl_sign($signingStr, $signature, $privateKey, OPENSSL_ALGO_SHA256)) {
+        return [0, null, -1, 'RSA signing failed.'];
+    }
+
+    $headers = [
+        'Content-Type: ' . $contentType,
+        'Content-Length: ' . strlen($bodyBytes),
+        'X-System-Code: ' . IOL_SYSTEM_CODE,
+        'X-Key-ID: ' . IOL_KEY_ID,
+        'X-Signature-Timestamp: ' . $timestamp,
+        'X-Request-Nonce: ' . $nonce,
+        'X-System-Signature: ' . base64_encode($signature),
+        'X-Facility-Code: ' . $facilityCode,
+        'X-Facility-Name: ' . $facilityName,
+    ];
+    if (!empty($_SESSION['user']['username'])) {
+        $headers[] = 'X-User-ID: ' . $_SESSION['user']['username'];
+    }
+    $headers = array_merge($headers, $extraHeaders);
+
+    $iolHost = $_ENV['IOL_HOST'] ?? 'localhost';
+    $ch = curl_init('http://' . $iolHost . ':8081' . $path);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
+    if (strtoupper($method) !== 'GET') {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $bodyBytes);
+    }
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErrno = curl_errno($ch);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+
+    return [$httpCode, $response, $curlErrno, $curlError];
+}
+
 /**
  * Returns PDO Database Instance
  * 
@@ -109,6 +260,87 @@ function getFreshApiKeyForLoggedInFacility() {
     return $row['api_key'];
 }
 
+/**
+ * True if this facility has already successfully sent a referral for the given
+ * local patient (any row in initiated_referrals for them, regardless of its
+ * current status). Used to stop a discharge/departure record from being saved
+ * for a patient who's already been referred onward through the system -- the
+ * two facts would contradict each other on the original hospital's tracker.
+ *
+ * @return bool
+ */
+function hasPatientBeenReferredOnward($pdo, $facilityId, $localPatientId) {
+    if ($localPatientId <= 0) {
+        return false;
+    }
+    $stmt = $pdo->prepare('
+        SELECT 1 FROM initiated_referrals
+        WHERE hospital_id = :fid AND patient_id = :pid AND sync_status = "SENT"
+        LIMIT 1
+    ');
+    $stmt->execute([':fid' => $facilityId, ':pid' => $localPatientId]);
+    return (bool)$stmt->fetch();
+}
+
+/**
+ * Looks for an existing patient at this facility with the same first name, last name,
+ * and DOB (case-insensitive on names). Used to prompt staff with a "link or create new?"
+ * choice instead of silently creating a duplicate patient record for the same person.
+ * Not a hard uniqueness rule -- callers still allow "create new anyway".
+ *
+ * @return array|null the matching row (id, first_name, last_name, dob, created_at), or null
+ */
+function findPossibleDuplicatePatient($pdo, $facilityId, $firstName, $lastName, $dob) {
+    $stmt = $pdo->prepare('
+        SELECT id, first_name, last_name, dob, created_at
+        FROM patients
+        WHERE facility_id = :fid
+          AND LOWER(first_name) = LOWER(:fn)
+          AND LOWER(last_name) = LOWER(:ln)
+          AND dob = :dob
+        LIMIT 1
+    ');
+    $stmt->execute([':fid' => $facilityId, ':fn' => $firstName, ':ln' => $lastName, ':dob' => $dob]);
+    $row = $stmt->fetch();
+    return $row ?: null;
+}
+
+/**
+ * Best-effort write to the facility-scoped audit trail -- records which staff account
+ * (doctor/nurse/facility_admin) performed a referral-lifecycle action, since IOL only
+ * authenticates at the facility level and has no concept of individual staff users.
+ * Never throws: a logging failure must not block the actual action it's describing.
+ *
+ * @param array       $user        getLoggedInUser() result
+ * @param string      $action      e.g. 'REFERRAL_SENT', 'REFERRAL_ACCEPTED'
+ * @param string|null $referralId
+ * @param string|null $patientName
+ * @param string|null $details     short free-text context, e.g. the chosen hospital name
+ */
+function logAuditEvent($user, $action, $referralId = null, $patientName = null, $details = null) {
+    try {
+        $pdo = getDbConnection();
+        $stmt = $pdo->prepare('
+            INSERT INTO audit_logs
+                (facility_id, user_id, user_full_name, user_role, action, referral_id, patient_name, details)
+            VALUES
+                (:facility_id, :user_id, :user_full_name, :user_role, :action, :referral_id, :patient_name, :details)
+        ');
+        $stmt->execute([
+            ':facility_id'     => (int)($user['facility']['id'] ?? 0),
+            ':user_id'         => isset($user['id']) ? (int)$user['id'] : null,
+            ':user_full_name'  => $user['full_name'] ?? 'Unknown',
+            ':user_role'       => $user['role'] ?? 'unknown',
+            ':action'          => $action,
+            ':referral_id'     => $referralId,
+            ':patient_name'    => $patientName,
+            ':details'         => $details
+        ]);
+    } catch (Exception $e) {
+        // Audit logging is best-effort -- never block the action it's describing
+    }
+}
+
 // Handle preflight CORS requests with credentials support
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
 
@@ -136,5 +368,27 @@ function sendJsonResponse($data, $statusCode = 200) {
     header('Access-Control-Allow-Headers: Content-Type, X-API-Key, Authorization');
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode($data, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+    exit;
+}
+
+/**
+ * Same CORS/headers handling as sendJsonResponse(), but passes $data through
+ * unwrapped -- for proxy endpoints forwarding IOL's raw array response (e.g.
+ * /mine, /incoming, /outcomes) straight to the frontend, which already parses
+ * that shape directly and shouldn't need to change just because the request
+ * now goes through this backend instead of hitting IOL from the browser.
+ *
+ * @param mixed $data
+ * @param int $statusCode
+ */
+function sendRawJsonResponse($data, $statusCode = 200) {
+    $origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
+    http_response_code($statusCode);
+    header("Access-Control-Allow-Origin: {$origin}");
+    header('Access-Control-Allow-Credentials: true');
+    header('Access-Control-Allow-Methods: GET, POST, PATCH, PUT, DELETE, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, X-API-Key, Authorization');
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($data, JSON_UNESCAPED_SLASHES);
     exit;
 }

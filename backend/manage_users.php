@@ -134,6 +134,61 @@ try {
             sendJsonResponse(['success' => true, 'message' => $nextActive ? 'User activated.' : 'User deactivated.']);
         }
 
+        if ($action === 'edit') {
+            $fullName = isset($input['full_name']) ? trim((string)$input['full_name']) : '';
+            $role = isset($input['role']) ? trim((string)$input['role']) : '';
+            $newPassword = isset($input['new_password']) ? (string)$input['new_password'] : '';
+
+            $errors = [];
+            if (empty($fullName)) $errors[] = 'Full name is required.';
+            if (!in_array($role, ['facility_admin', 'doctor', 'nurse'], true)) $errors[] = 'Invalid role.';
+            if ($newPassword !== '' && strlen($newPassword) < 6) $errors[] = 'Password must be at least 6 characters.';
+
+            if (!empty($errors)) {
+                sendJsonResponse(['success' => false, 'message' => implode(' ', $errors)], 400);
+            }
+
+            // A facility_admin being edited down to a non-admin role must not leave the
+            // facility without any active admin -- same guard as deactivate/delete.
+            if ($target['role'] === 'facility_admin' && $role !== 'facility_admin') {
+                $adminCountStmt = $pdo->prepare("
+                    SELECT COUNT(*) as cnt FROM users
+                    WHERE facility_id = :facility_id AND role = 'facility_admin' AND is_active = TRUE AND id != :id
+                ");
+                $adminCountStmt->execute([':facility_id' => $facilityId, ':id' => $targetId]);
+                if ((int)$adminCountStmt->fetch()['cnt'] === 0) {
+                    sendJsonResponse(['success' => false, 'message' => 'A facility must have at least one active admin.'], 400);
+                }
+            }
+
+            // Clinical credentials only apply to Doctor/Nurse -- cleared for Facility Admin
+            $isClinicalRole = in_array($role, ['doctor', 'nurse'], true);
+            $licenseNumber = ($isClinicalRole && !empty($input['license_number'])) ? trim((string)$input['license_number']) : null;
+            $trainings = ($isClinicalRole && !empty($input['trainings'])) ? trim((string)$input['trainings']) : null;
+
+            $sql = 'UPDATE users SET full_name = :full_name, role = :role, license_number = :license_number, trainings = :trainings';
+            $params = [
+                ':full_name' => $fullName,
+                ':role' => $role,
+                ':license_number' => $licenseNumber,
+                ':trainings' => $trainings,
+                ':id' => $targetId,
+                ':facility_id' => $facilityId
+            ];
+
+            if ($newPassword !== '') {
+                $sql .= ', password = :password';
+                $params[':password'] = password_hash($newPassword, PASSWORD_DEFAULT);
+            }
+
+            $sql .= ' WHERE id = :id AND facility_id = :facility_id';
+
+            $updateStmt = $pdo->prepare($sql);
+            $updateStmt->execute($params);
+
+            sendJsonResponse(['success' => true, 'message' => 'Staff account updated successfully.']);
+        }
+
         if ($action === 'reset_password') {
             $newPassword = isset($input['new_password']) ? (string)$input['new_password'] : '';
             if (strlen($newPassword) < 6) {

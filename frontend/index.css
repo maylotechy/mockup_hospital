@@ -35,6 +35,23 @@ body {
     background: #dc2626;
 }
 
+/* Corner toast notifications (showToast() in app.js) -- solid colored card,
+   icon + title + message, bottom timer bar draining as it counts down */
+.toast-notification-popup.swal2-popup {
+    padding: 1rem 1.25rem !important;
+    border-radius: 0.75rem !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.15) !important;
+}
+.toast-notification-popup .swal2-html-container {
+    margin: 0 !important;
+}
+.toast-notification-popup .swal2-timer-progress-bar-container {
+    background: rgba(255, 255, 255, 0.35) !important;
+}
+.toast-notification-popup .swal2-timer-progress-bar {
+    height: 4px !important;
+}
+
 /* DataTables Styling */
 div.dataTables_wrapper {
     padding: 1.25rem 0;

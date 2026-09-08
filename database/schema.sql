@@ -86,6 +86,10 @@ CREATE TABLE `patients` (
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
+  -- Speeds up the identity lookup used to prompt "possible duplicate patient?" on
+  -- registration/arrival -- not unique, since staff can still choose "create new anyway".
+  KEY `idx_patients_identity` (`facility_id`, `last_name`, `first_name`, `dob`),
+
   CONSTRAINT `fk_patients_facility` FOREIGN KEY (`facility_id`) REFERENCES `facilities` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_patients_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -147,6 +151,27 @@ CREATE TABLE `initiated_referrals` (
   `sync_status` VARCHAR(20) NOT NULL DEFAULT 'PENDING',
   `http_status` SMALLINT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ========================================================
+-- Audit Logs Table (facility-scoped record of who did what -- which staff account
+-- sent/accepted/rejected/finalized a referral, or marked a patient arrived/departed.
+-- Local-only: IOL only authenticates at the facility level, so per-staff attribution
+-- can only be captured here, at the point the action is actually taken.)
+-- ========================================================
+CREATE TABLE `audit_logs` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `facility_id` INT NOT NULL,
+  `user_id` INT NULL,
+  `user_full_name` VARCHAR(100) NOT NULL,
+  `user_role` VARCHAR(20) NOT NULL,
+  `action` VARCHAR(30) NOT NULL,
+  `referral_id` VARCHAR(100) NULL,
+  `patient_name` VARCHAR(255) NULL,
+  `details` VARCHAR(255) NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT `fk_audit_logs_facility` FOREIGN KEY (`facility_id`) REFERENCES `facilities` (`id`) ON DELETE CASCADE,
+  INDEX `idx_audit_logs_facility_created` (`facility_id`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ========================================================
