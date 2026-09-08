@@ -734,6 +734,19 @@ $(document).ready(function () {
                     $('#modalPatientGender').text(patient.gender);
                     $('#modalPatientPhone').text(patient.phone || 'N/A');
 
+                    // Pregnancy is not applicable to male patients
+                    const isMale = String(patient.gender || '').trim().toLowerCase() === 'male';
+
+                    $('#modalIsPregnant')
+                        .prop('disabled', isMale)
+                        .prop('checked', isMale ? false : $('#modalIsPregnant').prop('checked'));
+
+                    $('#modalIsPregnantLabel').toggleClass('text-slate-400', isMale);
+
+                    if (isMale) {
+                        $('#modalIsPregnant').prop('checked', false);
+                    }
+
                     switchTab('referPatient');
                     // Pre-fill the location selector from the patient's own registered
                     // address instead of always defaulting to Davao City
