@@ -53,7 +53,7 @@
         }
         byId('consentMethod').value = method;
         byId('consentMethodPaperCard').className = `flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${isElectronic ? 'border-slate-200' : 'border-red-300 bg-red-50'}`;
-        byId('consentMethodElectronicCard').className = `flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${isElectronic ? 'border-blue-300 bg-blue-50' : 'border-slate-200'}`;
+        byId('consentMethodElectronicCard').className = `flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${isElectronic ? 'border-red-300 bg-red-50' : 'border-slate-200'}`;
         byId('consentMethodPaper').checked = !isElectronic;
         byId('consentMethodElectronic').checked = isElectronic;
         if (isElectronic) {
@@ -498,7 +498,7 @@
         byId('referralForm')?.addEventListener('reset', () => window.setTimeout(() => {
             electronicConsentApplied = false;
             generatedElectronicFileName = '';
-            setMethod('PAPER');
+            setMethod('ELECTRONIC');
             byId('consentSignerType').value = '';
             byId('consentSignerName').value = '';
             byId('consentRepresentativeRelationship').value = '';
