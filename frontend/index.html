@@ -780,27 +780,67 @@
 
                             <!-- Printable Paper Consent -->
                             <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm mb-6">
-                                <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                                    <div>
-                                        <h4 class="text-sm font-bold text-slate-900">Referral Consent</h4>
-                                        <p class="text-xs text-slate-500 mt-1">The receiving hospital is not known yet and will be determined through IRDSS.</p>
+                                <div>
+                                    <h4 class="text-sm font-bold text-slate-900">Referral Consent</h4>
+                                    <p class="text-xs text-slate-500 mt-1">Choose how the patient or authorized representative will provide consent. The receiving hospital will be determined through IRDSS.</p>
+                                </div>
+                                <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-red-300 bg-red-50 p-4" id="consentMethodPaperCard">
+                                        <input type="radio" name="consentMethodChoice" id="consentMethodPaper" value="PAPER" checked class="mt-0.5 h-4 w-4 border-slate-300 text-red-600 focus:ring-red-500">
+                                        <span><strong class="block text-sm text-slate-900">Paper consent</strong><span class="mt-0.5 block text-xs text-slate-500">Print, sign physically, then optionally upload or scan the signed copy.</span></span>
+                                    </label>
+                                    <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-4" id="consentMethodElectronicCard">
+                                        <input type="radio" name="consentMethodChoice" id="consentMethodElectronic" value="ELECTRONIC" class="mt-0.5 h-4 w-4 border-slate-300 text-red-600 focus:ring-red-500">
+                                        <span><strong class="block text-sm text-slate-900">Electronic signature</strong><span class="mt-0.5 block text-xs text-slate-500">Review the consent and sign directly on this device.</span></span>
+                                    </label>
+                                </div>
+                                <input type="hidden" id="consentMethod" value="PAPER">
+                                <input type="hidden" id="consentSignerType" value="">
+                                <input type="hidden" id="consentSignerName" value="">
+                                <input type="hidden" id="consentRepresentativeRelationship" value="">
+                                <input type="hidden" id="consentRecordedAt" value="">
+                                <input type="hidden" id="consentDocumentSha256" value="">
+
+                                <div id="paperConsentPanel" class="mt-4">
+                                    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                                        <p class="text-xs text-slate-500">Generate the consent form after completing the referral details.</p>
+                                        <button type="button" id="btnPrintReferralConsent" class="h-10 px-4 rounded-xl border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 text-sm font-semibold inline-flex items-center justify-center gap-2">
+                                            <i class="bi bi-printer"></i> Review and Print Consent
+                                        </button>
                                     </div>
-                                    <button type="button" id="btnPrintReferralConsent" class="h-10 px-4 rounded-xl border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 text-sm font-semibold inline-flex items-center justify-center gap-2">
-                                        <i class="bi bi-printer"></i> Review and Print Consent
-                                    </button>
+                                    <label class="mt-4 inline-flex items-start gap-2.5 text-sm text-slate-700 cursor-pointer">
+                                        <input type="checkbox" id="paperConsentConfirmed" class="mt-0.5 w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500">
+                                        <span><strong>Signed paper consent obtained.</strong> I confirm that the patient or authorized representative reviewed and signed the printed consent form.</span>
+                                    </label>
+                                    <div class="mt-4">
+                                        <label for="signedConsentForm" class="block text-xs font-semibold text-slate-500 mb-1.5">Signed patient consent <span class="text-slate-400 font-normal">(optional for paper)</span></label>
+                                        <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+                                            <input type="file" id="signedConsentForm" accept="application/pdf,image/jpeg,image/png"
+                                                class="block min-w-0 flex-1 text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-red-50 file:px-4 file:py-2 file:font-semibold file:text-red-700 hover:file:bg-red-100">
+                                            <button type="button" id="btnScanSignedConsent" class="h-10 px-4 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 text-sm font-semibold inline-flex items-center justify-center gap-2 whitespace-nowrap">
+                                                <i class="bi bi-camera"></i> Scan with Camera
+                                            </button>
+                                        </div>
+                                        <div id="signedConsentScanStatus" class="hidden mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800"></div>
+                                        <p class="mt-1 text-[11px] text-slate-400">Upload a PDF, JPEG, or PNG, or scan the signed form with a camera. Images can be cropped, straightened, rotated, and enhanced before upload. Maximum 5 MB.</p>
+                                    </div>
                                 </div>
+
+                                <div id="electronicConsentPanel" class="hidden mt-4 rounded-xl border border-blue-200 bg-blue-50/50 p-4">
+                                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                        <div>
+                                            <p class="text-sm font-semibold text-slate-900">Patient electronic consent</p>
+                                            <p class="mt-1 text-xs text-slate-500">The signer must review the approved text and sign while the logged-in clinician witnesses the process.</p>
+                                        </div>
+                                        <button type="button" id="btnOpenElectronicConsent" class="h-10 px-4 rounded-xl bg-blue-600 text-white hover:bg-blue-700 text-sm font-semibold inline-flex items-center justify-center gap-2 whitespace-nowrap">
+                                            <i class="bi bi-pen"></i> Review and Sign
+                                        </button>
+                                    </div>
+                                    <div id="electronicConsentStatus" class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">Electronic consent has not been signed.</div>
+                                </div>
+
                                 <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
-                                    Prototype draft: consent wording must be approved by the participating hospitals and Data Protection Officer before production use.
-                                </div>
-                                <label class="mt-4 inline-flex items-start gap-2.5 text-sm text-slate-700 cursor-pointer">
-                                    <input type="checkbox" id="paperConsentConfirmed" class="mt-0.5 w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500">
-                                    <span><strong>Signed paper consent obtained.</strong> I confirm that the patient or authorized representative reviewed and signed the printed consent form.</span>
-                                </label>
-                                <div class="mt-4">
-                                    <label for="signedConsentForm" class="block text-xs font-semibold text-slate-500 mb-1.5">Upload signed consent copy <span class="text-slate-400 font-normal">(optional)</span></label>
-                                    <input type="file" id="signedConsentForm" accept="application/pdf,image/jpeg,image/png"
-                                        class="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-red-50 file:px-4 file:py-2 file:font-semibold file:text-red-700 hover:file:bg-red-100">
-                                    <p class="mt-1 text-[11px] text-slate-400">PDF, JPEG, or PNG; maximum 5 MB. The protected copy is shared only with the finalized receiving hospital.</p>
+                                    Prototype only: the consent wording, electronic-signature process, retention policy, and signer-verification method require approval from participating hospitals, legal/privacy teams, and the Data Protection Officer before production use.
                                 </div>
                             </div>
 
@@ -971,9 +1011,12 @@
                                             <option value="">All Statuses</option>
                                             <option value="PENDING">Pending</option>
                                             <option value="SEEN">Seen</option>
-                                            <option value="ACCEPTED">Accepted</option>
-                                            <option value="REDIRECTED">Redirected</option>
-                                            <option value="CANCELLED">Cancelled</option>
+                                              <option value="ACCEPTED">Accepted</option>
+                                              <option value="REDIRECTED">Redirected</option>
+                                              <option value="ARRIVED">Arrived</option>
+                                              <option value="DISCHARGED">Discharged</option>
+                                              <option value="REFERRED_ONWARD">Referred Onward</option>
+                                              <option value="CANCELLED">Cancelled</option>
                                         </select>
                                     </div>
 
@@ -1410,6 +1453,149 @@
         </main>
     </div>
 
+    <!-- Electronic referral consent and signature -->
+    <div id="electronicConsentModal" class="hidden fixed inset-0 z-[125] bg-slate-950/75 p-3 sm:p-6 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="electronicConsentTitle">
+        <div class="mx-auto max-w-4xl min-h-full flex items-center justify-center">
+            <div class="w-full rounded-2xl bg-white shadow-2xl overflow-hidden">
+                <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+                    <div>
+                        <h3 id="electronicConsentTitle" class="text-lg font-bold text-slate-900">Patient Referral and Data-Sharing Consent</h3>
+                        <p class="mt-1 text-xs text-slate-500">Consent text version: <span id="electronicConsentVersion">referral-consent-2026-09-v1</span></p>
+                    </div>
+                    <button type="button" id="btnCloseElectronicConsent" class="h-9 w-9 rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Close electronic consent"><i class="bi bi-x-lg"></i></button>
+                </div>
+                <div class="max-h-[78vh] overflow-y-auto p-5">
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-7 text-slate-700">
+                        <p>I have been informed why a referral is recommended and had an opportunity to ask questions. I understand that IRDSS may first share a limited clinical referral summary with candidate hospitals so they can evaluate capacity. My identity, complete clinical details, and protected attachments will be made available only to the hospital selected to receive the referral, except where disclosure is otherwise required or permitted by law.</p>
+                        <p class="mt-4">I authorize <strong id="electronicConsentFacility">the referring facility</strong> and participating IRDSS facilities to collect, securely transmit, access, and use the information reasonably necessary to coordinate this referral and provide care. I understand that consent may be withdrawn before disclosure or processing where withdrawal is legally and operationally possible, without affecting processing already lawfully completed.</p>
+                    </div>
+
+                    <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label for="electronicSignerType" class="block text-xs font-semibold text-slate-600 mb-1.5">Who is signing? <span class="text-red-600">*</span></label>
+                            <select id="electronicSignerType" class="w-full h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none">
+                                <option value="PATIENT">Patient</option>
+                                <option value="PARENT_GUARDIAN">Parent or guardian</option>
+                                <option value="AUTHORIZED_REPRESENTATIVE">Authorized representative</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="electronicSignerName" class="block text-xs font-semibold text-slate-600 mb-1.5">Signer’s full name <span class="text-red-600">*</span></label>
+                            <input type="text" id="electronicSignerName" maxlength="255" class="w-full h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none">
+                        </div>
+                        <div id="electronicRelationshipField" class="hidden sm:col-span-2">
+                            <label for="electronicSignerRelationship" class="block text-xs font-semibold text-slate-600 mb-1.5">Relationship to patient <span class="text-red-600">*</span></label>
+                            <input type="text" id="electronicSignerRelationship" maxlength="100" placeholder="e.g. Mother, father, legal guardian" class="w-full h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none">
+                        </div>
+                    </div>
+
+                    <div class="mt-5">
+                        <div class="flex items-center justify-between gap-3 mb-2">
+                            <label class="text-xs font-semibold text-slate-600">Signature <span class="text-red-600">*</span></label>
+                            <button type="button" id="btnClearElectronicSignature" class="text-xs font-semibold text-blue-700 hover:underline">Clear signature</button>
+                        </div>
+                        <div class="rounded-xl border-2 border-dashed border-slate-300 bg-white p-2">
+                            <canvas id="electronicSignatureCanvas" width="1200" height="320" class="block h-40 w-full cursor-crosshair touch-none" aria-label="Electronic signature pad"></canvas>
+                        </div>
+                        <p class="mt-1 text-[11px] text-slate-400">Sign using a finger, stylus, touchpad, or mouse.</p>
+                    </div>
+
+                    <label class="mt-5 flex cursor-pointer items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-slate-700">
+                        <input type="checkbox" id="electronicConsentAcknowledged" class="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                        <span>I confirm that I reviewed the consent text above, understood it, had an opportunity to ask questions, and voluntarily provide this electronic signature.</span>
+                    </label>
+
+                    <div class="mt-4 rounded-xl border border-slate-200 px-4 py-3 text-xs text-slate-600">
+                        <strong>Referring clinician and consent witness:</strong> <span id="electronicConsentWitness">Logged-in clinical staff</span><br>
+                        <strong>License No.:</strong> <span id="electronicConsentWitnessLicense">Not recorded</span>
+                    </div>
+
+                    <label class="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-slate-700">
+                        <input type="checkbox" id="electronicClinicianAttested" class="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+                        <span>I confirm that I explained the referral, answered questions, and personally witnessed the signer provide consent.</span>
+                    </label>
+
+                    <div class="mt-3 rounded-xl border border-slate-200 px-4 py-3 text-xs text-slate-600">
+                        The system will record the signing time, consent-text version, signer information, and SHA-256 hash of the generated consent document.
+                    </div>
+                </div>
+                <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200 px-5 py-4">
+                    <button type="button" id="btnCancelElectronicConsent" class="h-10 px-4 rounded-xl border border-slate-300 text-slate-700 text-sm font-semibold hover:bg-slate-50">Cancel</button>
+                    <button type="button" id="btnAcceptElectronicConsent" class="h-10 px-5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700"><i class="bi bi-shield-check me-1"></i>Accept and Apply Signature</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Signed consent document scanner -->
+    <div id="consentScannerModal" class="hidden fixed inset-0 z-[120] bg-slate-950/75 p-3 sm:p-6 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="consentScannerTitle">
+        <div class="mx-auto max-w-6xl min-h-full flex items-center justify-center">
+            <div class="w-full rounded-2xl bg-white shadow-2xl overflow-hidden">
+                <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+                    <div>
+                        <h3 id="consentScannerTitle" class="text-lg font-bold text-slate-900">Scan Signed Patient Consent</h3>
+                        <p id="consentScannerSubtitle" class="mt-1 text-xs text-slate-500">Place the complete form on a flat, contrasting surface with good lighting.</p>
+                    </div>
+                    <button type="button" id="btnCloseConsentScanner" class="h-9 w-9 rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Close scanner"><i class="bi bi-x-lg"></i></button>
+                </div>
+
+                <div class="p-4 sm:p-5">
+                    <div id="consentCameraStage">
+                        <div class="relative mx-auto overflow-hidden rounded-xl bg-black" style="max-width: 820px; aspect-ratio: 4 / 3;">
+                            <video id="consentScannerVideo" class="h-full w-full object-contain" autoplay playsinline muted></video>
+                            <div class="pointer-events-none absolute inset-[6%] rounded-lg border-2 border-dashed border-white/80"></div>
+                        </div>
+                        <div id="consentCameraMessage" class="mt-3 text-center text-sm text-slate-500">Requesting camera access…</div>
+                        <div class="mt-4 flex flex-wrap justify-center gap-3">
+                            <button type="button" id="btnCaptureConsent" disabled class="h-11 px-5 rounded-xl bg-blue-600 text-white font-semibold disabled:cursor-not-allowed disabled:opacity-50 hover:bg-blue-700"><i class="bi bi-camera-fill me-2"></i>Capture Form</button>
+                            <button type="button" id="btnChooseConsentInstead" class="h-11 px-5 rounded-xl border border-slate-300 text-slate-700 font-semibold hover:bg-slate-50"><i class="bi bi-upload me-2"></i>Choose Image Instead</button>
+                        </div>
+                    </div>
+
+                    <div id="consentEditorStage" class="hidden">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <div>
+                                <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Adjust document corners</p>
+                                <div id="consentCropSurface" class="relative mx-auto overflow-hidden rounded-xl bg-slate-900 select-none touch-none">
+                                    <canvas id="consentSourceCanvas" class="block h-auto w-full"></canvas>
+                                    <svg id="consentCropOverlay" class="absolute inset-0 h-full w-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                                        <polygon id="consentCropPolygon" points="0,0 100,0 100,100 0,100" fill="rgba(37,99,235,.12)" stroke="#60a5fa" stroke-width="0.7" vector-effect="non-scaling-stroke"></polygon>
+                                    </svg>
+                                    <button type="button" class="consent-crop-handle absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-blue-600 shadow" data-corner="0" aria-label="Top-left crop corner"></button>
+                                    <button type="button" class="consent-crop-handle absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-blue-600 shadow" data-corner="1" aria-label="Top-right crop corner"></button>
+                                    <button type="button" class="consent-crop-handle absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-blue-600 shadow" data-corner="2" aria-label="Bottom-right crop corner"></button>
+                                    <button type="button" class="consent-crop-handle absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-blue-600 shadow" data-corner="3" aria-label="Bottom-left crop corner"></button>
+                                </div>
+                                <p class="mt-2 text-[11px] text-slate-400">Drag the blue handles if the detected page boundary is incorrect.</p>
+                            </div>
+                            <div>
+                                <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Processed preview</p>
+                                <div class="flex min-h-[280px] items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-100 p-2">
+                                    <canvas id="consentOutputCanvas" class="block max-h-[62vh] max-w-full bg-white shadow-sm"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="consentScanWarning" class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800"></div>
+
+                        <div class="mt-4 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+                            <div class="flex flex-wrap gap-2" role="group" aria-label="Scan appearance">
+                                <button type="button" class="consent-scan-mode h-10 px-4 rounded-xl border border-slate-300 text-sm font-semibold" data-mode="color">Color</button>
+                                <button type="button" class="consent-scan-mode h-10 px-4 rounded-xl border border-blue-600 bg-blue-50 text-blue-700 text-sm font-semibold" data-mode="grayscale">Grayscale</button>
+                                <button type="button" class="consent-scan-mode h-10 px-4 rounded-xl border border-slate-300 text-sm font-semibold" data-mode="binary">Black &amp; White</button>
+                                <button type="button" id="btnRotateConsentScan" class="h-10 px-4 rounded-xl border border-slate-300 text-slate-700 text-sm font-semibold hover:bg-slate-50"><i class="bi bi-arrow-clockwise me-1"></i>Rotate</button>
+                            </div>
+                            <div class="flex flex-wrap justify-end gap-3">
+                                <button type="button" id="btnRetakeConsentScan" class="h-10 px-4 rounded-xl border border-slate-300 text-slate-700 text-sm font-semibold hover:bg-slate-50">Retake</button>
+                                <button type="button" id="btnUseConsentScan" class="h-10 px-5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700"><i class="bi bi-check-lg me-1"></i>Use This Copy</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ======================================================== -->
     <!-- LOCKED NOTICE VIEW (Doctor/Nurse at an unassessed facility) -->
     <!-- ======================================================== -->
@@ -1464,7 +1650,9 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <!-- Application JS -->
     <script src="js/service_assessment.js"></script>
-    <script src="js/app.js?v=20260908x"></script>
+    <script src="js/app.js?v=20260909f"></script>
+    <script src="js/consent-scanner.js?v=20260909d"></script>
+    <script src="js/electronic-consent.js?v=20260909d"></script>
 
 
 </body>

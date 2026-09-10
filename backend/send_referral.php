@@ -47,19 +47,42 @@ $consentStatus = strtoupper(trim((string)($input['consent_status'] ?? '')));
 $consentMethod = strtoupper(trim((string)($input['consent_method'] ?? '')));
 $consentTextVersion = trim((string)($input['consent_text_version'] ?? ''));
 $consentRecordedAtRaw = trim((string)($input['consent_recorded_at'] ?? ''));
-$consentWitnessedBy = trim((string)($input['consent_witnessed_by'] ?? ''));
+$submittedConsentWitness = trim((string)($input['consent_witnessed_by'] ?? ''));
+$consentWitnessedBy = trim((string)($user['full_name'] ?? ''));
+$consentSignerType = strtoupper(trim((string)($input['consent_signer_type'] ?? '')));
+$consentSignerName = trim((string)($input['consent_signer_name'] ?? ''));
+$consentRepresentativeRelationship = trim((string)($input['consent_representative_relationship'] ?? ''));
+$consentDocumentSha256 = strtolower(trim((string)($input['consent_document_sha256'] ?? '')));
 
-if ($consentStatus !== 'GRANTED' || $consentMethod !== 'PAPER'
-    || $consentTextVersion === '' || $consentRecordedAtRaw === '' || $consentWitnessedBy === '') {
-    sendJsonResponse(['success' => false, 'message' => 'Signed paper referral consent must be confirmed before transmission.'], 422);
+if ($consentStatus !== 'GRANTED' || !in_array($consentMethod, ['PAPER', 'ELECTRONIC'], true)
+    || $consentTextVersion !== 'referral-consent-2026-09-v1' || $consentRecordedAtRaw === '' || $consentWitnessedBy === '') {
+    sendJsonResponse(['success' => false, 'message' => 'Valid referral consent must be completed before transmission.'], 422);
+}
+if ($submittedConsentWitness !== '' && $submittedConsentWitness !== $consentWitnessedBy) {
+    sendJsonResponse(['success' => false, 'message' => 'The consent witness must match the logged-in clinical staff member.'], 422);
 }
 if (mb_strlen($consentTextVersion) > 50 || mb_strlen($consentWitnessedBy) > 255) {
     sendJsonResponse(['success' => false, 'message' => 'Consent audit information is invalid.'], 422);
+}
+if ($consentMethod === 'ELECTRONIC') {
+    $validSignerTypes = ['PATIENT', 'PARENT_GUARDIAN', 'AUTHORIZED_REPRESENTATIVE'];
+    if (!in_array($consentSignerType, $validSignerTypes, true)
+        || $consentSignerName === '' || mb_strlen($consentSignerName) > 255
+        || !preg_match('/^[a-f0-9]{64}$/', $consentDocumentSha256)) {
+        sendJsonResponse(['success' => false, 'message' => 'Electronic consent signer information or document hash is invalid.'], 422);
+    }
+    if ($consentSignerType !== 'PATIENT'
+        && ($consentRepresentativeRelationship === '' || mb_strlen($consentRepresentativeRelationship) > 100)) {
+        sendJsonResponse(['success' => false, 'message' => 'The representative relationship is required for electronic consent.'], 422);
+    }
 }
 try {
     $consentRecordedAtValue = new DateTimeImmutable($consentRecordedAtRaw);
     $consentRecordedAtIso = $consentRecordedAtValue->format(DateTimeInterface::ATOM);
     $consentRecordedAtMysql = $consentRecordedAtValue->format('Y-m-d H:i:s');
+    if ($consentMethod === 'ELECTRONIC' && abs(time() - $consentRecordedAtValue->getTimestamp()) > 1800) {
+        sendJsonResponse(['success' => false, 'message' => 'Electronic consent has expired. Please review and sign it again.'], 422);
+    }
 } catch (Exception $e) {
     sendJsonResponse(['success' => false, 'message' => 'Consent timestamp is invalid.'], 422);
 }
@@ -145,6 +168,16 @@ if (isset($_FILES['signed_consent_form']) && ($_FILES['signed_consent_form']['er
         sendJsonResponse(['success' => false, 'message' => 'The signed consent copy must be a PDF, JPEG, or PNG file.'], 422);
     }
 }
+if ($consentMethod === 'ELECTRONIC') {
+    if (!isset($_FILES['signed_consent_form'])
+        || ($_FILES['signed_consent_form']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        sendJsonResponse(['success' => false, 'message' => 'The generated electronic consent document is required.'], 422);
+    }
+    $uploadedConsentHash = hash_file('sha256', $_FILES['signed_consent_form']['tmp_name']);
+    if (!hash_equals($consentDocumentSha256, $uploadedConsentHash)) {
+        sendJsonResponse(['success' => false, 'message' => 'The electronic consent document failed its integrity check. Please sign again.'], 422);
+    }
+}
 
 try {
     $pdo = getDbConnection();
@@ -180,6 +213,10 @@ try {
     // Patient reference formatting for FHIR Encounter resource
     $patientRefId = 'P-' . sprintf('%06d', (int)$patient['id']);
     $fullName = trim($patient['first_name'] . ' ' . $patient['last_name']);
+    if ($consentMethod === 'ELECTRONIC' && $consentSignerType === 'PATIENT'
+        && mb_strtolower($consentSignerName) !== mb_strtolower($fullName)) {
+        sendJsonResponse(['success' => false, 'message' => 'A patient signature must use the selected patient’s full name.'], 422);
+    }
     $genderLower = strtolower(trim($patient['gender']));
 
     // Construct FHIR JSON Payload matching exact IOL schema specification
@@ -211,6 +248,14 @@ try {
     $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/consentTextVersion", "valueString" => $consentTextVersion];
     $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/consentRecordedAt", "valueString" => $consentRecordedAtIso];
     $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/consentWitnessedBy", "valueString" => $consentWitnessedBy];
+    if ($consentMethod === 'ELECTRONIC') {
+        $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/consentSignerType", "valueString" => $consentSignerType];
+        $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/consentSignerName", "valueString" => $consentSignerName];
+        if ($consentRepresentativeRelationship !== '') {
+            $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/consentRepresentativeRelationship", "valueString" => $consentRepresentativeRelationship];
+        }
+        $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/consentDocumentSha256", "valueString" => $consentDocumentSha256];
+    }
 
     // Patient identity fields -- only ever decrypted centrally by the facility this
     // referral is finalized to (GET /api/v1/referral/{id}/patient-details)
@@ -422,10 +467,12 @@ try {
         $consentStmt = $pdo->prepare('
             INSERT INTO referral_consents
                 (initiated_referral_id, central_referral_id, status, method, consent_text_version,
-                 witnessed_by, recorded_at, signed_copy_uploaded)
+                 witnessed_by, recorded_at, signer_type, signer_name,
+                 representative_relationship, document_sha256, signed_copy_uploaded)
             VALUES
                 (:local_referral_id, :central_referral_id, :status, :method, :text_version,
-                 :witnessed_by, :recorded_at, 0)
+                 :witnessed_by, :recorded_at, :signer_type, :signer_name,
+                 :representative_relationship, :document_sha256, 0)
         ');
         $consentStmt->execute([
             ':local_referral_id' => $localReferralId,
@@ -435,6 +482,10 @@ try {
             ':text_version' => $consentTextVersion,
             ':witnessed_by' => $consentWitnessedBy,
             ':recorded_at' => $consentRecordedAtMysql,
+            ':signer_type' => $consentSignerType !== '' ? $consentSignerType : null,
+            ':signer_name' => $consentSignerName !== '' ? $consentSignerName : null,
+            ':representative_relationship' => $consentRepresentativeRelationship !== '' ? $consentRepresentativeRelationship : null,
+            ':document_sha256' => $consentDocumentSha256 !== '' ? $consentDocumentSha256 : null,
         ]);
     } catch (Exception $e) {
         // Local persistence is a best-effort record -- never block the referral

@@ -1059,12 +1059,26 @@ $(document).ready(function () {
         );
 
         const consentFiles = Array.from($('#signedConsentForm')[0]?.files || []);
+        const consentMethod = String($('#consentMethod').val() || 'PAPER').toUpperCase();
         markField(
             $('#signedConsentForm'),
-            consentFiles.length > 1 || consentFiles.some(file => file.size > 5 * 1024 * 1024 || !allowedTypes.includes(file.type))
+            consentFiles.length > 1
+                || consentFiles.some(file => file.size > 5 * 1024 * 1024 || !allowedTypes.includes(file.type))
+                || (requireConsent && consentMethod === 'ELECTRONIC' && consentFiles.length !== 1)
         );
         if (requireConsent) {
-            markField($('#paperConsentConfirmed'), !$('#paperConsentConfirmed').is(':checked'));
+            if (consentMethod === 'PAPER') {
+                markField($('#paperConsentConfirmed'), !$('#paperConsentConfirmed').is(':checked'));
+            } else {
+                const electronicConsentComplete = Boolean(
+                    $('#consentSignerType').val()
+                    && $('#consentSignerName').val()
+                    && $('#consentRecordedAt').val()
+                    && /^[a-f0-9]{64}$/i.test(String($('#consentDocumentSha256').val() || ''))
+                    && ($('#consentSignerType').val() === 'PATIENT' || $('#consentRepresentativeRelationship').val())
+                );
+                markField($('#consentMethodElectronicCard'), !electronicConsentComplete);
+            }
         }
 
         if ($firstInvalid) {
@@ -1096,6 +1110,62 @@ $(document).ready(function () {
         if (!birthdayPassed) years -= 1;
         return `${Math.max(0, years)} year${years === 1 ? '' : 's'} old`;
     }
+
+    function consentRecordedText(consentStatus, consentMethod) {
+        if (String(consentStatus || '').toUpperCase() !== 'GRANTED') return 'Not recorded';
+        const method = String(consentMethod || '').toUpperCase();
+        if (method === 'ELECTRONIC') return 'Electronic consent recorded';
+        if (method === 'PAPER') return 'Paper consent recorded';
+        return 'Consent recorded';
+    }
+
+    window.getReferralConsentSnapshot = function () {
+        const primaryReason = $('#modalReasonText').val() || $('#modalReasonSelect').val();
+        const isDoctor = String(currentUser?.role || '').toLowerCase() === 'doctor';
+        const clinicianBaseName = currentUser?.full_name || currentUser?.name || currentUser?.username || 'Clinical staff';
+        const clinicianName = isDoctor && !/^(dr\.?|doctor)\s+/i.test(String(clinicianBaseName).trim())
+            ? `Dr. ${clinicianBaseName}`
+            : clinicianBaseName;
+        const isPhilHealthMember = String(currentReferralPatient?.philhealth_member || '').toLowerCase() === 'yes';
+        const hasAllergy = $('#modalHasAllergy').is(':checked');
+        const gender = String($('#modalPatientGender').text() || '').trim();
+
+        return {
+            patientName: String($('#modalPatientName').text() || '').trim(),
+            phone: String($('#modalPatientPhone').text() || '').trim(),
+            dateOfBirth: String($('#modalPatientDob').text() || '').trim(),
+            age: calculatePrintableAge($('#modalPatientDob').text()),
+            gender,
+            patientLocation: String($('#displayResolvedAddress').text() || '').trim(),
+            pwd: $('#modalIsPwd').is(':checked') ? 'Yes' : 'No',
+            pregnant: gender.toLowerCase() === 'male' ? 'Not applicable' : ($('#modalIsPregnant').is(':checked') ? 'Yes' : 'No'),
+            hasAllergy: hasAllergy ? 'Yes' : 'No',
+            allergyDetails: hasAllergy ? String($('#modalAllergyDetails').val() || 'Not specified').trim() : 'Not applicable',
+            philHealthMember: isPhilHealthMember ? 'Yes' : 'No',
+            philHealthType: isPhilHealthMember ? String(currentReferralPatient?.philhealth_status_type || 'Not specified').trim() : 'Not applicable',
+            philHealthNumber: isPhilHealthMember ? String(currentReferralPatient?.philhealth_number || '').trim() : '',
+            referringHospital: currentHospital?.name || 'Referring facility',
+            receivingHospital: 'To be determined through IRDSS',
+            chiefComplaint: String($('#modalChiefComplaint').val() || '').trim(),
+            diagnosis: String($('#modalDiagnosis').val() || 'Not specified').trim(),
+            severity: String($('#modalSeverity option:selected').text() || '').trim(),
+            reasons: [primaryReason, ...getAdditionalReferralReasons()].filter(Boolean).map(value => String(value).trim()),
+            vitals: {
+                bloodPressure: `${$('#modalVitalBpSystolic').val() || '--'}/${$('#modalVitalBpDiastolic').val() || '--'} mmHg`,
+                heartRate: `${$('#modalVitalHr').val() || '--'} bpm`,
+                respiratoryRate: `${$('#modalVitalRr').val() || '--'} br/min`,
+                temperature: `${$('#modalVitalTemp').val() || '--'} \u00b0C`,
+                oxygenSaturation: `${$('#modalVitalO2sat').val() || '--'}%`,
+                height: `${$('#modalVitalHeight').val() || '--'} cm`,
+                weight: `${$('#modalVitalWeight').val() || '--'} kg`
+            },
+            clinicianName,
+            clinicianRole: isDoctor ? 'Referring Doctor' : 'Referring Nurse',
+            clinicianLicenseNumber: currentUser?.license_number || 'Not recorded',
+            hospitalLogoUrl: new URL(getHospitalLogoPath(currentHospital?.code), window.location.href).href,
+            irdssLogoUrl: new URL('assets/logos/IRDSS_long.png', window.location.href).href
+        };
+    };
 
     function printReferralConsentForm() {
         if (!validateReferralForm(false)) {
@@ -1248,7 +1318,7 @@ $(document).ready(function () {
     // than making the doctor resubmit to find out it's no longer invalid.
     // #modalReasonCategory and #modalReasonSelect are included even though they don't have [required] attributes --
     // they're flagged manually above since the real requirement lives on the reason dropdowns.
-    $(document).on('input change', '#referralForm [required], #modalReasonCategory, #modalReasonSelect, .additional-reason-select, #referralAttachments, #signedConsentForm, #paperConsentConfirmed', function () {
+    $(document).on('input change', '#referralForm [required], #modalReasonCategory, #modalReasonSelect, .additional-reason-select, #referralAttachments, #signedConsentForm, #paperConsentConfirmed, [name="consentMethodChoice"]', function () {
         const $field = $(this);
         if (String($field.val() || '').trim()) {
             $field.removeClass(REQUIRED_FIELD_ERROR_CLASSES);
@@ -1284,6 +1354,7 @@ $(document).ready(function () {
             label: label
         }));
         const formData = new FormData();
+        const consentMethod = String($('#consentMethod').val() || 'PAPER').toUpperCase();
         const fields = {
             patient_id: parseInt($('#modalPatientId').val(), 10) || 1,
             latitude: parseFloat($('#modalLatitude').val()) || 7.1907,
@@ -1307,10 +1378,14 @@ $(document).ready(function () {
             has_allergy: $('#modalHasAllergy').is(':checked') ? 1 : 0,
             allergy_details: $('#modalHasAllergy').is(':checked') ? ($('#modalAllergyDetails').val() || '') : '',
             consent_status: 'GRANTED',
-            consent_method: 'PAPER',
+            consent_method: consentMethod,
             consent_text_version: 'referral-consent-2026-09-v1',
-            consent_recorded_at: new Date().toISOString(),
-            consent_witnessed_by: currentUser?.full_name || currentUser?.name || currentUser?.username || 'Clinical staff'
+            consent_recorded_at: consentMethod === 'ELECTRONIC' ? $('#consentRecordedAt').val() : new Date().toISOString(),
+            consent_witnessed_by: currentUser?.full_name || currentUser?.name || currentUser?.username || 'Clinical staff',
+            consent_signer_type: consentMethod === 'ELECTRONIC' ? $('#consentSignerType').val() : '',
+            consent_signer_name: consentMethod === 'ELECTRONIC' ? $('#consentSignerName').val() : '',
+            consent_representative_relationship: consentMethod === 'ELECTRONIC' ? $('#consentRepresentativeRelationship').val() : '',
+            consent_document_sha256: consentMethod === 'ELECTRONIC' ? $('#consentDocumentSha256').val() : ''
         };
         Object.entries(fields).forEach(([key, value]) => formData.append(key, value));
         Array.from($('#referralAttachments')[0]?.files || []).forEach(file => formData.append('referral_attachments[]', file));
@@ -2218,6 +2293,20 @@ $(document).ready(function () {
                 const allAttachments = Array.isArray(d.attachments) ? d.attachments : [];
                 const consentAttachments = allAttachments.filter(file => file.attachment_type === 'CONSENT_FORM');
                 const clinicalAttachments = allAttachments.filter(file => file.attachment_type !== 'CONSENT_FORM');
+                const signerTypeLabels = {
+                    PATIENT: 'Patient',
+                    PARENT_GUARDIAN: 'Parent or guardian',
+                    AUTHORIZED_REPRESENTATIVE: 'Authorized representative'
+                };
+                const electronicConsentAudit = d.consent_method === 'ELECTRONIC' ? `
+                    <div class="mb-3 rounded-lg bg-blue-50 px-3 py-2 text-xs text-slate-700">
+                        <p><span class="text-slate-500">Signed by:</span> <strong>${escapeHtml(d.consent_signer_name || '—')}</strong> (${escapeHtml(signerTypeLabels[d.consent_signer_type] || d.consent_signer_type || '—')})</p>
+                        ${d.consent_representative_relationship ? `<p class="mt-1"><span class="text-slate-500">Relationship:</span> ${escapeHtml(d.consent_representative_relationship)}</p>` : ''}
+                        <p class="mt-1"><span class="text-slate-500">Witness:</span> ${escapeHtml(d.consent_witnessed_by || '—')}</p>
+                        <p class="mt-1"><span class="text-slate-500">Signed:</span> ${escapeHtml(d.consent_recorded_at ? formatDateTime12h(d.consent_recorded_at) : '—')}</p>
+                        <p class="mt-1 break-all"><span class="text-slate-500">Document SHA-256:</span> <span class="font-mono">${escapeHtml(d.consent_document_sha256 || '—')}</span></p>
+                    </div>
+                ` : '';
 
                 Swal.fire({
                     title: 'Patient Details',
@@ -2243,7 +2332,7 @@ $(document).ready(function () {
                                     <p class="text-base font-bold text-slate-900 mb-3">${escapeHtml(d.diagnosis || '—')}</p>
                                     <p class="mb-2"><span class="text-slate-500">Chief Complaint:</span> <span class="font-semibold text-slate-800">${escapeHtml(d.chief_complaint || '—')}</span></p>
                                     <p class="mb-2"><span class="text-slate-500">Referral Reasons:</span> <span class="font-semibold text-slate-800">${escapeHtml(referralReasonsText(d))}</span></p>
-                                    <p class="mb-2"><span class="text-slate-500">Consent:</span> <span class="font-semibold ${d.consent_status === 'GRANTED' ? 'text-emerald-700' : 'text-red-700'}">${d.consent_status === 'GRANTED' ? 'Paper consent recorded' : 'Not recorded'}</span></p>
+                                    <p class="mb-2"><span class="text-slate-500">Consent:</span> <span class="font-semibold ${String(d.consent_status || '').toUpperCase() === 'GRANTED' ? 'text-emerald-700' : 'text-red-700'}">${consentRecordedText(d.consent_status, d.consent_method)}</span></p>
                                     <p class="mb-3"><span class="text-slate-500">Severity:</span> <span class="${severityClass} px-2.5 py-1 rounded-full text-xs font-bold ml-1">${severityText}</span></p>
                                     <p><span class="text-slate-500">Referring Facility:</span> <span class="font-semibold text-slate-800">${escapeHtml(d.referring_facility || '—')}</span></p>
                                     ${tagsRow}
@@ -2254,6 +2343,7 @@ $(document).ready(function () {
 
                             <div class="mb-4 border border-slate-200 rounded-xl p-4">
                                 <p class="font-semibold text-slate-800 mb-1">Patient Consent</p>
+                                ${electronicConsentAudit}
                                 ${consentAttachments.length
                                     ? attachmentLinksHtml(referralId, consentAttachments)
                                     : '<p class="text-xs text-slate-400">No signed patient consent copy uploaded.</p>'}
@@ -2849,8 +2939,32 @@ $(document).ready(function () {
         ACCEPTED: 'bg-emerald-100 text-emerald-800',
         REDIRECTED: 'bg-indigo-100 text-indigo-800',
         NOT_SELECTED: 'bg-slate-200 text-slate-600',
-        CANCELLED: 'bg-slate-200 text-slate-700'
+        CANCELLED: 'bg-slate-200 text-slate-700',
+        ARRIVED: 'bg-sky-100 text-sky-800',
+        DISCHARGED: 'bg-emerald-100 text-emerald-800',
+        REFERRED_ONWARD: 'bg-indigo-100 text-indigo-800',
+        TRANSFERRED: 'bg-indigo-100 text-indigo-800',
+        DECEASED: 'bg-slate-200 text-slate-800',
+        LEFT_AMA: 'bg-orange-100 text-orange-800',
+        DEPARTED: 'bg-slate-100 text-slate-700'
     };
+
+    const REFERRAL_STATUS_LABEL = {
+        REFERRED_ONWARD: 'Referred Onward',
+        DISCHARGED: 'Discharged',
+        TRANSFERRED: 'Transferred',
+        DECEASED: 'Deceased',
+        LEFT_AMA: 'Left AMA',
+        DEPARTED: 'Departed'
+    };
+
+    function effectiveReferralStatus(referral) {
+        if (referral?.departed_at) {
+            return String(referral.departure_outcome || 'DEPARTED').trim().toUpperCase();
+        }
+        if (referral?.onward_referral) return 'REFERRED_ONWARD';
+        return String(referral?.status || 'PENDING').trim().toUpperCase();
+    }
 
     function formatReferralTimestamp(value) {
         if (!value) return '—';
@@ -2873,7 +2987,10 @@ $(document).ready(function () {
             dataType: 'json',
             success: function (data) {
                 $('#referralsConnectionAlert').slideUp(200);
-                myReferralsCache = Array.isArray(data) ? data : [];
+                myReferralsCache = (Array.isArray(data) ? data : []).map(referral => ({
+                    ...referral,
+                    status: effectiveReferralStatus(referral)
+                }));
                 applyReferralFilters();
                 $('#myReferralsLastUpdated').text(
                     new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -2984,7 +3101,7 @@ $(document).ready(function () {
                     <td class="py-3.5 px-6 font-mono text-xs font-semibold text-slate-500 border-b border-slate-300/60">${escapeHtml(ref.referral_id)}</td>
                     <td class="py-3.5 px-6 text-slate-700 text-xs font-mono border-b border-slate-300/60">${escapeHtml(ref.patient_id)}</td>
                     <td class="py-3.5 px-6 text-slate-600 text-xs border-b border-slate-300/60">${escapeHtml(ref.disease_severity)}</td>
-                    <td class="py-3.5 px-6 border-b border-slate-300/60"><span class="px-2.5 py-1 rounded-full text-xs font-bold ${badgeClass}">${escapeHtml(ref.status)}</span></td>
+                    <td class="py-3.5 px-6 border-b border-slate-300/60"><span class="px-2.5 py-1 rounded-full text-xs font-bold ${badgeClass}">${escapeHtml(REFERRAL_STATUS_LABEL[ref.status] || ref.status)}</span></td>
                     <td class="py-3.5 px-6 text-slate-600 text-xs border-b border-slate-300/60">${formatReferralTimestamp(ref.created_at)}</td>
                     <td class="py-3.5 px-6 text-slate-600 text-xs border-b border-slate-300/60">${formatReferralTimestamp(ref.seen_at)}</td>
                     <td class="py-3.5 px-6 text-xs border-b border-slate-300/60">
@@ -3708,7 +3825,7 @@ $(document).ready(function () {
                         ${infoRow('Chief Complaint', escapeHtml(chiefComplaint), { id: 'modal-chief-complaint' })}
                         ${patientStatusText ? infoRow('Patient Status', escapeHtml(patientStatusText)) : ''}
                         ${allergyText ? infoRow('Allergy', escapeHtml(allergyText), { valueClass: 'font-bold text-red-700' }) : ''}
-                        ${infoRow('Consent', incomingAlert.consent_status === 'GRANTED' ? 'Paper consent recorded' : 'Not recorded', { valueClass: incomingAlert.consent_status === 'GRANTED' ? 'font-bold text-emerald-700' : 'font-bold text-red-700' })}
+                        ${infoRow('Consent', consentRecordedText(incomingAlert.consent_status, incomingAlert.consent_method), { valueClass: String(incomingAlert.consent_status || '').toUpperCase() === 'GRANTED' ? 'font-bold text-emerald-700' : 'font-bold text-red-700' })}
                         ${infoRow('Reason for Referral', escapeHtml(clinicalReason), { id: 'modal-reason', last: true })}
                     `, 'mt-3')}
 
