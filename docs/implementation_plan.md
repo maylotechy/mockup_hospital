@@ -133,3 +133,31 @@ scheduled as a dedicated block rather than squeezed in alongside feature work.
    answer before any related code is touched.
 2. Small UI gap: surface "Transferred In" origin on Patient Records (§1) — cheap, high clarity win.
 3. SSE migration (§3) — larger effort, schedule as its own block once the above are settled.
+
+---
+
+## 4. Referral lifecycle timeline and SNOMED referral categories
+
+### Referral lifecycle timeline
+
+- [ ] Add a visible timeline to every sent referral so the referring facility can follow the
+      referral across hospitals instead of seeing only its current status.
+- [ ] Include clear milestones for **Received**, **Referred Onward**, and **Complete**, with the
+      responsible facility and timestamp for each event.
+- [ ] When a referral is sent onward, link the new referral to its source referral and show the
+      destination hospital in the timeline without overwriting the earlier events.
+- [ ] Define the exact rule for **Complete** (for example: accepted/finalized, patient arrived, or
+      discharged) before implementation so the label has one consistent meaning.
+- [ ] Keep the timeline compatible with both the current IOL referral workflow and the FHIR
+      `ServiceRequest`/`Task` onward-referral chain where possible.
+
+### SNOMED-bound referral category dropdown
+
+- [ ] Review every Referral Category dropdown and source its options from the official PH
+      eReferral Referral Category ValueSet instead of maintaining unrelated free-text choices.
+- [ ] Store and transmit both the SNOMED CT code and display text, not the display label alone.
+- [ ] For the FHIR Connectathon flow, keep `ServiceRequest.category` bound to
+      `https://www.fhir.doh.gov.ph/pheref/ValueSet/referral-category` and validate the selected
+      code on the backend as well as in the frontend.
+- [ ] Avoid hard-coding the expansion permanently; add a locally cached fallback so the referral
+      form still works if the terminology server is temporarily unavailable.

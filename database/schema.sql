@@ -1,218 +1,440 @@
--- ========================================================
--- Database Schema for Multi-Tier Facility HIS
--- Database: hospital_db
--- ========================================================
+-- MySQL dump 10.13  Distrib 8.4.3, for Win64 (x86_64)
+--
+-- Host: 127.0.0.1    Database: hospital_db
+-- ------------------------------------------------------
+-- Server version	8.4.3
 
-CREATE DATABASE IF NOT EXISTS `hospital_db` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE `hospital_db`;
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8mb4 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `audit_logs`
+--
+
+DROP TABLE IF EXISTS `audit_logs`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `audit_logs` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `facility_id` int NOT NULL,
+  `user_id` int DEFAULT NULL,
+  `user_full_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_role` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `action` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `referral_id` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `patient_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `details` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_audit_logs_facility_created` (`facility_id`,`created_at`),
+  CONSTRAINT `fk_audit_logs_facility` FOREIGN KEY (`facility_id`) REFERENCES `facilities` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=84 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `audit_logs`
+--
+
+LOCK TABLES `audit_logs` WRITE;
+/*!40000 ALTER TABLE `audit_logs` DISABLE KEYS */;
+INSERT INTO `audit_logs` VALUES (3,5,16,'test','doctor','PATIENT_DEPARTED','ref_14b21743334b','Stephen Strange','DISCHARGED','2026-08-25 05:32:06'),(4,5,16,'test','doctor','PATIENT_DEPARTED','ref_d200481e6b98',NULL,'DISCHARGED','2026-08-25 05:36:46'),(5,5,16,'test','doctor','REFERRAL_SENT','ref_4f676bc41b61','Stephen Strange','No Available Nephrologist','2026-08-25 05:39:15'),(6,5,16,'test','doctor','REFERRAL_SENT','ref_9d32c7d3a38e','Bucky Barnes','No Available Neonatologist','2026-08-25 05:41:10'),(7,5,16,'test','doctor','REFERRAL_CANCELLED','ref_9d32c7d3a38e',NULL,NULL,'2026-08-25 05:41:24'),(8,3,15,'test','doctor','REFERRAL_SENT','ref_556407dc661c','Homer Simpson','No Available Dialysis Services','2026-08-25 08:02:13'),(9,10,18,'maylo','doctor','REFERRAL_ACCEPTED','ref_556407dc661c',NULL,NULL,'2026-08-25 08:03:19'),(10,3,15,'test','doctor','REFERRAL_FINALIZED','ref_556407dc661c',NULL,'Chose Amas Provincial Hospital','2026-08-25 08:04:01'),(11,10,18,'maylo','doctor','PATIENT_ARRIVED','ref_556407dc661c','Homer Simpson',NULL,'2026-08-25 08:05:49'),(12,10,18,'maylo','doctor','REFERRAL_SENT','ref_cb92056e9335','Homer Simpson','No Available General Surgeon','2026-08-25 08:06:49'),(13,5,16,'test','doctor','REFERRAL_ACCEPTED','ref_cb92056e9335',NULL,NULL,'2026-08-25 08:07:18'),(14,10,18,'maylo','doctor','REFERRAL_FINALIZED','ref_cb92056e9335',NULL,'Chose Metro Health Medical Center','2026-08-25 08:07:25'),(15,5,16,'test','doctor','PATIENT_ARRIVED','ref_cb92056e9335','Homer Simpson',NULL,'2026-08-25 08:08:30'),(16,5,16,'test','doctor','PATIENT_DEPARTED','ref_cb92056e9335','Homer Simpson','DISCHARGED','2026-08-25 08:08:40'),(17,11,19,'Josh Mojica','doctor','PATIENT_ADDED',NULL,'Bugs Bunny',NULL,'2026-09-01 04:51:41'),(18,11,19,'Josh Mojica','doctor','PATIENT_ADDED',NULL,'Lisa Simpson',NULL,'2026-09-01 06:22:10'),(19,5,16,'test','doctor','PATIENT_ADDED',NULL,'Lisa Simpson',NULL,'2026-09-01 07:04:57'),(20,11,19,'Josh Mojica','doctor','REFERRAL_SENT','ref_3a144ee4a897','Lisa Simpson','Full Critical Care Unit (CCU)','2026-09-01 07:05:34'),(21,5,16,'test','doctor','REFERRAL_ACCEPTED','ref_3a144ee4a897',NULL,NULL,'2026-09-01 07:05:55'),(22,11,19,'Josh Mojica','doctor','REFERRAL_FINALIZED','ref_3a144ee4a897',NULL,'Chose Metro Health Medical Center','2026-09-01 07:06:15'),(23,5,16,'test','doctor','PATIENT_ARRIVED','ref_3a144ee4a897','Lisa Simpson',NULL,'2026-09-01 07:06:42'),(24,5,16,'test','doctor','PATIENT_ADDED',NULL,'SpongeBob SquarePants',NULL,'2026-09-01 07:07:23'),(25,11,19,'Josh Mojica','doctor','PATIENT_ADDED',NULL,'SpongeBob SquarePants',NULL,'2026-09-01 07:08:05'),(26,11,19,'Josh Mojica','doctor','REFERRAL_SENT','ref_6313caa6f992','SpongeBob SquarePants','Non Functional 2D Echo Ultrasound Machine','2026-09-01 07:08:33'),(27,11,19,'Josh Mojica','doctor','REFERRAL_CANCELLED','ref_6313caa6f992',NULL,NULL,'2026-09-01 07:08:46'),(28,11,19,'Josh Mojica','doctor','REFERRAL_SENT','ref_bae5bf87b04d','SpongeBob SquarePants','Full Coronary Care Unit','2026-09-01 07:21:10'),(29,5,16,'test','doctor','REFERRAL_ACCEPTED','ref_bae5bf87b04d',NULL,NULL,'2026-09-01 07:21:21'),(30,11,19,'Josh Mojica','doctor','REFERRAL_FINALIZED','ref_bae5bf87b04d',NULL,'Chose Metro Health Medical Center','2026-09-01 07:21:34'),(31,5,16,'test','doctor','PATIENT_ADDED',NULL,'Sandy Cheeks',NULL,'2026-09-01 07:41:00'),(32,11,19,'Josh Mojica','doctor','PATIENT_ADDED',NULL,'Sandy Cheeks',NULL,'2026-09-01 07:41:37'),(33,11,19,'Josh Mojica','doctor','REFERRAL_SENT','ref_08e041a6cf7a','Sandy Cheeks','No Available Neonatal Intensive Care Unit','2026-09-01 07:42:11'),(34,5,16,'test','doctor','REFERRAL_ACCEPTED','ref_08e041a6cf7a',NULL,NULL,'2026-09-01 07:42:17'),(35,11,19,'Josh Mojica','doctor','REFERRAL_FINALIZED','ref_08e041a6cf7a',NULL,'Chose Metro Health Medical Center','2026-09-01 07:42:21'),(36,5,16,'test','doctor','PATIENT_ARRIVED_LINKED','ref_08e041a6cf7a','Sandy Cheeks','Linked to existing patient #35','2026-09-01 07:42:33'),(37,3,15,'test','doctor','REFERRAL_SENT','ref_17372b3047bc','Tony Stark','No Available Critical Care Surgeon','2026-09-03 05:26:18'),(38,10,18,'maylo','doctor','REFERRAL_ACCEPTED','ref_17372b3047bc',NULL,NULL,'2026-09-03 05:27:27'),(39,3,15,'test','doctor','REFERRAL_FINALIZED','ref_17372b3047bc',NULL,'Chose Amas Provincial Hospital','2026-09-03 05:28:17'),(40,10,18,'maylo','doctor','PATIENT_ARRIVED','ref_17372b3047bc','Tony Stark',NULL,'2026-09-03 05:28:36'),(41,10,18,'maylo','doctor','PATIENT_DEPARTED','ref_17372b3047bc','Tony Stark','DISCHARGED','2026-09-03 05:29:06'),(42,3,15,'test','doctor','PATIENT_ADDED',NULL,'Shaggy Rogers',NULL,'2026-09-03 08:31:34'),(43,3,15,'test','doctor','REFERRAL_SENT','ref_6f07184374c7','Shaggy Rogers','No Available Dentist','2026-09-03 08:35:48'),(44,10,18,'maylo','doctor','REFERRAL_ACCEPTED','ref_6f07184374c7',NULL,NULL,'2026-09-03 08:37:39'),(45,3,15,'test','doctor','REFERRAL_FINALIZED','ref_6f07184374c7',NULL,'Chose Amas Provincial Hospital','2026-09-03 08:39:52'),(46,10,18,'maylo','doctor','PATIENT_ARRIVED','ref_6f07184374c7','Shaggy Rogers',NULL,'2026-09-03 08:40:49'),(47,10,18,'maylo','doctor','PATIENT_DEPARTED','ref_6f07184374c7','Shaggy Rogers','DISCHARGED','2026-09-03 08:42:02'),(48,3,15,'test','doctor','REFERRAL_SENT','ref_9d574bc558e7','Tony Stark','No Available Gastroenterologist','2026-09-06 14:47:05'),(49,5,16,'test','doctor','REFERRAL_ACCEPTED','ref_9d574bc558e7',NULL,NULL,'2026-09-06 14:47:21'),(50,10,18,'maylo','doctor','REFERRAL_REJECTED','ref_9d574bc558e7',NULL,'NO_AVAILABLE_BED','2026-09-06 14:49:26'),(51,3,15,'test','doctor','REFERRAL_FINALIZED','ref_9d574bc558e7',NULL,'Chose Metro Health Medical Center','2026-09-06 14:51:02'),(52,10,21,'Dr. Juan Dela Cruz, M.D','doctor','REFERRAL_SENT','ref_4559150a793c','Gamora Zenwhoberi','Full Neonatal Intensive Care Unit','2026-09-08 07:11:22'),(53,5,16,'test','doctor','REFERRAL_ACCEPTED','ref_4559150a793c',NULL,NULL,'2026-09-08 07:13:00'),(54,10,21,'Dr. Juan Dela Cruz, M.D','doctor','REFERRAL_FINALIZED','ref_4559150a793c',NULL,'Chose Metro Health Medical Center','2026-09-08 07:13:44'),(55,5,16,'test','doctor','PATIENT_ARRIVED','ref_4559150a793c','Gamora Zenwhoberi',NULL,'2026-09-08 07:17:37'),(56,5,16,'test','doctor','PATIENT_DEPARTED','ref_4559150a793c','Gamora Zenwhoberi','DISCHARGED','2026-09-08 07:17:55'),(57,10,21,'Dr. Juan Dela Cruz, M.D','doctor','REFERRAL_SENT','ref_694d33c274d8','Gamora Zenwhoberi','Full Intensive Care Unit','2026-09-08 07:19:56'),(58,5,16,'test','doctor','REFERRAL_ACCEPTED','ref_694d33c274d8',NULL,NULL,'2026-09-08 07:20:03'),(59,10,21,'Dr. Juan Dela Cruz, M.D','doctor','REFERRAL_FINALIZED','ref_694d33c274d8',NULL,'Chose Metro Health Medical Center','2026-09-08 07:20:07'),(60,3,15,'test','doctor','REFERRAL_SENT','ref_1a4a7e1ecadb','Tony Stark','No Available Chest Tube Thoracostomy','2026-09-09 02:36:06'),(61,5,16,'test','doctor','REFERRAL_ACCEPTED','ref_1a4a7e1ecadb',NULL,NULL,'2026-09-09 02:36:22'),(62,3,15,'test','doctor','REFERRAL_FINALIZED','ref_1a4a7e1ecadb',NULL,'Chose Metro Health Medical Center','2026-09-09 02:36:29'),(63,3,15,'test','doctor','REFERRAL_SENT','ref_cb03f029685e','Tony Stark','No Available PET Scan','2026-09-09 02:54:04'),(64,5,16,'test','doctor','REFERRAL_ACCEPTED','ref_cb03f029685e',NULL,NULL,'2026-09-09 02:54:10'),(65,3,15,'test','doctor','REFERRAL_FINALIZED','ref_cb03f029685e',NULL,'Chose Metro Health Medical Center','2026-09-09 02:54:15'),(66,10,21,'Dr. Juan Dela Cruz, M.D','doctor','REFERRAL_SENT','ref_c258b29baf41','Sam Wilson','Full Delivery Room','2026-09-09 03:29:02'),(67,5,16,'test','doctor','REFERRAL_ACCEPTED','ref_c258b29baf41',NULL,NULL,'2026-09-09 03:29:08'),(68,10,21,'Dr. Juan Dela Cruz, M.D','doctor','REFERRAL_FINALIZED','ref_c258b29baf41',NULL,'Chose Metro Health Medical Center','2026-09-09 03:29:13'),(69,10,21,'Dr. Juan Dela Cruz, M.D','doctor','REFERRAL_SENT','ref_35b0cfd39e9f','Homer Simpson','No Available Patient Admission Services','2026-09-09 03:40:49'),(70,5,16,'test','doctor','REFERRAL_ACCEPTED','ref_35b0cfd39e9f',NULL,NULL,'2026-09-09 03:44:02'),(71,10,21,'Dr. Juan Dela Cruz, M.D','doctor','REFERRAL_FINALIZED','ref_35b0cfd39e9f',NULL,'Chose Metro Health Medical Center','2026-09-09 03:44:12'),(72,5,16,'test','doctor','PATIENT_ARRIVED','ref_35b0cfd39e9f','Homer Simpson',NULL,'2026-09-09 03:48:43'),(73,5,16,'test','doctor','PATIENT_DEPARTED','ref_35b0cfd39e9f','Homer Simpson','DISCHARGED','2026-09-09 03:49:02'),(74,10,21,'Dr. Juan Dela Cruz, M.D','doctor','REFERRAL_SENT','ref_60c8fcbdca04','Shaggy Rogers','Full Delivery Room','2026-09-09 03:54:33'),(75,5,16,'test','doctor','REFERRAL_ACCEPTED','ref_60c8fcbdca04',NULL,NULL,'2026-09-09 03:54:42'),(76,10,21,'Dr. Juan Dela Cruz, M.D','doctor','REFERRAL_FINALIZED','ref_60c8fcbdca04',NULL,'Chose Metro Health Medical Center','2026-09-09 03:54:47'),(77,5,16,'test','doctor','PATIENT_ARRIVED','ref_60c8fcbdca04','Shaggy Rogers',NULL,'2026-09-09 03:54:53'),(78,5,16,'test','doctor','PATIENT_DEPARTED','ref_60c8fcbdca04','Shaggy Rogers','DISCHARGED','2026-09-09 03:54:58'),(79,3,15,'test','doctor','REFERRAL_SENT','ref_a3d60a27bb4c','Matt Murdock','Full Intensive Care Unit','2026-09-11 07:02:53'),(80,3,15,'test','doctor','REFERRAL_CANCELLED','ref_a3d60a27bb4c',NULL,NULL,'2026-09-11 07:03:42'),(81,3,15,'test','doctor','FHIR_CONNECTATHON_ORG_REGISTER',NULL,'DiWA Center','Registered facility as a FHIR Organization on the Connectathon sandbox','2026-09-15 12:04:55'),(82,3,15,'test','doctor','FHIR_CONNECTATHON_ORG_REGISTER',NULL,'DiWA Center','Registered facility as a FHIR Organization on the Connectathon sandbox','2026-09-15 12:50:37'),(83,3,15,'test','doctor','FHIR_CONNECTATHON_TEST_SEND',NULL,'Matt Murdock','Test','2026-09-15 15:16:20');
+/*!40000 ALTER TABLE `audit_logs` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `facilities`
+--
+
+DROP TABLE IF EXISTS `facilities`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `facilities` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `code` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `address` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `phone` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `tier_level` enum('BHS','RHU','Level 1 Hospital','Level 2 Hospital','Level 3 Hospital') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `is_assessment_completed` tinyint(1) NOT NULL DEFAULT '0',
+  `api_key` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `fhir_organization_id` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `code` (`code`)
+) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `facilities`
+--
+
+LOCK TABLES `facilities` WRITE;
+/*!40000 ALTER TABLE `facilities` DISABLE KEYS */;
+INSERT INTO `facilities` VALUES (1,'BHS-MALAGOS','Malagos Barangay Health Station',NULL,NULL,'BHS',0,'irdss_api_key_malagos_bhs_1a2b3c4d5e',NULL,'2026-08-11 05:46:20'),(2,'RHU-MINTAL','Mintal Rural Health Unit',NULL,NULL,'RHU',0,'irdss_api_key_mintal_rhu_6f7g8h9i0j',NULL,'2026-08-11 05:46:20'),(3,'DiWA - IRDSS','DiWA Center','CSM Building, UP Mindanao, Mintal, Davao City','09123456756','Level 1 Hospital',1,'irdss_api_key_stjude_9a8b7c6d5e4f3a','Organization/23405','2026-08-11 05:46:20'),(4,'HOSP-CITYCARE','City Care Medical Center',NULL,NULL,'Level 2 Hospital',1,'irdss_api_key_citycare_1b2c3d4e5f6a',NULL,'2026-08-11 05:46:20'),(5,'HOSP-METRO','Metro Health Medical Center',NULL,NULL,'Level 3 Hospital',1,'irdss_api_key_metro_9z8y7x6w5v4u',NULL,'2026-08-11 05:46:20'),(6,'FAC-000013','test',NULL,NULL,'Level 1 Hospital',0,'irdss_api_key_test',NULL,'2026-08-11 07:40:12'),(7,'FAC-000014','Tacupan BHS',NULL,NULL,'BHS',1,'irdss_api_key_tacupanbhs',NULL,'2026-08-11 08:54:16'),(8,'FAC-000003','Maragusan Municipal Hospital',NULL,NULL,'Level 3 Hospital',0,'irdss_api_key_maragusanmunicipalhospital',NULL,'2026-08-18 07:24:45'),(9,'FAC-000001','Davao Regional Medical Center',NULL,NULL,'Level 3 Hospital',1,'irdss_api_key_davaoregionalmedicalcenter',NULL,'2026-08-24 04:01:04'),(10,'FAC-000015','Amas Provincial Hospital',NULL,NULL,'Level 3 Hospital',1,'irdss_api_key_amasprovincialhospital',NULL,'2026-08-24 04:28:37'),(11,'FAC-000017','Poblacion BHS',NULL,NULL,'BHS',1,'irdss_api_key_poblacionbhs',NULL,'2026-09-01 04:03:51');
+/*!40000 ALTER TABLE `facilities` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `fhir_sent_referrals`
+--
+
+DROP TABLE IF EXISTS `fhir_sent_referrals`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `fhir_sent_referrals` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `facility_id` int NOT NULL,
+  `patient_id` int NOT NULL,
+  `patient_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `service_request_ref` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `receiving_org_ref` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `receiving_org_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `referral_category` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `service_type` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `reason_text` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `http_status` smallint DEFAULT NULL,
+  `created_by_user_id` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `fk_fhir_sent_referrals_facility` (`facility_id`),
+  KEY `fk_fhir_sent_referrals_patient` (`patient_id`),
+  CONSTRAINT `fk_fhir_sent_referrals_facility` FOREIGN KEY (`facility_id`) REFERENCES `facilities` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_fhir_sent_referrals_patient` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `fhir_sent_referrals`
+--
+
+LOCK TABLES `fhir_sent_referrals` WRITE;
+/*!40000 ALTER TABLE `fhir_sent_referrals` DISABLE KEYS */;
+/*!40000 ALTER TABLE `fhir_sent_referrals` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `hospitals`
+--
+
+DROP TABLE IF EXISTS `hospitals`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `hospitals` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `code` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `username` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `password` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `api_key` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `code` (`code`),
+  UNIQUE KEY `username` (`username`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `hospitals`
+--
+
+LOCK TABLES `hospitals` WRITE;
+/*!40000 ALTER TABLE `hospitals` DISABLE KEYS */;
+INSERT INTO `hospitals` VALUES (1,'HOSP-DRMC','Davao Regional Medical Center','drmc','$2y$10$4n2zP0bNl18/Xz1gQpX8ce6a6aDqVz4z3X.8X1gQpX8ce6a6aDqVz','irdss_api_key_davaoregio_17dc2de085575ffd','2026-07-28 04:02:37'),(2,'HOSP-CVPHL','Compostela Valley Provincial Hospital - Laak','cvphl','$2y$10$4n2zP0bNl18/Xz1gQpX8ce6a6aDqVz4z3X.8X1gQpX8ce6a6aDqVz','irdss_api_key_compostela_7e6941265b534960','2026-07-28 04:02:37'),(3,'HOSP-MMH','Maragusan Municipal Hospital','mmh','$2y$10$4n2zP0bNl18/Xz1gQpX8ce6a6aDqVz4z3X.8X1gQpX8ce6a6aDqVz','irdss_api_key_maragusanm_d51b212524ed4546','2026-07-28 04:02:37');
+/*!40000 ALTER TABLE `hospitals` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `initiated_referral_reasons`
+--
+
+DROP TABLE IF EXISTS `initiated_referral_reasons`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `initiated_referral_reasons` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `initiated_referral_id` int NOT NULL,
+  `reason_code` varchar(100) NOT NULL,
+  `reason_label` varchar(255) NOT NULL,
+  `is_primary` tinyint(1) NOT NULL DEFAULT '0',
+  `sort_order` tinyint unsigned NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_initiated_referral_reason_order` (`initiated_referral_id`,`sort_order`),
+  KEY `idx_initiated_referral_reason_referral` (`initiated_referral_id`),
+  CONSTRAINT `fk_initiated_referral_reason_referral` FOREIGN KEY (`initiated_referral_id`) REFERENCES `initiated_referrals` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=76 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `initiated_referral_reasons`
+--
+
+LOCK TABLES `initiated_referral_reasons` WRITE;
+/*!40000 ALTER TABLE `initiated_referral_reasons` DISABLE KEYS */;
+INSERT INTO `initiated_referral_reasons` VALUES (1,1,'NO_SPECIALIST_AVAILABLE','No Specialist Available',1,0,'2026-09-06 14:18:39'),(2,2,'HIGHER_LEVEL_OF_CARE_REQUIRED','Higher Level of Care Required',1,0,'2026-09-06 14:18:39'),(3,3,'HIGHER_LEVEL_OF_CARE_REQUIRED','Higher Level of Care Required',1,0,'2026-09-06 14:18:39'),(4,4,'DIAGNOSTIC_SERVICES_NOT_AVAILABLE','Diagnostic Services Not Available',1,0,'2026-09-06 14:18:39'),(5,5,'HIGHER_LEVEL_OF_CARE_REQUIRED','Higher Level of Care Required',1,0,'2026-09-06 14:18:39'),(6,6,'HIGHER_LEVEL_OF_CARE_REQUIRED','Higher Level of Care Required',1,0,'2026-09-06 14:18:39'),(7,7,'HIGHER_LEVEL_OF_CARE_REQUIRED','Higher Level of Care Required',1,0,'2026-09-06 14:18:39'),(8,8,'HIGHER_LEVEL_OF_CARE_REQUIRED','Higher Level of Care Required',1,0,'2026-09-06 14:18:39'),(9,9,'HIGHER_LEVEL_OF_CARE_REQUIRED','Higher Level of Care Required',1,0,'2026-09-06 14:18:39'),(10,10,'SECRET','Secret',1,0,'2026-09-06 14:18:39'),(11,11,'PATIENT_FAMILY_REQUEST','Patient/Family Request',1,0,'2026-09-06 14:18:39'),(12,12,'PATIENT_FAMILY_REQUEST','Patient/Family Request',1,0,'2026-09-06 14:18:39'),(13,13,'DIAGNOSTIC_SERVICES_NOT_AVAILABLE','Diagnostic Services Not Available',1,0,'2026-09-06 14:18:39'),(14,14,'HIGHER_LEVEL_OF_CARE_REQUIRED','Higher Level of Care Required',1,0,'2026-09-06 14:18:39'),(15,15,'HIGHER_LEVEL_OF_CARE_REQUIRED','Higher Level of Care Required',1,0,'2026-09-06 14:18:39'),(16,16,'HIGHER_LEVEL_OF_CARE_REQUIRED','Higher Level of Care Required',1,0,'2026-09-06 14:18:39'),(17,17,'HIGHER_LEVEL_OF_CARE_REQUIRED','Higher Level of Care Required',1,0,'2026-09-06 14:18:39'),(18,18,'HIGHER_LEVEL_OF_CARE_REQUIRED','Higher Level of Care Required',1,0,'2026-09-06 14:18:39'),(19,19,'HIGHER_LEVEL_OF_CARE_REQUIRED','Higher Level of Care Required',1,0,'2026-09-06 14:18:39'),(20,20,'HIGHER_LEVEL_OF_CARE_REQUIRED','Higher Level of Care Required',1,0,'2026-09-06 14:18:39'),(21,21,'HIGHER_LEVEL_OF_CARE_REQUIRED','Higher Level of Care Required',1,0,'2026-09-06 14:18:39'),(22,22,'HIGHER_LEVEL_OF_CARE_REQUIRED','Higher Level of Care Required',1,0,'2026-09-06 14:18:39'),(23,23,'HIGHER_LEVEL_OF_CARE_REQUIRED','Higher Level of Care Required',1,0,'2026-09-06 14:18:39'),(24,24,'DIAGNOSTIC_SERVICES_NOT_AVAILABLE','Diagnostic Services Not Available',1,0,'2026-09-06 14:18:39'),(25,25,'SURGICAL_INTERVENTION_REQUIRED','Surgical Intervention Required',1,0,'2026-09-06 14:18:39'),(26,26,'HIGHER_LEVEL_OF_CARE_REQUIRED','Higher Level of Care Required',1,0,'2026-09-06 14:18:39'),(27,27,'HIGHER_LEVEL_OF_CARE_REQUIRED','Higher Level of Care Required',1,0,'2026-09-06 14:18:39'),(28,28,'NO_AVAILABLE_TOXICOLOGIST','No Available Toxicologist',1,0,'2026-09-06 14:18:39'),(29,29,'NO_AVAILABLE_GENERAL_SURGEON','No Available General Surgeon',1,0,'2026-09-06 14:18:39'),(30,30,'NO_AVAILABLE_RHEUMATOLOGIST','No Available Rheumatologist',1,0,'2026-09-06 14:18:39'),(31,31,'NO_AVAILABLE_TOXICOLOGIST','No Available Toxicologist',1,0,'2026-09-06 14:18:39'),(32,32,'NO_AVAILABLE_TOXICOLOGIST','No Available Toxicologist',1,0,'2026-09-06 14:18:39'),(33,33,'NO_AVAILABLE_CARDIOLOGIST','No Available Cardiologist',1,0,'2026-09-06 14:18:39'),(34,34,'NO_AVAILABLE_INTERNAL_MEDICINE','No Available Internal Medicine',1,0,'2026-09-06 14:18:39'),(35,35,'NO_AVAILABLE_OPERATING_ROOM','No Available Operating Room',1,0,'2026-09-06 14:18:39'),(36,36,'NO_AVAILABLE_NEPHROLOGIST','No Available Nephrologist',1,0,'2026-09-06 14:18:39'),(37,37,'NO_AVAILABLE_NEONATOLOGIST','No Available Neonatologist',1,0,'2026-09-06 14:18:39'),(38,38,'NO_AVAILABLE_NEONATOLOGIST','No Available Neonatologist',1,0,'2026-09-06 14:18:39'),(39,39,'NO_AVAILABLE_DIALYSIS_SERVICES','No Available Dialysis Services',1,0,'2026-09-06 14:18:39'),(40,40,'NO_AVAILABLE_GENERAL_SURGEON','No Available General Surgeon',1,0,'2026-09-06 14:18:39'),(41,41,'FULL_CRITICAL_CARE_UNIT_CCU','Full Critical Care Unit (CCU)',1,0,'2026-09-06 14:18:39'),(42,42,'NON_FUNCTIONAL_2D_ECHO_ULTRASOUND_MACHINE','Non Functional 2D Echo Ultrasound Machine',1,0,'2026-09-06 14:18:39'),(43,43,'FULL_CRITICAL_CARE_UNIT_CCU','Full Critical Care Unit (CCU)',1,0,'2026-09-06 14:18:39'),(44,44,'FULL_CORONARY_CARE_UNIT','Full Coronary Care Unit',1,0,'2026-09-06 14:18:39'),(45,45,'NO_AVAILABLE_NEONATAL_INTENSIVE_CARE_UNIT','No Available Neonatal Intensive Care Unit',1,0,'2026-09-06 14:18:39'),(46,46,'NO_AVAILABLE_CRITICAL_CARE_SURGEON','No Available Critical Care Surgeon',1,0,'2026-09-06 14:18:39'),(47,47,'NO_AVAILABLE_DENTIST','No Available Dentist',1,0,'2026-09-06 14:18:39'),(64,48,'NO_AVAILABLE_GASTROENTEROLOGIST','No Available Gastroenterologist',1,0,'2026-09-06 14:47:05'),(65,48,'NO_AVAILABLE_FAMILY_MEDICINE_PHYSICIAN','No Available Family Medicine Physician',0,1,'2026-09-06 14:47:05'),(66,48,'NO_AVAILABLE_INTERNAL_MEDICINE','No Available Internal Medicine',0,2,'2026-09-06 14:47:05'),(67,49,'FULL_NEONATAL_INTENSIVE_CARE_UNIT','Full Neonatal Intensive Care Unit',1,0,'2026-09-08 07:11:21'),(68,50,'FULL_INTENSIVE_CARE_UNIT','Full Intensive Care Unit',1,0,'2026-09-08 07:19:56'),(69,51,'NO_AVAILABLE_CHEST_TUBE_THORACOSTOMY','No Available Chest Tube Thoracostomy',1,0,'2026-09-09 02:35:48'),(70,52,'NO_AVAILABLE_CHEST_TUBE_THORACOSTOMY','No Available Chest Tube Thoracostomy',1,0,'2026-09-09 02:36:06'),(71,53,'NO_AVAILABLE_PET_SCAN','No Available PET Scan',1,0,'2026-09-09 02:54:04'),(72,54,'FULL_DELIVERY_ROOM','Full Delivery Room',1,0,'2026-09-09 03:29:02'),(73,55,'NO_AVAILABLE_PATIENT_ADMISSION_SERVICES','No Available Patient Admission Services',1,0,'2026-09-09 03:40:49'),(74,56,'FULL_DELIVERY_ROOM','Full Delivery Room',1,0,'2026-09-09 03:54:32'),(75,57,'FULL_INTENSIVE_CARE_UNIT','Full Intensive Care Unit',1,0,'2026-09-11 07:02:53');
+/*!40000 ALTER TABLE `initiated_referral_reasons` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `initiated_referrals`
+--
 
 DROP TABLE IF EXISTS `initiated_referrals`;
-DROP TABLE IF EXISTS `service_assessments`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `initiated_referrals` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `hospital_id` int NOT NULL,
+  `referral_id` varchar(100) DEFAULT NULL,
+  `patient_id` int NOT NULL,
+  `patient_name` varchar(255) NOT NULL,
+  `reason` varchar(255) DEFAULT NULL,
+  `chief_complaint` varchar(255) DEFAULT NULL,
+  `diagnosis` varchar(255) DEFAULT NULL,
+  `vital_bp` varchar(20) DEFAULT NULL,
+  `vital_hr` smallint DEFAULT NULL,
+  `vital_rr` smallint DEFAULT NULL,
+  `vital_temp_c` decimal(4,1) DEFAULT NULL,
+  `vital_o2sat` smallint DEFAULT NULL,
+  `status` varchar(50) DEFAULT 'AWAITING',
+  `sync_status` varchar(20) NOT NULL DEFAULT 'PENDING',
+  `http_status` smallint DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=58 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `initiated_referrals`
+--
+
+LOCK TABLES `initiated_referrals` WRITE;
+/*!40000 ALTER TABLE `initiated_referrals` DISABLE KEYS */;
+INSERT INTO `initiated_referrals` VALUES (1,3,'ref_f1948fb6e92b',1,'Tony Stark','No Specialist Available','Acute Renal Failure requiring dialysis','Acute Renal Failure requiring dialysis','120/80',80,18,36.5,98,'SEND_FAILED','FAILED',409,'2026-08-17 07:46:21'),(2,3,NULL,1,'Tony Stark','Higher Level of Care Required','Acute Renal Failure requiring dialysis','Acute Renal Failure requiring dialysis','120/80',80,18,36.5,98,'SEND_FAILED','FAILED',500,'2026-08-17 07:49:36'),(3,3,'ref_cdbf9a6d9f5d',1,'Tony Stark','Higher Level of Care Required','Acute Renal Failure requiring dialysis','Acute Renal Failure requiring dialysis','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-08-17 08:01:34'),(4,3,'ref_cdbf9a6d9f5d',1,'Tony Stark','Diagnostic Services Not Available','awda','wd','120/80',80,18,36.5,98,'SEND_FAILED','FAILED',409,'2026-08-17 08:35:27'),(5,3,'ref_a98d046643d5',1,'Tony Stark','Higher Level of Care Required','Sudden onset slurred speech and facial droop','Acute stroke','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-08-17 08:36:56'),(6,3,'ref_b817a09e974e',2,'Steve Rogers','Higher Level of Care Required','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'SEND_FAILED','FAILED',409,'2026-08-18 06:47:05'),(7,3,'ref_d200481e6b98',7,'Stephen Strange','Higher Level of Care Required','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-08-18 06:47:11'),(8,5,'ref_86cf74cfd07e',9,'Scott Lang','Higher Level of Care Required','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-08-18 07:29:06'),(9,3,'ref_14b21743334b',7,'Stephen Strange','Higher Level of Care Required','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-08-18 07:29:45'),(10,3,'ref_b4b7cdce6f70',11,'Sam Wilson','Secret','Cute kaayo','Di makaya ang ka cute','120/80',80,18,34.5,98,'AWAITING','SENT',200,'2026-08-19 07:52:07'),(11,3,'ref_b4b7cdce6f70',11,'Sam Wilson','Patient/Family Request','Cute kaayo','Di makaya ang ka cute','120/80',80,18,36.5,98,'SEND_FAILED','FAILED',409,'2026-08-19 08:10:32'),(12,3,'ref_eeca5ed8d288',11,'Sam Wilson','Patient/Family Request','Cute kaayo','Di makaya ang ka cute','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-08-19 08:11:54'),(13,3,'ref_f2db2a1922d9',13,'Peter Quill','Diagnostic Services Not Available','Testing','Test','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-08-20 06:31:05'),(14,5,'ref_86cf74cfd07e',9,'Scott Lang','Higher Level of Care Required','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,32.0,98,'SEND_FAILED','FAILED',409,'2026-08-24 02:55:08'),(15,5,'ref_86cf74cfd07e',9,'Scott Lang','Higher Level of Care Required','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,32.0,98,'SEND_FAILED','FAILED',409,'2026-08-24 02:55:18'),(16,5,'ref_efb872e00091',9,'Scott Lang','Higher Level of Care Required','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,32.0,98,'AWAITING','SENT',200,'2026-08-24 02:56:09'),(17,5,'ref_efb872e00091',9,'Scott Lang','Higher Level of Care Required','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'SEND_FAILED','FAILED',409,'2026-08-24 03:05:35'),(18,5,'ref_efb872e00091',9,'Scott Lang','Higher Level of Care Required','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'SEND_FAILED','FAILED',409,'2026-08-24 03:07:49'),(19,5,'ref_efb872e00091',9,'Scott Lang','Higher Level of Care Required','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'SEND_FAILED','FAILED',409,'2026-08-24 03:08:26'),(20,5,'ref_efb872e00091',9,'Scott Lang','Higher Level of Care Required','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'SEND_FAILED','FAILED',409,'2026-08-24 03:08:32'),(21,5,'ref_efb872e00091',9,'Scott Lang','Higher Level of Care Required','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'SEND_FAILED','FAILED',409,'2026-08-24 03:08:42'),(22,5,'ref_efb872e00091',9,'Scott Lang','Higher Level of Care Required','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'SEND_FAILED','FAILED',409,'2026-08-24 03:09:53'),(23,5,'ref_e1f96f33a75f',5,'Peter Parker','Higher Level of Care Required','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-08-24 03:10:33'),(24,3,'ref_20e1ff2fa4eb',14,'Gamora Zenwhoberi','Diagnostic Services Not Available','Difficulty Breathing','Pneumonia','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-08-24 03:19:36'),(25,3,'ref_5543c8d1ce29',16,'Rocket Raccoon','Surgical Intervention Required','maldita kaayo','hehe','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-08-24 03:55:28'),(26,3,'ref_d45f71ce6e20',16,'Rocket Raccoon','Higher Level of Care Required','maldita kaayo','hehe','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-08-24 03:59:04'),(27,3,'ref_9c3321b34933',16,'Rocket Raccoon','Higher Level of Care Required','Maldita kaayo','hehe','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-08-24 04:38:57'),(28,10,'ref_c0477de7a453',17,'Wade Wilson','No Available Toxicologist','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-08-24 05:46:48'),(29,10,'ref_8c17609cecfb',17,'Wade Wilson','No Available General Surgeon','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-08-24 05:53:32'),(30,3,'ref_9eac5daa1ae4',11,'Sam Wilson','No Available Rheumatologist','Acute Renal Failure requiring dialysis','Pneumonia','134/56',89,18,36.5,98,'AWAITING','SENT',200,'2026-08-25 03:27:34'),(31,10,'ref_82f6bbf98a3c',20,'Luke Cage','No Available Toxicologist','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-08-25 03:34:12'),(32,3,'ref_ca8cf2b4b1ee',18,'Matt Murdock','No Available Toxicologist','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-08-25 04:30:00'),(33,3,'ref_19d02f4bcca0',18,'Matt Murdock','No Available Cardiologist','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-08-25 04:44:05'),(34,3,'ref_2c720ba4f0b6',14,'Gamora Zenwhoberi','No Available Internal Medicine','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-08-25 04:46:34'),(35,10,'ref_728b4868e401',23,'Pietro Maximoff','No Available Operating Room','Test','Pneumonia','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-08-25 04:50:05'),(36,5,'ref_4f676bc41b61',10,'Clint Barton','No Available Nephrologist','Test','Pneumonia','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-08-25 05:39:15'),(37,5,'ref_4f676bc41b61',10,'Clint Barton','No Available Neonatologist','Test','Pneumonia','120/80',80,18,36.5,98,'SEND_FAILED','FAILED',409,'2026-08-25 05:40:48'),(38,5,'ref_9d32c7d3a38e',12,'Bucky Barnes','No Available Neonatologist','Test','Pneumonia','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-08-25 05:41:10'),(39,3,'ref_556407dc661c',25,'Homer Simpson','No Available Dialysis Services','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-08-25 08:02:13'),(40,10,'ref_cb92056e9335',26,'Marge Simpson','No Available General Surgeon','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-08-25 08:06:49'),(41,11,'ref_3a144ee4a897',28,'Lisa Simpson','Full Critical Care Unit (CCU)','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-09-01 07:05:34'),(42,11,'ref_6313caa6f992',34,'Patrick Star','Non Functional 2D Echo Ultrasound Machine','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-09-01 07:08:33'),(43,11,'ref_6313caa6f992',34,'Patrick Star','Full Critical Care Unit (CCU)','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,35.6,98,'SEND_FAILED','FAILED',409,'2026-09-01 07:19:43'),(44,11,'ref_bae5bf87b04d',34,'Patrick Star','Full Coronary Care Unit','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-09-01 07:21:10'),(45,11,'ref_08e041a6cf7a',36,'Squidward Tentacles','No Available Neonatal Intensive Care Unit','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-09-01 07:42:11'),(46,3,'ref_17372b3047bc',1,'Tony Stark','No Available Critical Care Surgeon','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-09-03 05:26:18'),(47,3,'ref_6f07184374c7',38,'Shaggy Rogers','No Available Dentist','Acute Renal Failure requiring dialysis','Pneumonia','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-09-03 08:35:48'),(48,3,'ref_9d574bc558e7',1,'Tony Stark','No Available Gastroenterologist','Testing','Pneumonia','120/80',80,18,36.5,98,'AWAITING','SENT',200,'2026-09-06 14:47:05'),(49,10,'ref_4559150a793c',23,'Pietro Maximoff','Full Neonatal Intensive Care Unit','Sample Chief Complaint','Sample Diagnosis','120/80',90,50,36.5,90,'AWAITING','SENT',200,'2026-09-08 07:11:21'),(50,10,'ref_694d33c274d8',23,'Pietro Maximoff','Full Intensive Care Unit','Sample Chief Complaint','Sample Diagnosis','120/80',90,50,36.5,90,'AWAITING','SENT',200,'2026-09-08 07:19:56'),(51,3,NULL,1,'Tony Stark','No Available Chest Tube Thoracostomy','Test','Pneumonia',NULL,NULL,NULL,NULL,NULL,'SEND_FAILED','FAILED',503,'2026-09-09 02:35:48'),(52,3,'ref_1a4a7e1ecadb',1,'Tony Stark','No Available Chest Tube Thoracostomy','Test','Pneumonia',NULL,NULL,NULL,NULL,NULL,'AWAITING','SENT',200,'2026-09-09 02:36:06'),(53,3,'ref_cb03f029685e',1,'Tony Stark','No Available PET Scan','Test','Pneumonia',NULL,NULL,NULL,NULL,NULL,'AWAITING','SENT',200,'2026-09-09 02:54:04'),(54,10,'ref_c258b29baf41',20,'Luke Cage','Full Delivery Room','adwaw','Pneumonia',NULL,NULL,NULL,NULL,NULL,'AWAITING','SENT',200,'2026-09-09 03:29:02'),(55,10,'ref_35b0cfd39e9f',26,'Marge Simpson','No Available Patient Admission Services','adwda','Pneumonia',NULL,NULL,NULL,NULL,NULL,'AWAITING','SENT',200,'2026-09-09 03:40:49'),(56,10,'ref_60c8fcbdca04',39,'Fred Flintstone','Full Delivery Room','dawdaw','Pneumonia',NULL,NULL,NULL,NULL,NULL,'AWAITING','SENT',200,'2026-09-09 03:54:32'),(57,3,'ref_a3d60a27bb4c',18,'Matt Murdock','Full Intensive Care Unit','asda','Pneumonia',NULL,NULL,NULL,NULL,NULL,'AWAITING','SENT',200,'2026-09-11 07:02:53');
+/*!40000 ALTER TABLE `initiated_referrals` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `patient_contacts`
+--
+
+DROP TABLE IF EXISTS `patient_contacts`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `patient_contacts` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `patient_id` int NOT NULL,
+  `name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `relationship` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `phone` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `fk_patient_contacts_patient` (`patient_id`),
+  CONSTRAINT `fk_patient_contacts_patient` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=44 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `patient_contacts`
+--
+
+LOCK TABLES `patient_contacts` WRITE;
+/*!40000 ALTER TABLE `patient_contacts` DISABLE KEYS */;
+INSERT INTO `patient_contacts` VALUES (2,1,'Carol Danvers','Spouse','09171000037','2026-09-15 13:01:34'),(3,2,'Scott Lang','Parent','09171000074','2026-09-15 13:01:34'),(4,3,'Clint Barton','Sibling','09171000111','2026-09-15 13:01:34'),(5,4,'Sam Wilson','Child','09171000148','2026-09-15 13:01:34'),(6,5,'Bucky Barnes','Guardian','09171000185','2026-09-15 13:01:34'),(7,6,'Peter Quill','Friend','09171000222','2026-09-15 13:01:34'),(8,7,'Gamora Zenwhoberi','Spouse','09171000259','2026-09-15 13:01:34'),(9,8,'Groot Flora','Parent','09171000296','2026-09-15 13:01:34'),(10,9,'Rocket Raccoon','Sibling','09171000333','2026-09-15 13:01:34'),(11,10,'Wade Wilson','Child','09171000370','2026-09-15 13:01:34'),(12,11,'Matt Murdock','Guardian','09171000407','2026-09-15 13:01:34'),(13,12,'Jessica Jones','Friend','09171000444','2026-09-15 13:01:34'),(14,13,'Luke Cage','Spouse','09171000481','2026-09-15 13:01:34'),(15,14,'Danny Rand','Parent','09171000518','2026-09-15 13:01:34'),(16,15,'Hope VanDyne','Sibling','09171000555','2026-09-15 13:01:34'),(17,16,'Pietro Maximoff','Child','09171000592','2026-09-15 13:01:34'),(18,17,'Vision Android','Guardian','09171000629','2026-09-15 13:01:35'),(19,18,'Homer Simpson','Friend','09171000666','2026-09-15 13:01:35'),(20,19,'Marge Simpson','Spouse','09171000703','2026-09-15 13:01:35'),(21,20,'Bart Simpson','Parent','09171000740','2026-09-15 13:01:35'),(22,21,'Lisa Simpson','Sibling','09171000777','2026-09-15 13:01:35'),(23,22,'Bugs Bunny','Child','09171000814','2026-09-15 13:01:35'),(24,23,'Daffy Duck','Guardian','09171000851','2026-09-15 13:01:35'),(25,24,'Mickey Mouse','Friend','09171000888','2026-09-15 13:01:35'),(26,25,'Minnie Mouse','Spouse','09171000925','2026-09-15 13:01:35'),(27,26,'SpongeBob SquarePants','Parent','09171000962','2026-09-15 13:01:35'),(28,27,'Patrick Star','Sibling','09171000999','2026-09-15 13:01:35'),(29,28,'Sandy Cheeks','Child','09171001036','2026-09-15 13:01:35'),(30,29,'Squidward Tentacles','Guardian','09171001073','2026-09-15 13:01:35'),(31,30,'Scooby Doo','Friend','09171001110','2026-09-15 13:01:35'),(32,31,'Shaggy Rogers','Spouse','09171001147','2026-09-15 13:01:35'),(33,32,'Fred Flintstone','Parent','09171001184','2026-09-15 13:01:35'),(34,33,'Wilma Flintstone','Sibling','09171001221','2026-09-15 13:01:35'),(35,34,'Timmy Turner','Child','09171001258','2026-09-15 13:01:35'),(36,35,'Dexter Boygenius','Guardian','09171001295','2026-09-15 13:01:35'),(37,36,'Johnny Bravo','Friend','09171001332','2026-09-15 13:01:35'),(38,37,'Samurai Jack','Spouse','09171001369','2026-09-15 13:01:35'),(39,38,'Finn Mertens','Parent','09171001406','2026-09-15 13:01:35'),(40,39,'Jake Dog','Sibling','09171001443','2026-09-15 13:01:35'),(41,40,'Popeye Sailor','Child','09171001480','2026-09-15 13:01:35'),(42,41,'Olive Oyl','Guardian','09171001517','2026-09-15 13:01:35'),(43,42,'Woody Pride','Friend','09171001554','2026-09-15 13:01:35');
+/*!40000 ALTER TABLE `patient_contacts` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `patients`
+--
+
 DROP TABLE IF EXISTS `patients`;
-DROP TABLE IF EXISTS `users`;
-DROP TABLE IF EXISTS `facilities`;
-
--- ========================================================
--- Facilities Table (BHS / RHU / Hospital tiers)
--- ========================================================
-CREATE TABLE `facilities` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `code` VARCHAR(20) NOT NULL UNIQUE,
-  `name` VARCHAR(150) NOT NULL,
-  `tier_level` ENUM('BHS', 'RHU', 'Level 1 Hospital', 'Level 2 Hospital', 'Level 3 Hospital') NOT NULL,
-  `is_assessment_completed` BOOLEAN NOT NULL DEFAULT FALSE,
-  `api_key` VARCHAR(64) NOT NULL,
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ========================================================
--- Users Table (per-staff logins, scoped to a facility)
--- ========================================================
-CREATE TABLE `users` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `facility_id` INT NOT NULL,
-  `username` VARCHAR(50) NOT NULL UNIQUE,
-  `password` VARCHAR(255) NOT NULL,
-  `full_name` VARCHAR(100) NOT NULL,
-  `role` ENUM('facility_admin', 'doctor', 'nurse') NOT NULL,
-  `license_number` VARCHAR(30) NULL,
-  `trainings` TEXT NULL,
-  `is_active` BOOLEAN NOT NULL DEFAULT TRUE,
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT `fk_users_facility` FOREIGN KEY (`facility_id`) REFERENCES `facilities` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ========================================================
--- Patients Table (DOH iClinicSys-style enrollment record)
--- ========================================================
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `patients` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `facility_id` INT NOT NULL,
+  `id` int NOT NULL AUTO_INCREMENT,
+  `facility_id` int NOT NULL,
+  `first_name` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `middle_name` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `last_name` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `suffix` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `dob` date NOT NULL,
+  `gender` enum('Male','Female','Other') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `civil_status` enum('Single','Married','Widow/er','Separated') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `phone` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `region` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `province` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `city_municipality` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `barangay` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `zip_code` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `philhealth_member` enum('Yes','No') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'No',
+  `philhealth_number` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `philhealth_status_type` enum('Member','Dependent') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `philsys_id` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `is_4ps_member` enum('Yes','No') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'No',
+  `created_by_user_id` int DEFAULT NULL,
+  `source_referral_id` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `source_facility` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `transferred_address` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `transferred_details_snapshot` json DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `fk_patients_created_by` (`created_by_user_id`),
+  KEY `idx_patients_identity` (`facility_id`,`last_name`,`first_name`,`dob`),
+  CONSTRAINT `fk_patients_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_patients_facility` FOREIGN KEY (`facility_id`) REFERENCES `facilities` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=43 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 
-  -- Demographics
-  `first_name` VARCHAR(50) NOT NULL,
-  `middle_name` VARCHAR(50) NULL,
-  `last_name` VARCHAR(50) NOT NULL,
-  `suffix` VARCHAR(10) NULL,
-  `dob` DATE NOT NULL,
-  `gender` ENUM('Male', 'Female', 'Other') NOT NULL,
-  `civil_status` ENUM('Single', 'Married', 'Widow/er', 'Separated') NULL,
-  `phone` VARCHAR(20) NOT NULL,
+--
+-- Dumping data for table `patients`
+--
 
-  -- Residential Address
-  `region` VARCHAR(100) NULL,
-  `province` VARCHAR(100) NULL,
-  `city_municipality` VARCHAR(100) NULL,
-  `barangay` VARCHAR(100) NULL,
-  `zip_code` VARCHAR(10) NULL,
+LOCK TABLES `patients` WRITE;
+/*!40000 ALTER TABLE `patients` DISABLE KEYS */;
+INSERT INTO `patients` VALUES (1,3,'Tony',NULL,'Stark',NULL,'1988-04-12','Female','Married','+639171234567','Region XI','Davao del Sur','Davao City','Talomo','8000','Yes','PH-1234-5678-9012','Member','0000-7919-4729-0001','No',4,NULL,NULL,NULL,NULL,'2026-08-11 05:46:20','2026-09-15 13:01:34'),(2,3,'Steve',NULL,'Rogers',NULL,'1975-11-23','Male','Married','+639189876543','Region XI','Davao del Sur','Davao City','Buhangin','8000','No',NULL,NULL,'0001-5838-9458-0002','Yes',5,NULL,NULL,NULL,NULL,'2026-08-11 05:46:20','2026-09-15 13:01:34'),(3,4,'Natasha',NULL,'Romanoff',NULL,'1995-08-05','Female','Single','+639205551234','Region XI','Davao del Sur','Davao City','Poblacion','8000','Yes','PH-2234-5678-9013','Dependent','0002-3757-4187-0003','No',7,NULL,NULL,NULL,NULL,'2026-08-11 05:46:20','2026-09-15 13:01:34'),(4,4,'Bruce',NULL,'Banner',NULL,'1962-02-17','Male','Widow/er','+639174448899','Region XI','Davao del Sur','Davao City','Matina','8000','Yes','PH-3234-5678-9014','Member','0003-1676-8916-0004','No',8,NULL,NULL,NULL,NULL,'2026-08-11 05:46:20','2026-09-15 13:01:34'),(5,5,'Peter',NULL,'Parker',NULL,'1980-10-29','Male','Married','+639193332211','Region XI','Davao del Sur','Davao City','Toril','8000','No',NULL,NULL,'0003-9595-3645-0005','Yes',10,NULL,NULL,NULL,NULL,'2026-08-11 05:46:20','2026-09-15 13:01:34'),(6,5,'Wanda',NULL,'Maximoff',NULL,'1992-06-14','Female','Single','+639157778899','Region XI','Davao del Sur','Davao City','Agdao','8000','Yes','PH-4234-5678-9015','Member','0004-7514-8374-0006','No',11,NULL,NULL,NULL,NULL,'2026-08-11 05:46:20','2026-09-15 13:01:34'),(7,3,'Stephen',NULL,'Strange',NULL,'1990-02-23','Male','Single','+639091919153','Test','test','test','test','0000','No',NULL,NULL,'0005-5433-3103-0007','No',NULL,NULL,NULL,NULL,NULL,'2026-08-11 05:52:15','2026-09-15 13:01:34'),(8,7,'Carol',NULL,'Danvers',NULL,'2018-11-21','Male','Single','1234556656','WDAWDAW','AWDA','WDAWD','AWDAW','AWDWA','Yes',NULL,'Member','0006-3352-7832-0008','Yes',13,NULL,NULL,NULL,NULL,'2026-08-13 05:47:21','2026-09-15 13:01:34'),(9,5,'Scott',NULL,'Lang',NULL,'2026-08-04','Male','Single','1234556656','Region XI (Davao Region)','Davao del Sur','Bansalan','Poblacion Dos','8022','Yes','1234567','Member','0007-1271-2561-0009','No',16,NULL,NULL,NULL,NULL,'2026-08-18 07:28:45','2026-09-15 13:01:34'),(10,5,'Clint',NULL,'Barton',NULL,'1990-02-23','Male','Single','+639091919153',NULL,NULL,NULL,NULL,NULL,'No',NULL,NULL,'0007-9190-7290-0010','No',16,'ref_14b21743334b','St. Jude General Hospital','test, test, test, Test, 0000','{\"age\": 36, \"phone\": \"+639091919153\", \"gender\": \"male\", \"address\": \"test, test, test, Test, 0000\", \"vital_bp\": null, \"vital_hr\": null, \"vital_rr\": null, \"diagnosis\": \"Pneumonia\", \"full_name\": \"Clint Barton\", \"departed_at\": \"2026-08-25T13:32:06.029930\", \"reason_text\": \"Higher Level of Care Required\", \"referral_id\": \"ref_14b21743334b\", \"vital_o2sat\": null, \"civil_status\": \"Single\", \"vital_temp_c\": null, \"date_of_birth\": \"1990-02-23\", \"chief_complaint\": \"Acute Renal Failure requiring dialysis\", \"disease_severity\": \"3\", \"departure_outcome\": \"DISCHARGED\", \"departure_remarks\": null, \"philhealth_number\": null, \"philhealth_status\": null, \"referring_facility\": \"St. Jude General Hospital\"}','2026-08-18 07:56:48','2026-09-15 13:01:34'),(11,3,'Sam',NULL,'Wilson',NULL,'2025-10-19','Male','Single','1234556656','Region XII (SOCCSKSARGEN)','Cotabato','Carmen','Tacupan','9408','Yes','1234567','Dependent','0008-7109-2019-0011','No',15,NULL,NULL,NULL,NULL,'2026-08-19 07:28:56','2026-09-15 13:01:34'),(12,5,'Bucky',NULL,'Barnes',NULL,'2026-08-19','Male',NULL,'',NULL,NULL,NULL,NULL,NULL,'No',NULL,NULL,'0009-5028-6748-0012','No',16,'ref_d200481e6b98','St. Jude General Hospital',NULL,'{\"age\": 36, \"phone\": null, \"gender\": \"male\", \"address\": null, \"vital_bp\": null, \"vital_hr\": null, \"vital_rr\": null, \"diagnosis\": \"Pneumonia\", \"full_name\": \"Bucky Barnes\", \"departed_at\": \"2026-08-25T13:36:46.368468\", \"reason_text\": \"Higher Level of Care Required\", \"referral_id\": \"ref_d200481e6b98\", \"vital_o2sat\": null, \"civil_status\": null, \"vital_temp_c\": null, \"date_of_birth\": null, \"chief_complaint\": \"Acute Renal Failure requiring dialysis\", \"disease_severity\": \"3\", \"departure_outcome\": \"DISCHARGED\", \"departure_remarks\": null, \"philhealth_number\": null, \"philhealth_status\": null, \"referring_facility\": \"St. Jude General Hospital\"}','2026-08-19 11:14:57','2026-09-15 13:01:34'),(13,3,'Peter',NULL,'Quill',NULL,'2022-03-20','Male','Single','1234556656','Region XI (Davao Region)','Davao del Sur','Bansalan','Poblacion Dos',NULL,'Yes','1234567','Member','0010-2947-1477-0013','No',15,NULL,NULL,NULL,NULL,'2026-08-20 06:30:14','2026-09-15 13:01:34'),(14,3,'Gamora',NULL,'Zenwhoberi',NULL,'2020-02-24','Male','Single','09091919153','Region XII (SOCCSKSARGEN)','Cotabato','Carmen','Tacupan','9808','Yes','1234567','Member','0011-0866-6206-0014','No',15,NULL,NULL,NULL,NULL,'2026-08-24 03:18:38','2026-09-15 13:01:34'),(15,5,'Groot',NULL,'Flora',NULL,'2020-02-24','Male','Single','09091919153',NULL,NULL,NULL,NULL,NULL,'Yes','1234567','Member','0011-8785-0935-0015','No',16,'ref_20e1ff2fa4eb','St. Jude General Hospital','Tacupan, Carmen, Cotabato, Region XII (SOCCSKSARGEN), 9808','{\"age\": 6, \"phone\": \"09091919153\", \"gender\": \"male\", \"is_pwd\": false, \"address\": \"Tacupan, Carmen, Cotabato, Region XII (SOCCSKSARGEN), 9808\", \"vital_bp\": \"120/80\", \"vital_hr\": \"80\", \"vital_rr\": \"18\", \"diagnosis\": \"Pneumonia\", \"full_name\": \"Groot Flora\", \"has_allergy\": true, \"is_pregnant\": false, \"reason_text\": \"Diagnostic Services Not Available\", \"referral_id\": \"ref_20e1ff2fa4eb\", \"vital_o2sat\": \"98\", \"civil_status\": \"Single\", \"vital_temp_c\": \"36.5\", \"date_of_birth\": \"2020-02-24\", \"allergy_details\": \"Seafood\", \"chief_complaint\": \"Difficulty Breathing\", \"vital_height_cm\": \"165.0\", \"vital_weight_kg\": \"60.0\", \"disease_severity\": \"3\", \"is_senior_citizen\": false, \"philhealth_number\": \"1234567\", \"philhealth_status\": \"Member\", \"referring_facility\": \"St. Jude General Hospital\"}','2026-08-24 03:46:28','2026-09-15 13:01:34'),(16,3,'Rocket',NULL,'Raccoon',NULL,'2006-04-08','Female','Single','1234556656','Region XII (SOCCSKSARGEN)','Cotabato','City of Kidapawan','Perez','9400','Yes','1234567','Member','0012-6704-5664-0016','No',15,NULL,NULL,NULL,NULL,'2026-08-24 03:48:46','2026-09-15 13:01:34'),(17,10,'Wade',NULL,'Wilson',NULL,'2006-04-08','Female','Single','1234556656',NULL,NULL,NULL,NULL,NULL,'Yes','1234567','Member','0013-4623-0393-0017','No',17,'ref_9c3321b34933','St. Jude General Hospital','Perez, City of Kidapawan, Cotabato, Region XII (SOCCSKSARGEN), 9400','{\"age\": 20, \"phone\": \"1234556656\", \"gender\": \"female\", \"is_pwd\": false, \"address\": \"Perez, City of Kidapawan, Cotabato, Region XII (SOCCSKSARGEN), 9400\", \"vital_bp\": \"120/80\", \"vital_hr\": \"80\", \"vital_rr\": \"18\", \"diagnosis\": \"hehe\", \"full_name\": \"Wade Wilson\", \"arrived_at\": \"2026-08-24T13:45:40.137519\", \"has_allergy\": true, \"is_pregnant\": false, \"reason_text\": \"Higher Level of Care Required\", \"referral_id\": \"ref_9c3321b34933\", \"vital_o2sat\": \"98\", \"civil_status\": \"Single\", \"vital_temp_c\": \"36.5\", \"date_of_birth\": \"2006-04-08\", \"allergy_details\": \"Allergy sa sigeg pangutana\", \"chief_complaint\": \"Maldita kaayo\", \"vital_height_cm\": \"165.0\", \"vital_weight_kg\": \"60.0\", \"arrival_vital_bp\": null, \"arrival_vital_hr\": null, \"arrival_vital_rr\": null, \"disease_severity\": \"3\", \"is_senior_citizen\": false, \"philhealth_number\": \"1234567\", \"philhealth_status\": \"Member\", \"referring_facility\": \"St. Jude General Hospital\", \"arrival_vital_o2sat\": null, \"arrival_vital_temp_c\": null}','2026-08-24 05:45:40','2026-09-15 13:01:35'),(18,3,'Matt',NULL,'Murdock',NULL,'2026-08-05','Male','Single','1234556656','Region XI (Davao Region)','Davao del Sur','City of Davao','Buhangin',NULL,'Yes','1234567','Member','0014-2542-5122-0018','No',15,NULL,NULL,NULL,NULL,'2026-08-24 05:59:55','2026-09-15 13:01:35'),(19,5,'Jessica',NULL,'Jones',NULL,'2006-04-08','Female','Single','1234556656',NULL,NULL,NULL,NULL,NULL,'Yes','1234567','Member','0015-0461-9851-0019','No',16,'ref_8c17609cecfb','Amas Provincial Hospital',NULL,'{\"age\": 20, \"phone\": \"1234556656\", \"gender\": \"female\", \"is_pwd\": false, \"address\": null, \"vital_bp\": \"120/80\", \"vital_hr\": \"80\", \"vital_rr\": \"18\", \"diagnosis\": \"Pneumonia\", \"full_name\": \"Jessica Jones\", \"arrived_at\": \"2026-08-24T14:59:54.167477\", \"departed_at\": \"2026-08-24T15:00:41.109002\", \"has_allergy\": false, \"is_pregnant\": false, \"reason_text\": \"No Available General Surgeon\", \"referral_id\": \"ref_8c17609cecfb\", \"vital_o2sat\": \"98\", \"civil_status\": \"Single\", \"vital_temp_c\": \"36.5\", \"date_of_birth\": \"2006-04-08\", \"allergy_details\": null, \"chief_complaint\": \"Acute Renal Failure requiring dialysis\", \"vital_height_cm\": \"165.0\", \"vital_weight_kg\": \"60.0\", \"arrival_vital_bp\": null, \"arrival_vital_hr\": null, \"arrival_vital_rr\": null, \"disease_severity\": \"3\", \"departure_outcome\": \"DISCHARGED\", \"departure_remarks\": \"Gumaling na po\", \"is_senior_citizen\": false, \"philhealth_number\": \"1234567\", \"philhealth_status\": \"Member\", \"referring_facility\": \"Amas Provincial Hospital\", \"arrival_vital_o2sat\": null, \"arrival_vital_temp_c\": null}','2026-08-24 06:59:54','2026-09-15 13:01:35'),(20,10,'Luke',NULL,'Cage',NULL,'2025-10-19','Male','Single','1234556656',NULL,NULL,NULL,NULL,NULL,'Yes','1234567','Dependent','0015-8380-4580-0020','No',18,'ref_9eac5daa1ae4','St. Jude General Hospital','Tacupan, Carmen, Cotabato, Region XII (SOCCSKSARGEN), 9408','{\"age\": 0, \"phone\": \"1234556656\", \"gender\": \"male\", \"is_pwd\": false, \"address\": \"Tacupan, Carmen, Cotabato, Region XII (SOCCSKSARGEN), 9408\", \"vital_bp\": \"134/56\", \"vital_hr\": \"89\", \"vital_rr\": \"18\", \"diagnosis\": \"Pneumonia\", \"full_name\": \"Luke Cage\", \"arrived_at\": \"2026-08-25T11:32:24.992332\", \"has_allergy\": false, \"is_pregnant\": false, \"reason_text\": \"No Available Rheumatologist\", \"referral_id\": \"ref_9eac5daa1ae4\", \"vital_o2sat\": \"98\", \"civil_status\": \"Single\", \"vital_temp_c\": \"36.5\", \"date_of_birth\": \"2025-10-19\", \"allergy_details\": null, \"chief_complaint\": \"Acute Renal Failure requiring dialysis\", \"vital_height_cm\": \"165.0\", \"vital_weight_kg\": \"60.0\", \"arrival_vital_bp\": null, \"arrival_vital_hr\": null, \"arrival_vital_rr\": null, \"disease_severity\": \"3\", \"is_senior_citizen\": false, \"philhealth_number\": \"1234567\", \"philhealth_status\": \"Dependent\", \"referring_facility\": \"St. Jude General Hospital\", \"arrival_vital_o2sat\": null, \"arrival_vital_temp_c\": null}','2026-08-25 03:32:25','2026-09-15 13:01:35'),(21,5,'Danny',NULL,'Rand',NULL,'2025-10-19','Male','Single','1234556656',NULL,NULL,NULL,NULL,NULL,'Yes','1234567','Dependent','0016-6299-9309-0021','No',16,'ref_82f6bbf98a3c','Amas Provincial Hospital',NULL,'{\"age\": 0, \"phone\": \"1234556656\", \"gender\": \"male\", \"is_pwd\": false, \"address\": null, \"vital_bp\": \"120/80\", \"vital_hr\": \"80\", \"vital_rr\": \"18\", \"diagnosis\": \"Pneumonia\", \"full_name\": \"Danny Rand\", \"arrived_at\": \"2026-08-25T11:37:51.883696\", \"departed_at\": \"2026-08-25T11:38:31.917499\", \"has_allergy\": false, \"is_pregnant\": false, \"reason_text\": \"No Available Toxicologist\", \"referral_id\": \"ref_82f6bbf98a3c\", \"vital_o2sat\": \"98\", \"civil_status\": \"Single\", \"vital_temp_c\": \"36.5\", \"date_of_birth\": \"2025-10-19\", \"allergy_details\": null, \"chief_complaint\": \"Acute Renal Failure requiring dialysis\", \"vital_height_cm\": \"165.0\", \"vital_weight_kg\": \"60.0\", \"arrival_vital_bp\": null, \"arrival_vital_hr\": null, \"arrival_vital_rr\": null, \"disease_severity\": \"3\", \"departure_outcome\": \"DECEASED\", \"departure_remarks\": \"Namatay na\", \"is_senior_citizen\": false, \"philhealth_number\": \"1234567\", \"philhealth_status\": \"Dependent\", \"referring_facility\": \"Amas Provincial Hospital\", \"arrival_vital_o2sat\": null, \"arrival_vital_temp_c\": null}','2026-08-25 03:37:51','2026-09-15 13:01:35'),(22,10,'Hope',NULL,'VanDyne',NULL,'2026-08-05','Male','Single','1234556656',NULL,NULL,NULL,NULL,NULL,'Yes','1234567','Member','0017-4218-4038-0022','No',18,'ref_19d02f4bcca0','St. Jude General Hospital','Buhangin, City of Davao, Davao del Sur, Region XI (Davao Region)','{\"age\": 0, \"phone\": \"1234556656\", \"gender\": \"male\", \"is_pwd\": true, \"address\": \"Buhangin, City of Davao, Davao del Sur, Region XI (Davao Region)\", \"age_days\": 20, \"vital_bp\": \"120/80\", \"vital_hr\": \"80\", \"vital_rr\": \"18\", \"diagnosis\": \"Pneumonia\", \"full_name\": \"Hope VanDyne\", \"age_months\": 0, \"arrived_at\": \"2026-08-25T12:45:27.605042\", \"departed_at\": \"2026-08-25T12:45:48.964838\", \"has_allergy\": true, \"is_pregnant\": false, \"reason_text\": \"No Available Cardiologist\", \"referral_id\": \"ref_19d02f4bcca0\", \"vital_o2sat\": \"98\", \"civil_status\": \"Single\", \"vital_temp_c\": \"36.5\", \"date_of_birth\": \"2026-08-05\", \"allergy_details\": \"Seafoods\", \"chief_complaint\": \"Acute Renal Failure requiring dialysis\", \"vital_height_cm\": \"165.0\", \"vital_weight_kg\": \"60.0\", \"arrival_vital_bp\": null, \"arrival_vital_hr\": null, \"arrival_vital_rr\": null, \"disease_severity\": \"3\", \"departure_outcome\": \"DISCHARGED\", \"departure_remarks\": \"Secret\", \"is_senior_citizen\": false, \"philhealth_number\": \"1234567\", \"philhealth_status\": \"Member\", \"referring_facility\": \"St. Jude General Hospital\", \"arrival_vital_o2sat\": null, \"arrival_vital_temp_c\": null}','2026-08-25 04:45:27','2026-09-15 13:01:35'),(23,10,'Pietro',NULL,'Maximoff',NULL,'2020-02-24','Male','Single','09091919153',NULL,NULL,NULL,NULL,NULL,'Yes','1234567','Member','0018-2137-8767-0023','No',18,'ref_2c720ba4f0b6','St. Jude General Hospital','Tacupan, Carmen, Cotabato, Region XII (SOCCSKSARGEN), 9808','{\"age\": 6, \"phone\": \"09091919153\", \"gender\": \"male\", \"is_pwd\": true, \"address\": \"Tacupan, Carmen, Cotabato, Region XII (SOCCSKSARGEN), 9808\", \"age_days\": 2374, \"vital_bp\": \"120/80\", \"vital_hr\": \"80\", \"vital_rr\": \"18\", \"diagnosis\": \"Pneumonia\", \"full_name\": \"Pietro Maximoff\", \"age_months\": 78, \"arrived_at\": \"2026-08-25T12:49:18.627636\", \"has_allergy\": false, \"is_pregnant\": false, \"reason_text\": \"No Available Internal Medicine\", \"referral_id\": \"ref_2c720ba4f0b6\", \"vital_o2sat\": \"98\", \"civil_status\": \"Single\", \"vital_temp_c\": \"36.5\", \"date_of_birth\": \"2020-02-24\", \"allergy_details\": null, \"chief_complaint\": \"Acute Renal Failure requiring dialysis\", \"vital_height_cm\": \"165.0\", \"vital_weight_kg\": \"60.0\", \"arrival_vital_bp\": null, \"arrival_vital_hr\": null, \"arrival_vital_rr\": null, \"disease_severity\": \"3\", \"is_senior_citizen\": true, \"philhealth_number\": \"1234567\", \"philhealth_status\": \"Member\", \"referring_facility\": \"St. Jude General Hospital\", \"arrival_vital_o2sat\": null, \"arrival_vital_temp_c\": null}','2026-08-25 04:49:18','2026-09-15 13:01:35'),(24,5,'Vision',NULL,'Android',NULL,'2020-02-24','Male','Single','09091919153',NULL,NULL,NULL,NULL,NULL,'Yes','1234567','Member','0019-0056-3496-0024','No',16,'ref_728b4868e401','Amas Provincial Hospital',NULL,'{\"age\": 6, \"phone\": \"09091919153\", \"gender\": \"male\", \"is_pwd\": true, \"address\": null, \"age_days\": 2374, \"vital_bp\": \"120/80\", \"vital_hr\": \"80\", \"vital_rr\": \"18\", \"diagnosis\": \"Pneumonia\", \"full_name\": \"Vision Android\", \"age_months\": 78, \"arrived_at\": \"2026-08-25T12:52:09.562966\", \"departed_at\": \"2026-08-25T13:24:35.955750\", \"has_allergy\": false, \"is_pregnant\": false, \"reason_text\": \"No Available Operating Room\", \"referral_id\": \"ref_728b4868e401\", \"vital_o2sat\": \"98\", \"civil_status\": \"Single\", \"vital_temp_c\": \"36.5\", \"date_of_birth\": \"2020-02-24\", \"allergy_details\": null, \"chief_complaint\": \"Test\", \"vital_height_cm\": \"165.0\", \"vital_weight_kg\": \"60.0\", \"arrival_vital_bp\": null, \"arrival_vital_hr\": null, \"arrival_vital_rr\": null, \"disease_severity\": \"3\", \"departure_outcome\": \"DISCHARGED\", \"departure_remarks\": \"Gumaling na po\", \"is_senior_citizen\": true, \"philhealth_number\": \"1234567\", \"philhealth_status\": \"Member\", \"referring_facility\": \"Amas Provincial Hospital\", \"arrival_vital_o2sat\": null, \"arrival_vital_temp_c\": null}','2026-08-25 04:52:09','2026-09-15 13:01:35'),(25,3,'Homer',NULL,'Simpson',NULL,'1997-07-25','Male','Single','09091919153','Region XI (Davao Region)','Davao del Sur','City of Davao','Mintal',NULL,'Yes','9078777687687','Member','0019-7975-8225-0025','Yes',15,NULL,NULL,NULL,NULL,'2026-08-25 05:58:57','2026-09-15 13:01:35'),(26,10,'Marge',NULL,'Simpson',NULL,'1997-07-25','Male','Single','09091919153',NULL,NULL,NULL,NULL,NULL,'Yes','9078777687687','Member','0020-5894-2954-0026','No',18,'ref_556407dc661c','St. Jude General Hospital','Mintal, City of Davao, Davao del Sur, Region XI (Davao Region)','{\"age\": 29, \"phone\": \"09091919153\", \"gender\": \"male\", \"is_pwd\": false, \"address\": \"Mintal, City of Davao, Davao del Sur, Region XI (Davao Region)\", \"age_days\": 10623, \"vital_bp\": \"120/80\", \"vital_hr\": \"80\", \"vital_rr\": \"18\", \"diagnosis\": \"Pneumonia\", \"full_name\": \"Marge Simpson\", \"age_months\": 349, \"arrived_at\": \"2026-08-25T16:05:49.222538\", \"has_allergy\": false, \"is_pregnant\": false, \"reason_text\": \"No Available Dialysis Services\", \"referral_id\": \"ref_556407dc661c\", \"vital_o2sat\": \"98\", \"civil_status\": \"Single\", \"vital_temp_c\": \"36.5\", \"date_of_birth\": \"1997-07-25\", \"allergy_details\": null, \"chief_complaint\": \"Acute Renal Failure requiring dialysis\", \"vital_height_cm\": \"165.0\", \"vital_weight_kg\": \"60.0\", \"arrival_vital_bp\": null, \"arrival_vital_hr\": null, \"arrival_vital_rr\": null, \"disease_severity\": \"3\", \"is_senior_citizen\": false, \"philhealth_number\": \"9078777687687\", \"philhealth_status\": \"Member\", \"referring_facility\": \"St. Jude General Hospital\", \"arrival_vital_o2sat\": null, \"arrival_vital_temp_c\": null}','2026-08-25 08:05:49','2026-09-15 13:01:35'),(27,5,'Bart',NULL,'Simpson',NULL,'1997-07-25','Male','Single','09091919153',NULL,NULL,NULL,NULL,NULL,'Yes','9078777687687','Member','0021-3813-7683-0027','No',16,'ref_cb92056e9335','Amas Provincial Hospital',NULL,'{\"age\": 29, \"phone\": \"09091919153\", \"gender\": \"male\", \"is_pwd\": false, \"address\": null, \"age_days\": 10623, \"vital_bp\": \"120/80\", \"vital_hr\": \"80\", \"vital_rr\": \"18\", \"diagnosis\": \"Pneumonia\", \"full_name\": \"Bart Simpson\", \"age_months\": 349, \"arrived_at\": \"2026-08-25T16:08:30.677419\", \"departed_at\": \"2026-08-25T16:08:40.928053\", \"has_allergy\": false, \"is_pregnant\": false, \"reason_text\": \"No Available General Surgeon\", \"referral_id\": \"ref_cb92056e9335\", \"vital_o2sat\": \"98\", \"civil_status\": \"Single\", \"vital_temp_c\": \"36.5\", \"date_of_birth\": \"1997-07-25\", \"allergy_details\": null, \"chief_complaint\": \"Acute Renal Failure requiring dialysis\", \"vital_height_cm\": \"165.0\", \"vital_weight_kg\": \"60.0\", \"arrival_vital_bp\": null, \"arrival_vital_hr\": null, \"arrival_vital_rr\": null, \"disease_severity\": \"3\", \"departure_outcome\": \"DISCHARGED\", \"departure_remarks\": \"DOA\", \"is_senior_citizen\": false, \"philhealth_number\": \"9078777687687\", \"philhealth_status\": \"Member\", \"referring_facility\": \"Amas Provincial Hospital\", \"arrival_vital_o2sat\": null, \"arrival_vital_temp_c\": null}','2026-08-25 08:08:30','2026-09-15 13:01:35'),(28,11,'Lisa',NULL,'Simpson',NULL,'2020-02-01','Male','Single','1234556656','Region XII (SOCCSKSARGEN)','Cotabato','Carmen','Ugalingan','9408','Yes','1234567','Member','0022-1732-2412-0028','No',19,NULL,NULL,NULL,NULL,'2026-09-01 04:46:53','2026-09-15 13:01:35'),(29,11,'Bugs',NULL,'Bunny',NULL,'2020-07-01','Male','Single','1234556656','Region XII (SOCCSKSARGEN)','Cotabato','Carmen','Tacupan','9408','Yes','1234567','Member','0022-9651-7141-0029','No',19,NULL,NULL,NULL,NULL,'2026-09-01 04:51:41','2026-09-15 13:01:35'),(30,11,'Daffy',NULL,'Duck',NULL,'2022-02-01','Male','Single','1234556656','Region XI (Davao Region)','Davao del Sur','City of Davao','Buhangin','8022','No',NULL,NULL,'0023-7570-1870-0030','No',19,NULL,NULL,NULL,NULL,'2026-09-01 06:22:10','2026-09-15 13:01:35'),(31,5,'Mickey',NULL,'Mouse',NULL,'2022-02-01','Male','Single','1234556656','Region XI (Davao Region)','Davao del Sur','City of Davao','Buhangin',NULL,'No',NULL,NULL,'0024-5489-6599-0031','No',16,NULL,NULL,NULL,NULL,'2026-09-01 07:04:57','2026-09-15 13:01:35'),(32,5,'Minnie',NULL,'Mouse',NULL,'2020-02-01','Male','Single','1234556656',NULL,NULL,NULL,NULL,NULL,'Yes','1234567','Member','0025-3408-1328-0032','No',16,'ref_3a144ee4a897','Poblacion BHS','Ugalingan, Carmen, Cotabato, Region XII (SOCCSKSARGEN), 9408','{\"age\": 6, \"phone\": \"1234556656\", \"gender\": \"male\", \"is_pwd\": false, \"address\": \"Ugalingan, Carmen, Cotabato, Region XII (SOCCSKSARGEN), 9408\", \"age_days\": 2404, \"vital_bp\": \"120/80\", \"vital_hr\": \"80\", \"vital_rr\": \"18\", \"diagnosis\": \"Pneumonia\", \"full_name\": \"Minnie Mouse\", \"age_months\": 79, \"arrived_at\": \"2026-09-01T15:06:42.634969\", \"has_allergy\": true, \"is_pregnant\": false, \"reason_text\": \"Full Critical Care Unit (CCU)\", \"referral_id\": \"ref_3a144ee4a897\", \"vital_o2sat\": \"98\", \"civil_status\": \"Single\", \"vital_temp_c\": \"36.5\", \"date_of_birth\": \"2020-02-01\", \"allergy_details\": \"Allergy sa sigeg pangutana\", \"chief_complaint\": \"Acute Renal Failure requiring dialysis\", \"vital_height_cm\": \"165.0\", \"vital_weight_kg\": \"60.0\", \"arrival_vital_bp\": null, \"arrival_vital_hr\": null, \"arrival_vital_rr\": null, \"disease_severity\": \"3\", \"is_senior_citizen\": false, \"philhealth_number\": \"1234567\", \"philhealth_status\": \"Member\", \"referring_facility\": \"Poblacion BHS\", \"arrival_vital_o2sat\": null, \"arrival_vital_temp_c\": null}','2026-09-01 07:06:42','2026-09-15 13:01:35'),(33,5,'SpongeBob',NULL,'SquarePants',NULL,'2026-08-30','Male','Single','1234556656','Region XI (Davao Region)','Davao del Sur','City of Davao','Buhangin',NULL,'No',NULL,NULL,'0026-1327-6057-0033','No',16,NULL,NULL,NULL,NULL,'2026-09-01 07:07:23','2026-09-15 13:01:35'),(34,11,'Patrick',NULL,'Star',NULL,'2026-08-30','Male','Single','1234556656','Region XI (Davao Region)','Davao del Sur','City of Davao','Buhangin',NULL,'No',NULL,NULL,'0026-9246-0786-0034','No',19,NULL,NULL,NULL,NULL,'2026-09-01 07:08:05','2026-09-15 13:01:35'),(35,5,'Sandy',NULL,'Cheeks',NULL,'2026-08-30','Male','Single','1234556656','Region XI (Davao Region)','Davao del Sur','City of Davao','Buhangin',NULL,'No',NULL,NULL,'0027-7165-5515-0035','No',16,'ref_08e041a6cf7a','Poblacion BHS','Buhangin, City of Davao, Davao del Sur, Region XI (Davao Region)','{\"age\": 0, \"phone\": \"1234556656\", \"gender\": \"male\", \"is_pwd\": false, \"address\": \"Buhangin, City of Davao, Davao del Sur, Region XI (Davao Region)\", \"age_days\": 2, \"vital_bp\": \"120/80\", \"vital_hr\": \"80\", \"vital_rr\": \"18\", \"diagnosis\": \"Pneumonia\", \"full_name\": \"Sandy Cheeks\", \"age_months\": 0, \"arrived_at\": \"2026-09-01T15:42:28.349452\", \"has_allergy\": true, \"is_pregnant\": false, \"reason_text\": \"No Available Neonatal Intensive Care Unit\", \"referral_id\": \"ref_08e041a6cf7a\", \"vital_o2sat\": \"98\", \"civil_status\": \"Single\", \"vital_temp_c\": \"36.5\", \"date_of_birth\": \"2026-08-30\", \"allergy_details\": \"Allergy sa sigeg pangutana\", \"chief_complaint\": \"Acute Renal Failure requiring dialysis\", \"vital_height_cm\": \"165.0\", \"vital_weight_kg\": \"60.0\", \"arrival_vital_bp\": null, \"arrival_vital_hr\": null, \"arrival_vital_rr\": null, \"disease_severity\": \"3\", \"is_senior_citizen\": false, \"philhealth_number\": null, \"philhealth_status\": null, \"referring_facility\": \"Poblacion BHS\", \"arrival_vital_o2sat\": null, \"arrival_vital_temp_c\": null}','2026-09-01 07:41:00','2026-09-15 13:01:35'),(36,11,'Squidward',NULL,'Tentacles',NULL,'2026-08-30','Male','Single','1234556656','Region XI (Davao Region)','Davao del Sur','City of Davao','Buhangin',NULL,'No',NULL,NULL,'0028-5084-0244-0036','No',19,NULL,NULL,NULL,NULL,'2026-09-01 07:41:37','2026-09-15 13:01:35'),(37,10,'Scooby',NULL,'Doo',NULL,'1988-04-12','Female','Married','+639171234567',NULL,NULL,NULL,NULL,NULL,'Yes','PH-1234-5678-9012','Member','0029-3003-4973-0037','No',18,'ref_17372b3047bc','St. Jude General Hospital','Talomo, Davao City, Davao del Sur, Region XI, 8000','{\"age\": 38, \"phone\": \"+639171234567\", \"gender\": \"female\", \"is_pwd\": true, \"address\": \"Talomo, Davao City, Davao del Sur, Region XI, 8000\", \"age_days\": 14023, \"vital_bp\": \"120/80\", \"vital_hr\": \"80\", \"vital_rr\": \"18\", \"diagnosis\": \"Pneumonia\", \"full_name\": \"Scooby Doo\", \"age_months\": 460, \"arrived_at\": \"2026-09-03T13:28:36.110484\", \"departed_at\": \"2026-09-03T13:29:06.461438\", \"has_allergy\": false, \"is_pregnant\": false, \"reason_text\": \"No Available Critical Care Surgeon\", \"referral_id\": \"ref_17372b3047bc\", \"vital_o2sat\": \"98\", \"civil_status\": \"Married\", \"vital_temp_c\": \"36.5\", \"date_of_birth\": \"1988-04-12\", \"allergy_details\": null, \"chief_complaint\": \"Acute Renal Failure requiring dialysis\", \"vital_height_cm\": \"165.0\", \"vital_weight_kg\": \"60.0\", \"arrival_vital_bp\": null, \"arrival_vital_hr\": null, \"arrival_vital_rr\": null, \"disease_severity\": \"3\", \"departure_outcome\": \"DISCHARGED\", \"departure_remarks\": \"Healing for ebriwan\", \"is_senior_citizen\": false, \"philhealth_number\": \"PH-1234-5678-9012\", \"philhealth_status\": \"Member\", \"referring_facility\": \"St. Jude General Hospital\", \"arrival_vital_o2sat\": null, \"arrival_vital_temp_c\": null}','2026-09-03 05:28:36','2026-09-15 13:01:35'),(38,3,'Shaggy',NULL,'Rogers',NULL,'2017-01-02','Male','Single','1234556656','Region XI (Davao Region)','Davao del Sur','City of Davao','Lamanan','8022','Yes','1234567','Member','0030-0922-9702-0038','No',15,NULL,NULL,NULL,NULL,'2026-09-03 08:31:34','2026-09-15 13:01:35'),(39,10,'Fred',NULL,'Flintstone',NULL,'2017-01-02','Male','Single','1234556656',NULL,NULL,NULL,NULL,NULL,'Yes','1234567','Member','0030-8841-4431-0039','No',18,'ref_6f07184374c7','St. Jude General Hospital','Lamanan, City of Davao, Davao del Sur, Region XI (Davao Region), 8022','{\"age\": 9, \"phone\": \"1234556656\", \"gender\": \"male\", \"is_pwd\": false, \"address\": \"Lamanan, City of Davao, Davao del Sur, Region XI (Davao Region), 8022\", \"age_days\": 3531, \"vital_bp\": \"120/80\", \"vital_hr\": \"80\", \"vital_rr\": \"18\", \"diagnosis\": \"Pneumonia\", \"full_name\": \"Fred Flintstone\", \"age_months\": 116, \"arrived_at\": \"2026-09-03T16:40:48.991739\", \"departed_at\": \"2026-09-03T16:42:02.671859\", \"has_allergy\": false, \"is_pregnant\": false, \"reason_text\": \"No Available Dentist\", \"referral_id\": \"ref_6f07184374c7\", \"vital_o2sat\": \"98\", \"civil_status\": \"Single\", \"vital_temp_c\": \"36.5\", \"date_of_birth\": \"2017-01-02\", \"allergy_details\": null, \"chief_complaint\": \"Acute Renal Failure requiring dialysis\", \"vital_height_cm\": \"165.0\", \"vital_weight_kg\": \"60.0\", \"arrival_vital_bp\": null, \"arrival_vital_hr\": null, \"arrival_vital_rr\": null, \"disease_severity\": \"3\", \"departure_outcome\": \"DISCHARGED\", \"departure_remarks\": \"healed\", \"is_senior_citizen\": false, \"philhealth_number\": \"1234567\", \"philhealth_status\": \"Member\", \"referring_facility\": \"St. Jude General Hospital\", \"arrival_vital_o2sat\": null, \"arrival_vital_temp_c\": null}','2026-09-03 08:40:49','2026-09-15 13:01:35'),(40,5,'Wilma',NULL,'Flintstone',NULL,'2020-02-24','Male','Single','09091919153',NULL,NULL,NULL,NULL,NULL,'Yes','1234567','Member','0031-6760-9160-0040','No',16,'ref_4559150a793c','Amas Provincial Hospital',NULL,'{\"age\": 6, \"phone\": \"09091919153\", \"gender\": \"male\", \"is_pwd\": false, \"address\": null, \"age_days\": 2388, \"vital_bp\": \"120/80\", \"vital_hr\": \"90\", \"vital_rr\": \"50\", \"diagnosis\": \"Sample Diagnosis\", \"full_name\": \"Wilma Flintstone\", \"age_months\": 78, \"arrived_at\": \"2026-09-08T15:17:33.774907\", \"attachments\": [{\"id\": \"ddab65f7-a3f1-4f4f-8109-cdb704ef9c07\", \"sha256\": \"31cda3ca7af5eeb8cf40a1692c53c66427cd308843e65addab1e0ef2ea723d93\", \"mime_type\": \"image/jpeg\", \"created_at\": \"2026-09-08T15:11:22.032937\", \"size_bytes\": 177537, \"download_url\": \"/api/v1/referral/ref_4559150a793c/attachments/ddab65f7-a3f1-4f4f-8109-cdb704ef9c07\", \"workflow_stage\": \"REFERRAL\", \"attachment_type\": \"CONSENT_FORM\", \"uploaded_by_user\": \"Juan\", \"original_filename\": \"1000124959.jpeg\", \"uploaded_by_facility\": \"Amas Provincial Hospital\"}], \"departed_at\": \"2026-09-08T15:17:55.461986\", \"has_allergy\": false, \"is_pregnant\": true, \"reason_text\": \"Full Neonatal Intensive Care Unit\", \"referral_id\": \"ref_4559150a793c\", \"vital_o2sat\": \"90\", \"civil_status\": \"Single\", \"vital_temp_c\": \"36.5\", \"date_of_birth\": \"2020-02-24\", \"consent_method\": \"PAPER\", \"consent_status\": \"GRANTED\", \"allergy_details\": null, \"chief_complaint\": \"Sample Chief Complaint\", \"vital_height_cm\": \"165.0\", \"vital_weight_kg\": \"50.0\", \"arrival_vital_bp\": null, \"arrival_vital_hr\": null, \"arrival_vital_rr\": null, \"disease_severity\": \"1\", \"referral_reasons\": [{\"code\": \"FULL_NEONATAL_INTENSIVE_CARE_UNIT\", \"label\": \"Full Neonatal Intensive Care Unit\", \"is_primary\": true, \"sort_order\": 0}], \"departure_outcome\": \"DISCHARGED\", \"departure_remarks\": null, \"is_senior_citizen\": false, \"philhealth_number\": \"1234567\", \"philhealth_status\": \"Member\", \"referring_facility\": \"Amas Provincial Hospital\", \"arrival_vital_o2sat\": null, \"consent_recorded_at\": \"2026-09-08T15:11:21\", \"arrival_vital_temp_c\": null, \"consent_text_version\": \"referral-consent-2026-09-v1\", \"consent_witnessed_by\": \"Dr. Juan Dela Cruz, M.D\"}','2026-09-08 07:17:37','2026-09-15 13:01:35'),(41,5,'Timmy',NULL,'Turner',NULL,'1997-07-25','Male','Single','09091919153',NULL,NULL,NULL,NULL,NULL,'Yes','9078777687687','Member','0032-4679-3889-0041','No',16,'ref_35b0cfd39e9f','Amas Provincial Hospital',NULL,'{\"age\": 29, \"phone\": \"09091919153\", \"gender\": \"male\", \"is_pwd\": false, \"address\": null, \"age_days\": 10638, \"vital_bp\": null, \"vital_hr\": null, \"vital_rr\": null, \"diagnosis\": \"Pneumonia\", \"full_name\": \"Timmy Turner\", \"age_months\": 349, \"arrived_at\": \"2026-09-09T11:48:42.422582\", \"attachments\": [{\"id\": \"8c37eb19-02b5-4e2c-b590-26ab7ee6f3f1\", \"sha256\": \"1349062902775a3785358a944a72065f3920834de7176d9b946acf007308c35d\", \"mime_type\": \"image/jpeg\", \"created_at\": \"2026-09-09T11:40:49.793999\", \"size_bytes\": 308135, \"download_url\": \"/api/v1/referral/ref_35b0cfd39e9f/attachments/8c37eb19-02b5-4e2c-b590-26ab7ee6f3f1\", \"workflow_stage\": \"REFERRAL\", \"attachment_type\": \"CONSENT_FORM\", \"uploaded_by_user\": \"Juan\", \"original_filename\": \"consent_Josh_Sinco.jpg\", \"uploaded_by_facility\": \"Amas Provincial Hospital\"}], \"departed_at\": \"2026-09-09T11:49:02.627691\", \"has_allergy\": false, \"is_pregnant\": false, \"reason_text\": \"No Available Patient Admission Services\", \"referral_id\": \"ref_35b0cfd39e9f\", \"vital_o2sat\": null, \"civil_status\": \"Single\", \"vital_temp_c\": null, \"date_of_birth\": \"1997-07-25\", \"consent_method\": \"ELECTRONIC\", \"consent_status\": \"GRANTED\", \"allergy_details\": null, \"chief_complaint\": \"adwda\", \"vital_height_cm\": null, \"vital_weight_kg\": null, \"arrival_vital_bp\": null, \"arrival_vital_hr\": null, \"arrival_vital_rr\": null, \"disease_severity\": \"3\", \"referral_reasons\": [{\"code\": \"NO_AVAILABLE_PATIENT_ADMISSION_SERVICES\", \"label\": \"No Available Patient Admission Services\", \"is_primary\": true, \"sort_order\": 0}], \"departure_outcome\": \"DISCHARGED\", \"departure_remarks\": null, \"is_senior_citizen\": false, \"philhealth_number\": \"9078777687687\", \"philhealth_status\": \"Member\", \"referring_facility\": \"Amas Provincial Hospital\", \"arrival_vital_o2sat\": null, \"consent_recorded_at\": \"2026-09-09T11:40:46\", \"consent_signer_name\": \"Josh Sinco\", \"consent_signer_type\": \"PATIENT\", \"arrival_vital_temp_c\": null, \"consent_text_version\": \"referral-consent-2026-09-v1\", \"consent_witnessed_by\": \"Dr. Juan Dela Cruz, M.D\", \"consent_document_sha256\": \"1349062902775a3785358a944a72065f3920834de7176d9b946acf007308c35d\", \"consent_representative_relationship\": null}','2026-09-09 03:48:43','2026-09-15 13:01:35'),(42,5,'Dexter',NULL,'Boygenius',NULL,'2017-01-02','Male','Single','1234556656',NULL,NULL,NULL,NULL,NULL,'Yes','1234567','Member','0033-2598-8618-0042','No',16,'ref_60c8fcbdca04','Amas Provincial Hospital',NULL,'{\"age\": 9, \"phone\": \"1234556656\", \"gender\": \"male\", \"is_pwd\": false, \"address\": null, \"age_days\": 3537, \"vital_bp\": null, \"vital_hr\": null, \"vital_rr\": null, \"diagnosis\": \"Pneumonia\", \"full_name\": \"Dexter Boygenius\", \"age_months\": 116, \"arrived_at\": \"2026-09-09T11:54:53.339738\", \"attachments\": [{\"id\": \"be8ac265-4ea0-453f-9b88-18edac4f835a\", \"sha256\": \"e3b738797a768ab66da2dd58af1bef8cb48b3eb6ce2fb96cd7bc71fb4727240c\", \"mime_type\": \"image/jpeg\", \"created_at\": \"2026-09-09T11:54:33.021461\", \"size_bytes\": 308620, \"download_url\": \"/api/v1/referral/ref_60c8fcbdca04/attachments/be8ac265-4ea0-453f-9b88-18edac4f835a\", \"workflow_stage\": \"REFERRAL\", \"attachment_type\": \"CONSENT_FORM\", \"uploaded_by_user\": \"Juan\", \"original_filename\": \"consent_Gian_Plariza.jpg\", \"uploaded_by_facility\": \"Amas Provincial Hospital\"}], \"departed_at\": \"2026-09-09T11:54:58.889442\", \"has_allergy\": false, \"is_pregnant\": false, \"reason_text\": \"Full Delivery Room\", \"referral_id\": \"ref_60c8fcbdca04\", \"vital_o2sat\": null, \"civil_status\": \"Single\", \"vital_temp_c\": null, \"date_of_birth\": \"2017-01-02\", \"consent_method\": \"ELECTRONIC\", \"consent_status\": \"GRANTED\", \"allergy_details\": null, \"chief_complaint\": \"dawdaw\", \"vital_height_cm\": null, \"vital_weight_kg\": null, \"arrival_vital_bp\": null, \"arrival_vital_hr\": null, \"arrival_vital_rr\": null, \"disease_severity\": \"3\", \"referral_reasons\": [{\"code\": \"FULL_DELIVERY_ROOM\", \"label\": \"Full Delivery Room\", \"is_primary\": true, \"sort_order\": 0}], \"departure_outcome\": \"DISCHARGED\", \"departure_remarks\": \"wadwad\", \"is_senior_citizen\": false, \"philhealth_number\": \"1234567\", \"philhealth_status\": \"Member\", \"referring_facility\": \"Amas Provincial Hospital\", \"arrival_vital_o2sat\": null, \"consent_recorded_at\": \"2026-09-09T11:54:30\", \"consent_signer_name\": \"Gian Plariza\", \"consent_signer_type\": \"PATIENT\", \"arrival_vital_temp_c\": null, \"consent_text_version\": \"referral-consent-2026-09-v1\", \"consent_witnessed_by\": \"Dr. Juan Dela Cruz, M.D\", \"consent_document_sha256\": \"e3b738797a768ab66da2dd58af1bef8cb48b3eb6ce2fb96cd7bc71fb4727240c\", \"consent_representative_relationship\": null}','2026-09-09 03:54:53','2026-09-15 13:01:35');
+/*!40000 ALTER TABLE `patients` ENABLE KEYS */;
+UNLOCK TABLES;
 
-  -- Socio-Economic & Health Insurance
-  `philhealth_member` ENUM('Yes', 'No') NOT NULL DEFAULT 'No',
-  `philhealth_number` VARCHAR(20) NULL,
-  `philhealth_status_type` ENUM('Member', 'Dependent') NULL,
-  `is_4ps_member` ENUM('Yes', 'No') NOT NULL DEFAULT 'No',
+--
+-- Table structure for table `referral_consents`
+--
 
-  `created_by_user_id` INT NULL,
+DROP TABLE IF EXISTS `referral_consents`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `referral_consents` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `initiated_referral_id` int NOT NULL,
+  `central_referral_id` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `method` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `consent_text_version` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `witnessed_by` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `recorded_at` datetime NOT NULL,
+  `signer_type` varchar(40) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `signer_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `representative_relationship` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `document_sha256` char(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `signed_copy_uploaded` tinyint(1) NOT NULL DEFAULT '0',
+  `central_attachment_id` varchar(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_referral_consents_local_referral` (`initiated_referral_id`),
+  KEY `idx_referral_consents_central_referral` (`central_referral_id`),
+  CONSTRAINT `fk_referral_consents_initiated_referral` FOREIGN KEY (`initiated_referral_id`) REFERENCES `initiated_referrals` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 
-  -- Populated only when this patient record originated from an incoming referral marked
-  -- "Arrived" -- lets Patient Records show where a transferred-in patient came from, and
-  -- lets get_transferred_patient_details.php serve a local-first snapshot instead of
-  -- re-fetching from the central IRDSS server every time.
-  `source_referral_id` VARCHAR(100) NULL,
-  `source_facility` VARCHAR(150) NULL,
-  `transferred_address` VARCHAR(255) NULL,
-  `transferred_details_snapshot` JSON NULL,
+--
+-- Dumping data for table `referral_consents`
+--
 
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+LOCK TABLES `referral_consents` WRITE;
+/*!40000 ALTER TABLE `referral_consents` DISABLE KEYS */;
+INSERT INTO `referral_consents` VALUES (1,49,'ref_4559150a793c','GRANTED','PAPER','referral-consent-2026-09-v1','Dr. Juan Dela Cruz, M.D','2026-09-08 07:11:21',NULL,NULL,NULL,NULL,1,'ddab65f7-a3f1-4f4f-8109-cdb704ef9c07','2026-09-08 07:11:21'),(2,50,'ref_694d33c274d8','GRANTED','PAPER','referral-consent-2026-09-v1','Dr. Juan Dela Cruz, M.D','2026-09-08 07:19:56',NULL,NULL,NULL,NULL,1,'401c026a-aa30-4a34-b1ec-5b871461eda2','2026-09-08 07:19:56'),(3,51,NULL,'GRANTED','PAPER','referral-consent-2026-09-v1','test','2026-09-09 02:35:43',NULL,NULL,NULL,NULL,0,NULL,'2026-09-09 02:35:48'),(4,52,'ref_1a4a7e1ecadb','GRANTED','PAPER','referral-consent-2026-09-v1','test','2026-09-09 02:36:06',NULL,NULL,NULL,NULL,1,'03cd3cb4-ef40-4465-a52e-7294d3d4845a','2026-09-09 02:36:06'),(5,53,'ref_cb03f029685e','GRANTED','PAPER','referral-consent-2026-09-v1','test','2026-09-09 02:54:04',NULL,NULL,NULL,NULL,1,'e2cf93fa-2ef9-4e58-8e36-e20e0dfe6634','2026-09-09 02:54:04'),(6,54,'ref_c258b29baf41','GRANTED','ELECTRONIC','referral-consent-2026-09-v1','Dr. Juan Dela Cruz, M.D','2026-09-09 03:28:44','PATIENT','Tommie Tabol',NULL,'9425164f8dc5fd7aa3b7ac042a0f346755e21609af4c7155d412dc1ea07c4bf0',1,'c41a8ce9-47bd-4651-a9b7-697449f7e373','2026-09-09 03:29:02'),(7,55,'ref_35b0cfd39e9f','GRANTED','ELECTRONIC','referral-consent-2026-09-v1','Dr. Juan Dela Cruz, M.D','2026-09-09 03:40:46','PATIENT','Josh Sinco',NULL,'1349062902775a3785358a944a72065f3920834de7176d9b946acf007308c35d',1,'8c37eb19-02b5-4e2c-b590-26ab7ee6f3f1','2026-09-09 03:40:49'),(8,56,'ref_60c8fcbdca04','GRANTED','ELECTRONIC','referral-consent-2026-09-v1','Dr. Juan Dela Cruz, M.D','2026-09-09 03:54:30','PATIENT','Gian Plariza',NULL,'e3b738797a768ab66da2dd58af1bef8cb48b3eb6ce2fb96cd7bc71fb4727240c',1,'be8ac265-4ea0-453f-9b88-18edac4f835a','2026-09-09 03:54:32'),(9,57,'ref_a3d60a27bb4c','GRANTED','PAPER','referral-consent-2026-09-v1','test','2026-09-11 07:02:53',NULL,NULL,NULL,NULL,1,'d5d5f41a-0446-4a08-9596-19bacf0083b0','2026-09-11 07:02:53');
+/*!40000 ALTER TABLE `referral_consents` ENABLE KEYS */;
+UNLOCK TABLES;
 
-  -- Speeds up the identity lookup used to prompt "possible duplicate patient?" on
-  -- registration/arrival -- not unique, since staff can still choose "create new anyway".
-  KEY `idx_patients_identity` (`facility_id`, `last_name`, `first_name`, `dob`),
+--
+-- Table structure for table `service_assessments`
+--
 
-  CONSTRAINT `fk_patients_facility` FOREIGN KEY (`facility_id`) REFERENCES `facilities` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_patients_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ========================================================
--- Service Assessments Table (streamlined DOH HFP checklist)
--- One row per facility -- completing it flips facilities.is_assessment_completed
--- ========================================================
+DROP TABLE IF EXISTS `service_assessments`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `service_assessments` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `facility_id` INT NOT NULL UNIQUE,
-
-  -- Bed Capacity Metrics
-  `authorized_bed_capacity` INT NOT NULL DEFAULT 0,
-  `functional_beds` INT NOT NULL DEFAULT 0,
-
-  -- Critical Service Capabilities
-  `has_icu` BOOLEAN NOT NULL DEFAULT FALSE,
-  `has_nicu` BOOLEAN NOT NULL DEFAULT FALSE,
-  `has_er_trauma` BOOLEAN NOT NULL DEFAULT FALSE,
-  `has_delivery_room` BOOLEAN NOT NULL DEFAULT FALSE,
-  `has_hemodialysis` BOOLEAN NOT NULL DEFAULT FALSE,
-  `has_blood_bank` BOOLEAN NOT NULL DEFAULT FALSE,
-  `has_ct_mri` BOOLEAN NOT NULL DEFAULT FALSE,
-
-  -- Specialist Availability
-  `has_cardiologist` BOOLEAN NOT NULL DEFAULT FALSE,
-  `has_obgyn` BOOLEAN NOT NULL DEFAULT FALSE,
-  `has_neurologist` BOOLEAN NOT NULL DEFAULT FALSE,
-  `has_general_surgeon` BOOLEAN NOT NULL DEFAULT FALSE,
-
-  `submitted_by_user_id` INT NULL,
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
+  `id` int NOT NULL AUTO_INCREMENT,
+  `facility_id` int NOT NULL,
+  `authorized_bed_capacity` int NOT NULL DEFAULT '0',
+  `functional_beds` int NOT NULL DEFAULT '0',
+  `has_icu` tinyint(1) NOT NULL DEFAULT '0',
+  `has_nicu` tinyint(1) NOT NULL DEFAULT '0',
+  `has_er_trauma` tinyint(1) NOT NULL DEFAULT '0',
+  `has_delivery_room` tinyint(1) NOT NULL DEFAULT '0',
+  `has_hemodialysis` tinyint(1) NOT NULL DEFAULT '0',
+  `has_blood_bank` tinyint(1) NOT NULL DEFAULT '0',
+  `has_ct_mri` tinyint(1) NOT NULL DEFAULT '0',
+  `has_cardiologist` tinyint(1) NOT NULL DEFAULT '0',
+  `has_obgyn` tinyint(1) NOT NULL DEFAULT '0',
+  `has_neurologist` tinyint(1) NOT NULL DEFAULT '0',
+  `has_general_surgeon` tinyint(1) NOT NULL DEFAULT '0',
+  `submitted_by_user_id` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `facility_id` (`facility_id`),
+  KEY `fk_assessment_submitted_by` (`submitted_by_user_id`),
   CONSTRAINT `fk_assessment_facility` FOREIGN KEY (`facility_id`) REFERENCES `facilities` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_assessment_submitted_by` FOREIGN KEY (`submitted_by_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 
--- ========================================================
--- Initiated Referrals Table (local best-effort log of every referral this facility
--- sent to the central IRDSS server, kept even if the central transmission failed)
--- ========================================================
-CREATE TABLE `initiated_referrals` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `hospital_id` INT NOT NULL,
-  `referral_id` VARCHAR(100) NULL,
-  `patient_id` INT NOT NULL,
-  `patient_name` VARCHAR(255) NOT NULL,
-  `reason` VARCHAR(255) NULL,
-  `chief_complaint` VARCHAR(255) NULL,
-  `diagnosis` VARCHAR(255) NULL,
-  `vital_bp` VARCHAR(20) NULL,
-  `vital_hr` SMALLINT NULL,
-  `vital_rr` SMALLINT NULL,
-  `vital_temp_c` DECIMAL(4,1) NULL,
-  `vital_o2sat` SMALLINT NULL,
-  `status` VARCHAR(50) DEFAULT 'AWAITING',
-  `sync_status` VARCHAR(20) NOT NULL DEFAULT 'PENDING',
-  `http_status` SMALLINT NULL,
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+--
+-- Dumping data for table `service_assessments`
+--
 
--- ========================================================
--- Audit Logs Table (facility-scoped record of who did what -- which staff account
--- sent/accepted/rejected/finalized a referral, or marked a patient arrived/departed.
--- Local-only: IOL only authenticates at the facility level, so per-staff attribution
--- can only be captured here, at the point the action is actually taken.)
--- ========================================================
-CREATE TABLE `audit_logs` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `facility_id` INT NOT NULL,
-  `user_id` INT NULL,
-  `user_full_name` VARCHAR(100) NOT NULL,
-  `user_role` VARCHAR(20) NOT NULL,
-  `action` VARCHAR(30) NOT NULL,
-  `referral_id` VARCHAR(100) NULL,
-  `patient_name` VARCHAR(255) NULL,
-  `details` VARCHAR(255) NULL,
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT `fk_audit_logs_facility` FOREIGN KEY (`facility_id`) REFERENCES `facilities` (`id`) ON DELETE CASCADE,
-  INDEX `idx_audit_logs_facility_created` (`facility_id`, `created_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+LOCK TABLES `service_assessments` WRITE;
+/*!40000 ALTER TABLE `service_assessments` DISABLE KEYS */;
+INSERT INTO `service_assessments` VALUES (1,4,120,98,1,0,1,1,1,1,1,1,1,0,1,6,'2026-08-11 05:46:20','2026-08-11 05:46:20'),(2,3,100,80,1,1,1,0,0,0,0,1,0,0,1,3,'2026-08-11 05:47:29','2026-08-11 05:47:29');
+/*!40000 ALTER TABLE `service_assessments` ENABLE KEYS */;
+UNLOCK TABLES;
 
--- ========================================================
--- Seed Data
--- ========================================================
+--
+-- Table structure for table `users`
+--
 
--- Facilities spanning the full DOH tier hierarchy (BHS -> RHU -> Hospital Levels 1-3)
-INSERT INTO `facilities` (`id`, `code`, `name`, `tier_level`, `is_assessment_completed`, `api_key`) VALUES
-(1, 'BHS-MALAGOS', 'Malagos Barangay Health Station', 'BHS', FALSE, 'irdss_api_key_malagos_bhs_1a2b3c4d5e'),
-(2, 'RHU-MINTAL', 'Mintal Rural Health Unit', 'RHU', FALSE, 'irdss_api_key_mintal_rhu_6f7g8h9i0j'),
-(3, 'HOSP-STJUDE', 'St. Jude General Hospital', 'Level 1 Hospital', FALSE, 'irdss_api_key_stjude_9a8b7c6d5e4f3a'),
-(4, 'HOSP-CITYCARE', 'City Care Medical Center', 'Level 2 Hospital', TRUE, 'irdss_api_key_citycare_1b2c3d4e5f6a'),
-(5, 'HOSP-METRO', 'Metro Health Medical Center', 'Level 3 Hospital', FALSE, 'irdss_api_key_metro_9z8y7x6w5v4u');
+DROP TABLE IF EXISTS `users`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `users` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `facility_id` int NOT NULL,
+  `username` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `password` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `full_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `role` enum('facility_admin','doctor','nurse') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `license_number` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `trainings` text COLLATE utf8mb4_unicode_ci,
+  `is_active` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `username` (`username`),
+  KEY `fk_users_facility` (`facility_id`),
+  CONSTRAINT `fk_users_facility` FOREIGN KEY (`facility_id`) REFERENCES `facilities` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=22 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 
--- Users (seeded with password: password123)
--- Facility administrators authenticate centrally via IRDSS login delegation.
--- Doctors and nurses remain authenticated locally for offline resilience.
-INSERT INTO `users` (`id`, `facility_id`, `username`, `password`, `full_name`, `role`, `license_number`, `trainings`) VALUES
-(4, 3, 'stjude_doctor', '$2y$10$Ph9ncmz1mnF1sVTf/5G33uIGmItImjInm/itSrkLmnQUvauYEww6S', 'Dr. Miguel Santos', 'doctor', '0123456', 'BLS Certification 2023, ACLS Training 2024'),
-(5, 3, 'stjude_nurse', '$2y$10$Ph9ncmz1mnF1sVTf/5G33uIGmItImjInm/itSrkLmnQUvauYEww6S', 'Nurse Angela Cruz', 'nurse', 'N-002233', 'BLS Certification 2023'),
-(7, 4, 'citycare_doctor', '$2y$10$Ph9ncmz1mnF1sVTf/5G33uIGmItImjInm/itSrkLmnQUvauYEww6S', 'Dr. Patricia Reyes', 'doctor', '0456789', 'ACLS Training 2024, PALS Certification 2022'),
-(8, 4, 'citycare_nurse', '$2y$10$Ph9ncmz1mnF1sVTf/5G33uIGmItImjInm/itSrkLmnQUvauYEww6S', 'Nurse Bea Gonzales', 'nurse', 'N-004455', 'BLS Certification 2024'),
-(10, 5, 'metro_doctor', '$2y$10$Ph9ncmz1mnF1sVTf/5G33uIGmItImjInm/itSrkLmnQUvauYEww6S', 'Dr. Isabel Mendoza', 'doctor', '0789012', 'ACLS Training 2023'),
-(11, 5, 'metro_nurse', '$2y$10$Ph9ncmz1mnF1sVTf/5G33uIGmItImjInm/itSrkLmnQUvauYEww6S', 'Nurse Julius Ramos', 'nurse', 'N-006677', 'BLS Certification 2023, Basic Life Support Refresher 2025');
+--
+-- Dumping data for table `users`
+--
 
+LOCK TABLES `users` WRITE;
+/*!40000 ALTER TABLE `users` DISABLE KEYS */;
+INSERT INTO `users` VALUES (1,1,'malagos_admin','$2y$10$Ph9ncmz1mnF1sVTf/5G33uIGmItImjInm/itSrkLmnQUvauYEww6S','Grace Villanueva','facility_admin',NULL,NULL,1,'2026-08-11 05:46:20'),(2,2,'mintal_admin','$2y$10$Ph9ncmz1mnF1sVTf/5G33uIGmItImjInm/itSrkLmnQUvauYEww6S','Ramon Bautista','facility_admin',NULL,NULL,1,'2026-08-11 05:46:20'),(3,3,'stjude_admin','$2y$10$Ph9ncmz1mnF1sVTf/5G33uIGmItImjInm/itSrkLmnQUvauYEww6S','Corazon Ibarra','facility_admin',NULL,NULL,1,'2026-08-11 05:46:20'),(4,3,'stjude_doctor','$2y$10$Ph9ncmz1mnF1sVTf/5G33uIGmItImjInm/itSrkLmnQUvauYEww6S','Dr. Miguel Santos','doctor','0123456','BLS Certification 2023, ACLS Training 2024',1,'2026-08-11 05:46:20'),(5,3,'stjude_nurse','$2y$10$Ph9ncmz1mnF1sVTf/5G33uIGmItImjInm/itSrkLmnQUvauYEww6S','Nurse Angela Cruz','nurse','N-002233','BLS Certification 2023',1,'2026-08-11 05:46:20'),(6,4,'citycare_admin','$2y$10$Ph9ncmz1mnF1sVTf/5G33uIGmItImjInm/itSrkLmnQUvauYEww6S','Eduardo Marasigan','facility_admin',NULL,NULL,1,'2026-08-11 05:46:20'),(7,4,'citycare_doctor','$2y$10$Ph9ncmz1mnF1sVTf/5G33uIGmItImjInm/itSrkLmnQUvauYEww6S','Dr. Patricia Reyes','doctor','0456789','ACLS Training 2024, PALS Certification 2022',1,'2026-08-11 05:46:20'),(8,4,'citycare_nurse','$2y$10$Ph9ncmz1mnF1sVTf/5G33uIGmItImjInm/itSrkLmnQUvauYEww6S','Nurse Bea Gonzales','nurse','N-004455','BLS Certification 2024',1,'2026-08-11 05:46:20'),(9,5,'metro_admin','$2y$10$Ph9ncmz1mnF1sVTf/5G33uIGmItImjInm/itSrkLmnQUvauYEww6S','Federico Aquino','facility_admin',NULL,NULL,1,'2026-08-11 05:46:20'),(10,5,'metro_doctor','$2y$10$Ph9ncmz1mnF1sVTf/5G33uIGmItImjInm/itSrkLmnQUvauYEww6S','Dr. Isabel Mendoza','doctor','0789012','ACLS Training 2023',1,'2026-08-11 05:46:20'),(11,5,'metro_nurse','$2y$10$Ph9ncmz1mnF1sVTf/5G33uIGmItImjInm/itSrkLmnQUvauYEww6S','Nurse Julius Ramos','nurse','N-006677','BLS Certification 2023, Basic Life Support Refresher 2025',1,'2026-08-11 05:46:20'),(13,7,'Alvin','$2y$10$.H77fyXt3spF6z.J0RHACuJOWl/IA1RBa1UUA9xMG/zw/BRwQOTSS','Dr Alvin','doctor','123451','None',1,'2026-08-13 05:46:06'),(14,4,'Tomi','$2y$10$QmvSKmgnftYf0Z9scwd8Wewocpoyb8xYCU6jn0rFpd55qRu2qcGlG','Tomi','doctor','123451',NULL,1,'2026-08-17 07:38:50'),(15,3,'test','$2y$10$S2.nABwR/UY6yV1rxxIHKOqtBxnWIvXtT1LGvUD3IMbD2K6jofkya','test','doctor','1234567','None',1,'2026-08-17 07:45:24'),(16,5,'test1234','$2y$10$aNOQC.UghJQ3j18e7RzWEeRRlKXYtyMjLUNaBycwRHgqbhll3q0wi','test','doctor','123456',NULL,1,'2026-08-17 08:31:59'),(17,10,'maylo','$2y$10$k9aqN7SPU9BQLhuZJacuZ.L5QlYlNID7oDYxeDnlotimL1fH6dj8a','Tomi Maylo','doctor','123456',NULL,1,'2026-08-24 04:33:17'),(18,10,'maylotest','$2y$10$Lp8Cq9uTU6/zEqYQoywo3.c9ANBkC2jt5AdKryh1UFoOW9Cy9/YQu','maylo','doctor','123456',NULL,1,'2026-08-24 07:04:14'),(19,11,'kangkong','$2y$10$bDrn5/8eDeNtvt2XWBismelJqucADtKo9yQNbVUnMTHRyUoS3inbi','Josh Mojica','doctor','123456','None',1,'2026-09-01 04:45:38'),(20,5,'testadmin','$2y$10$ibHkmQei/3N/nRCkYufvuuP3FA1jU.WECaBiFBiT7A4Ni.h92246u','Tes admin','facility_admin',NULL,NULL,1,'2026-09-02 06:18:58'),(21,10,'Juan','$2y$10$/wDqER6Y/ypaq.ShitZ/DO66H7LfIMqzSoEOPjPR741PCqZDO.KcO','Dr. Juan Dela Cruz, M.D','doctor','0123456',NULL,1,'2026-09-08 04:59:35');
+/*!40000 ALTER TABLE `users` ENABLE KEYS */;
+UNLOCK TABLES;
 
--- Sample Patients for St. Jude General Hospital (facility 3)
-INSERT INTO `patients` (`facility_id`, `first_name`, `middle_name`, `last_name`, `suffix`, `dob`, `gender`, `civil_status`, `phone`, `region`, `province`, `city_municipality`, `barangay`, `zip_code`, `philhealth_member`, `philhealth_number`, `philhealth_status_type`, `is_4ps_member`, `created_by_user_id`) VALUES
-(3, 'Maria', 'Lopez', 'Santos', NULL, '1988-04-12', 'Female', 'Married', '+639171234567', 'Region XI', 'Davao del Sur', 'Davao City', 'Talomo', '8000', 'Yes', 'PH-1234-5678-9012', 'Member', 'No', 4),
-(3, 'Juan', 'Ramos', 'Dela Cruz', 'Jr.', '1975-11-23', 'Male', 'Married', '+639189876543', 'Region XI', 'Davao del Sur', 'Davao City', 'Buhangin', '8000', 'No', NULL, NULL, 'Yes', 5);
+--
+-- Dumping routines for database 'hospital_db'
+--
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
--- Sample Patients for City Care Medical Center (facility 4)
-INSERT INTO `patients` (`facility_id`, `first_name`, `middle_name`, `last_name`, `suffix`, `dob`, `gender`, `civil_status`, `phone`, `region`, `province`, `city_municipality`, `barangay`, `zip_code`, `philhealth_member`, `philhealth_number`, `philhealth_status_type`, `is_4ps_member`, `created_by_user_id`) VALUES
-(4, 'Elena', 'Bacani', 'Reyes', NULL, '1995-08-05', 'Female', 'Single', '+639205551234', 'Region XI', 'Davao del Sur', 'Davao City', 'Poblacion', '8000', 'Yes', 'PH-2234-5678-9013', 'Dependent', 'No', 7),
-(4, 'Carlos', 'Uy', 'Mendoza', NULL, '1962-02-17', 'Male', 'Widow/er', '+639174448899', 'Region XI', 'Davao del Sur', 'Davao City', 'Matina', '8000', 'Yes', 'PH-3234-5678-9014', 'Member', 'No', 8);
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Sample Patients for Metro Health Medical Center (facility 5)
-INSERT INTO `patients` (`facility_id`, `first_name`, `middle_name`, `last_name`, `suffix`, `dob`, `gender`, `civil_status`, `phone`, `region`, `province`, `city_municipality`, `barangay`, `zip_code`, `philhealth_member`, `philhealth_number`, `philhealth_status_type`, `is_4ps_member`, `created_by_user_id`) VALUES
-(5, 'Antonio', 'Bermudez', 'Luna', NULL, '1980-10-29', 'Male', 'Married', '+639193332211', 'Region XI', 'Davao del Sur', 'Davao City', 'Toril', '8000', 'No', NULL, NULL, 'Yes', 10),
-(5, 'Sofia', 'Castillo', 'Gonzales', NULL, '1992-06-14', 'Female', 'Single', '+639157778899', 'Region XI', 'Davao del Sur', 'Davao City', 'Agdao', '8000', 'Yes', 'PH-4234-5678-9015', 'Member', 'No', 11);
-
--- Completed Service Assessment for City Care Medical Center (facility 4) -- demonstrates the unlocked state
-INSERT INTO `service_assessments` (`facility_id`, `authorized_bed_capacity`, `functional_beds`, `has_icu`, `has_nicu`, `has_er_trauma`, `has_delivery_room`, `has_hemodialysis`, `has_blood_bank`, `has_ct_mri`, `has_cardiologist`, `has_obgyn`, `has_neurologist`, `has_general_surgeon`, `submitted_by_user_id`) VALUES
-(4, 120, 98, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, 7);
+-- Dump completed on 2026-09-15 23:24:53

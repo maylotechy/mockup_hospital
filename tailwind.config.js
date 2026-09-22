@@ -31,7 +31,7 @@ tailwind.config = {
                 },
             },
             fontFamily: {
-                sans: ['Inter', 'system-ui', 'sans-serif'],
+                sans: ['Outfit', 'Inter', 'system-ui', 'sans-serif'],
                 mono: ['JetBrains Mono', 'monospace'],
             },
             // Shifts every text-* utility up one step app-wide (text-xs now reads at the old

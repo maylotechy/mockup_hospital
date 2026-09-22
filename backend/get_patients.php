@@ -21,9 +21,20 @@ $patientColumns = '
     p.first_name, p.middle_name, p.last_name, p.suffix,
     p.dob, p.gender, p.civil_status, p.phone,
     p.region, p.province, p.city_municipality, p.barangay, p.zip_code,
-    p.philhealth_member, p.philhealth_number, p.philhealth_status_type, p.is_4ps_member,
+    p.philhealth_member, p.philhealth_number, p.philhealth_status_type, p.philsys_id, p.is_4ps_member,
     p.source_referral_id, p.transferred_details_snapshot,
-    p.created_by_user_id, p.created_at, p.updated_at
+    p.created_by_user_id, p.created_at, p.updated_at,
+    nok.name as next_of_kin_name, nok.relationship as next_of_kin_relationship, nok.phone as next_of_kin_phone
+';
+// Each patient has at most one next-of-kin contact today (Add Patient only
+// collects one) -- LEFT JOIN keyed to the most recently added row is safe as
+// long as that stays true; a real one-to-many UI would need GROUP_CONCAT instead.
+$patientJoins = '
+    LEFT JOIN (
+        SELECT pc1.* FROM patient_contacts pc1
+        INNER JOIN (SELECT patient_id, MAX(id) as max_id FROM patient_contacts GROUP BY patient_id) pc2
+            ON pc1.patient_id = pc2.patient_id AND pc1.id = pc2.max_id
+    ) nok ON nok.patient_id = p.id
 ';
 
 /**
@@ -68,6 +79,7 @@ try {
             SELECT {$patientColumns}
             FROM patients p
             JOIN facilities f ON p.facility_id = f.id
+            {$patientJoins}
             WHERE p.id = :id AND p.facility_id = :facility_id
         ");
         $stmt->execute([':id' => $patientId, ':facility_id' => $facilityId]);
@@ -89,6 +101,7 @@ try {
             SELECT {$patientColumns}
             FROM patients p
             JOIN facilities f ON p.facility_id = f.id
+            {$patientJoins}
             WHERE p.facility_id = :facility_id
             ORDER BY p.id ASC
         ");

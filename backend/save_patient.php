@@ -62,6 +62,15 @@ if ($philhealthStatusType !== null && !in_array($philhealthStatusType, ['Member'
 $is4psMember = inVal($input, 'is_4ps_member', 'No');
 if (!in_array($is4psMember, ['Yes', 'No'], true)) $errors[] = 'Invalid 4Ps member value.';
 
+// Next of kin is optional but must arrive as a complete set if provided at all --
+// a name with no way to reach them isn't useful, per Phase 2's "not mandatory" rule.
+$nokName = inVal($input, 'next_of_kin_name');
+$nokRelationship = inVal($input, 'next_of_kin_relationship');
+$nokPhone = inVal($input, 'next_of_kin_phone');
+if ($nokName !== null && $nokPhone === null) {
+    $errors[] = 'Next of kin phone number is required when a name is provided.';
+}
+
 if (!empty($errors)) {
     sendJsonResponse([
         'success' => false,
@@ -105,12 +114,12 @@ try {
         INSERT INTO patients (
             facility_id, first_name, middle_name, last_name, suffix, dob, gender, civil_status, phone,
             region, province, city_municipality, barangay, zip_code,
-            philhealth_member, philhealth_number, philhealth_status_type, is_4ps_member,
+            philhealth_member, philhealth_number, philhealth_status_type, philsys_id, is_4ps_member,
             created_by_user_id
         ) VALUES (
             :facility_id, :first_name, :middle_name, :last_name, :suffix, :dob, :gender, :civil_status, :phone,
             :region, :province, :city_municipality, :barangay, :zip_code,
-            :philhealth_member, :philhealth_number, :philhealth_status_type, :is_4ps_member,
+            :philhealth_member, :philhealth_number, :philhealth_status_type, :philsys_id, :is_4ps_member,
             :created_by_user_id
         )
     ');
@@ -132,11 +141,25 @@ try {
         ':philhealth_member'       => $philhealthMember,
         ':philhealth_number'       => inVal($input, 'philhealth_number'),
         ':philhealth_status_type'  => $philhealthStatusType,
+        ':philsys_id'              => inVal($input, 'philsys_id'),
         ':is_4ps_member'           => $is4psMember,
         ':created_by_user_id'      => (int)$loggedInUser['id']
     ]);
 
     $newPatientId = (int)$pdo->lastInsertId();
+
+    if ($nokName !== null && $nokPhone !== null) {
+        $nokStmt = $pdo->prepare('
+            INSERT INTO patient_contacts (patient_id, name, relationship, phone)
+            VALUES (:patient_id, :name, :relationship, :phone)
+        ');
+        $nokStmt->execute([
+            ':patient_id' => $newPatientId,
+            ':name' => $nokName,
+            ':relationship' => $nokRelationship,
+            ':phone' => $nokPhone,
+        ]);
+    }
 
     logAuditEvent($loggedInUser, 'PATIENT_ADDED', null, "{$firstName} {$lastName}");
 

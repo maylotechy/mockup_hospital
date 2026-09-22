@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IRDSS FHIR, JSON, and POST Reference Paper</title>
+  <style>
+    @page { size: A4; margin: 9mm 12mm; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #172033; background: #fff; font: 9.8pt/1.38 Arial, Helvetica, sans-serif; }
+    .page { position: relative; height: 273mm; padding-bottom: 12mm; overflow: hidden; page-break-after: always; }
+    .page:last-child { page-break-after: auto; }
+    .cover { margin-top: 31mm; padding: 20mm 16mm; border-top: 7px solid #971b22; background: linear-gradient(135deg,#fff7f3,#eef4fb); }
+    .eyebrow { margin: 0 0 5px; color: #9a1a21; font-weight: 700; font-size: 8.5pt; letter-spacing: 1.4px; text-transform: uppercase; }
+    h1 { margin: 0; color: #741218; font-size: 28pt; line-height: 1.08; }
+    h2 { margin: 0 0 10px; color: #741218; font-size: 19pt; line-height: 1.15; }
+    h3 { margin: 13px 0 6px; color: #293955; font-size: 12pt; }
+    p { margin: 6px 0; }
+    ul, ol { margin: 6px 0 6px 20px; padding: 0; }
+    li { margin: 3px 0; }
+    code { font-family: Consolas, "Courier New", monospace; }
+    .subtitle { max-width: 158mm; margin: 12px 0 0; color: #44536d; font-size: 14pt; line-height: 1.45; }
+    .summary { margin: 20mm 8mm 0; padding: 14px 16px; border-left: 5px solid #c88c12; background: #fff6da; font-size: 11pt; }
+    .footer { position: absolute; right: 0; bottom: 0; left: 0; padding-top: 5px; border-top: 1px solid #d9e1ec; color: #657287; font-size: 8pt; }
+    .footer span { float: right; }
+    .cards { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin: 12px 0; }
+    .card { padding: 13px; border: 1px solid #d8e0eb; border-radius: 8px; background: #f8fafc; }
+    .card strong { display: block; color: #8b171e; font-size: 13pt; }
+    .callout { margin: 12px 0; padding: 10px 14px; border-left: 5px solid #c88c12; background: #fff6da; }
+    .plain { margin: 12px 0; padding: 13px 15px; border: 1px solid #d8e0eb; border-radius: 8px; background: #f7f9fc; font-size: 10.5pt; }
+    table { width: 100%; margin: 8px 0; border-collapse: collapse; font-size: 9pt; }
+    th { padding: 7px 8px; color: #fff; text-align: left; background: #293955; }
+    td { padding: 7px 8px; border-bottom: 1px solid #dbe2ec; vertical-align: top; }
+    tr:nth-child(even) td { background: #f7f9fc; }
+    pre { margin: 7px 0; padding: 11px 13px; border-radius: 8px; overflow: hidden; white-space: pre-wrap; word-break: break-word; background: #101827; color: #e7edf7; font: 7.65pt/1.34 Consolas,"Courier New",monospace; }
+    .key { color: #7dd3fc; } .str { color: #fde68a; } .num { color: #86efac; } .bool { color: #f0abfc; }
+    .flow { display: grid; grid-template-columns: 1fr 25px 1.1fr 25px 1.15fr; align-items: center; margin: 13px 0; }
+    .node { padding: 12px 8px; border: 1px solid #ccd6e4; border-radius: 8px; text-align: center; background: #fff; }
+    .node strong { display: block; color: #81171d; }
+    .arrow { color: #a71920; text-align: center; font-size: 18pt; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .note { color: #5f6c80; font-size: 8.7pt; }
+    .tag { display: inline-block; padding: 2px 7px; border-radius: 999px; color: #fff; background: #16834b; font-size: 8pt; font-weight: bold; }
+    .warning { background: #aa6b00; }
+  </style>
+</head>
+<body>
+  <section class="page">
+    <div class="cover">
+      <p class="eyebrow">Intelligent Referral Decision Support System</p>
+      <h1>FHIR, JSON, and the POST Method</h1>
+      <p class="subtitle">A plain-language reference to the healthcare data format used between the Mock Hospital and the IRDSS Interoperability Layer (IOL).</p>
+    </div>
+    <div class="summary">
+      <strong>Purpose of this paper</strong>
+      <p>This paper explains what FHIR and JSON mean, which FHIR-style fields are defined by the current IOL server, what data the Mock Hospital sends, and how the HTTP POST method delivers a new referral.</p>
+    </div>
+    <div class="footer">IRDSS Prototype Reference Paper <span>1</span></div>
+  </section>
+
+  <section class="page">
+    <p class="eyebrow">Background</p>
+    <h2>Understanding FHIR and JSON</h2>
+
+    <h3>What is FHIR?</h3>
+    <p><strong>FHIR</strong> means <strong>Fast Healthcare Interoperability Resources</strong>. It is a healthcare information standard developed by HL7. It provides agreed names and structures for information that different health systems need to exchange.</p>
+    <p>Instead of every hospital inventing a different label and layout for the same information, FHIR organizes information into reusable “resources.” Examples include a <strong>Patient</strong> for demographics and an <strong>Encounter</strong> for an interaction involving a patient.</p>
+
+    <h3>What is JSON?</h3>
+    <p><strong>JSON</strong> means <strong>JavaScript Object Notation</strong>. It is a simple text format that computers can create, send, read, and validate. JSON stores information as labeled values. Curly braces contain one object, square brackets contain a list, and a colon separates a label from its value.</p>
+
+    <div class="cards">
+      <div class="card"><strong>FHIR</strong><p>Defines what the healthcare information means and how it is organized.</p></div>
+      <div class="card"><strong>JSON</strong><p>Writes that information in a format that computer systems can exchange.</p></div>
+      <div class="card"><strong>POST</strong><p>Delivers the completed JSON to an API to create a new referral.</p></div>
+    </div>
+
+    <h3>A small example</h3>
+    <pre>{
+  <span class="key">"resourceType"</span>: <span class="str">"Patient"</span>,
+  <span class="key">"id"</span>: <span class="str">"P-000026"</span>,
+  <span class="key">"gender"</span>: <span class="str">"female"</span>,
+  <span class="key">"birthDate"</span>: <span class="str">"1997-05-15"</span>
+}</pre>
+    <table>
+      <tr><th>Part</th><th>Plain-language meaning</th></tr>
+      <tr><td><code>resourceType</code></td><td>This tells the receiving system that the object represents a FHIR Patient.</td></tr>
+      <tr><td><code>id</code></td><td>This is the hospital’s identifier for the patient record.</td></tr>
+      <tr><td><code>gender</code></td><td>This contains the recorded gender value.</td></tr>
+      <tr><td><code>birthDate</code></td><td>This contains the date of birth using year-month-day format.</td></tr>
+    </table>
+
+    <div class="plain"><strong>Simple comparison:</strong> FHIR is like an agreed healthcare form, JSON is the typed version of that form, and POST is the courier that delivers it to the IOL.</div>
+    <div class="footer">IRDSS Prototype Reference Paper <span>2</span></div>
+  </section>
+
+  <section class="page">
+    <p class="eyebrow">IOL definition</p>
+    <h2>FHIR-style structure accepted by the IOL</h2>
+    <p>The IOL server uses Python validation models to check an incoming referral. The main model is named <code>ReferralRequestSchema</code>. It currently requires the following top-level fields.</p>
+
+    <table>
+      <tr><th>IOL field</th><th>Required?</th><th>Purpose in the current system</th></tr>
+      <tr><td><code>resourceType</code></td><td>Yes</td><td>Identifies the referral payload as an <code>Encounter</code>.</td></tr>
+      <tr><td><code>status</code></td><td>Yes</td><td>Shows the state of the encounter; the Mock Hospital sends <code>planned</code>.</td></tr>
+      <tr><td><code>subject</code></td><td>Yes</td><td>References the patient using <code>Patient/{id}</code> and may include a display name.</td></tr>
+      <tr><td><code>reasonCode</code></td><td>Yes</td><td>A list containing one primary referral reason and up to three additional reasons.</td></tr>
+      <tr><td><code>patient_record</code></td><td>Yes</td><td>Contains the Patient object needed by the current IOL workflow.</td></tr>
+    </table>
+
+    <h3>Nested definitions used by the IOL</h3>
+    <table>
+      <tr><th>Definition</th><th>Fields</th><th>Meaning</th></tr>
+      <tr><td><code>FHIRSubject</code></td><td><code>reference</code>, optional <code>display</code></td><td>Connects the referral to the patient.</td></tr>
+      <tr><td><code>FHIRReasonCode</code></td><td><code>text</code>, optional <code>coding</code></td><td>Describes why the patient is being referred.</td></tr>
+      <tr><td><code>FHIRCoding</code></td><td><code>system</code>, <code>code</code>, <code>display</code></td><td>Provides a computer-readable code and a human-readable label.</td></tr>
+      <tr><td><code>FHIRPatient</code></td><td><code>resourceType</code>, <code>id</code>, <code>name</code>, <code>gender</code>, <code>birthDate</code>, <code>extension</code></td><td>Contains the patient demographics and IRDSS-specific information.</td></tr>
+      <tr><td><code>FHIRName</code></td><td><code>family</code>, list of <code>given</code> names</td><td>Separates surname from given names.</td></tr>
+      <tr><td><code>FHIRExtension</code></td><td><code>url</code> plus decimal, string, or Boolean value</td><td>Adds information needed by IRDSS that is not placed in the basic Patient fields.</td></tr>
+    </table>
+
+    <h3>Validation applied by the IOL</h3>
+    <ul>
+      <li>The referral must contain between one and four referral reasons.</li>
+      <li>Each reason must contain text and must not exceed 255 characters.</li>
+      <li>Duplicate referral reasons are rejected.</li>
+      <li>The Patient must contain an ID, at least one name entry, a birth date, and an extension list.</li>
+    </ul>
+
+    <div class="callout"><strong>Important:</strong> <code>patient_record</code> is an IRDSS-specific wrapper. It helps the present prototype send an Encounter and Patient together, but it is not a standard field of the official FHIR Encounter resource.</div>
+    <p class="note">Source in the current IOL: <code>app/schemas/encounter.py</code>, <code>app/schemas/patient_schema.py</code>, and <code>app/schemas/fhir_base_schema.py</code>.</p>
+    <div class="footer">IRDSS Prototype Reference Paper <span>3</span></div>
+  </section>
+
+  <section class="page">
+    <p class="eyebrow">Mock Hospital output</p>
+    <h2>Sample referral payload sent to the IOL</h2>
+    <p>The following sanitized example follows the payload assembled by <code>backend/send_referral.php</code>. It does not contain a real patient or a real security credential.</p>
+
+    <pre>{
+  <span class="key">"resourceType"</span>: <span class="str">"Encounter"</span>,
+  <span class="key">"status"</span>: <span class="str">"planned"</span>,
+  <span class="key">"subject"</span>: {
+    <span class="key">"reference"</span>: <span class="str">"Patient/P-000026"</span>,
+    <span class="key">"display"</span>: <span class="str">"Sample Patient"</span>
+  },
+  <span class="key">"reasonCode"</span>: [
+    {
+      <span class="key">"coding"</span>: [{
+        <span class="key">"system"</span>: <span class="str">"http://irdss.gov.ph/fhir/CodeSystem/referral-reason"</span>,
+        <span class="key">"code"</span>: <span class="str">"NO_AVAILABLE_ICU"</span>,
+        <span class="key">"display"</span>: <span class="str">"No Available Intensive Care Unit"</span>
+      }],
+      <span class="key">"text"</span>: <span class="str">"No Available Intensive Care Unit"</span>
+    },
+    {
+      <span class="key">"coding"</span>: [{
+        <span class="key">"system"</span>: <span class="str">"http://irdss.gov.ph/fhir/CodeSystem/referral-reason"</span>,
+        <span class="key">"code"</span>: <span class="str">"SPECIALIST_UNAVAILABLE"</span>,
+        <span class="key">"display"</span>: <span class="str">"Specialist Unavailable"</span>
+      }],
+      <span class="key">"text"</span>: <span class="str">"Specialist Unavailable"</span>
+    }
+  ],
+  <span class="key">"patient_record"</span>: {
+    <span class="key">"resourceType"</span>: <span class="str">"Patient"</span>,
+    <span class="key">"id"</span>: <span class="str">"P-000026"</span>,
+    <span class="key">"name"</span>: [{
+      <span class="key">"family"</span>: <span class="str">"Patient"</span>,
+      <span class="key">"given"</span>: [<span class="str">"Sample"</span>]
+    }],
+    <span class="key">"gender"</span>: <span class="str">"female"</span>,
+    <span class="key">"birthDate"</span>: <span class="str">"1997-05-15"</span>,
+    <span class="key">"extension"</span>: [
+      { <span class="key">"url"</span>: <span class="str">".../severity"</span>, <span class="key">"valueDecimal"</span>: <span class="num">3</span> },
+      { <span class="key">"url"</span>: <span class="str">".../chiefComplaint"</span>, <span class="key">"valueString"</span>: <span class="str">"Difficulty breathing"</span> },
+      { <span class="key">"url"</span>: <span class="str">".../diagnosis"</span>, <span class="key">"valueString"</span>: <span class="str">"Pneumonia"</span> },
+      { <span class="key">"url"</span>: <span class="str">".../vitalHeartRate"</span>, <span class="key">"valueDecimal"</span>: <span class="num">90</span> },
+      { <span class="key">"url"</span>: <span class="str">".../vitalOxygenSaturation"</span>, <span class="key">"valueDecimal"</span>: <span class="num">95</span> },
+      { <span class="key">"url"</span>: <span class="str">".../hasAllergy"</span>, <span class="key">"valueBoolean"</span>: <span class="bool">true</span> },
+      { <span class="key">"url"</span>: <span class="str">".../allergyDetails"</span>, <span class="key">"valueString"</span>: <span class="str">"Seafood"</span> },
+      { <span class="key">"url"</span>: <span class="str">".../consentMethod"</span>, <span class="key">"valueString"</span>: <span class="str">"ELECTRONIC"</span> }
+    ]
+  },
+  <span class="key">"serviceProvider"</span>: {
+    <span class="key">"reference"</span>: <span class="str">"Organization/FAC-000015"</span>,
+    <span class="key">"display"</span>: <span class="str">"Sample Provincial Hospital"</span>
+  }
+}</pre>
+    <div class="footer">IRDSS Prototype Reference Paper <span>4</span></div>
+  </section>
+
+  <section class="page">
+    <p class="eyebrow">Payload reference</p>
+    <h2>Meaning of the data sent by the Mock Hospital</h2>
+    <table>
+      <tr><th>Payload section</th><th>Information represented</th><th>How IRDSS uses it</th></tr>
+      <tr><td><code>Encounter</code></td><td>The planned patient referral event.</td><td>Starts the referral workflow.</td></tr>
+      <tr><td><code>subject</code></td><td>The patient reference and display name.</td><td>Links the referral to the correct patient.</td></tr>
+      <tr><td><code>reasonCode</code></td><td>Primary reason followed by optional additional reasons.</td><td>Explains the referral and supports analytics.</td></tr>
+      <tr><td><code>patient_record</code></td><td>Patient demographics and extensions.</td><td>Supplies the clinical and demographic data required for matching and care coordination.</td></tr>
+      <tr><td><code>serviceProvider</code></td><td>The referring hospital as an Organization reference.</td><td>Sent by the Mock Hospital, but not currently declared in the IOL request validation schema.</td></tr>
+    </table>
+
+    <h3>Extensions currently produced by the Mock Hospital</h3>
+    <table>
+      <tr><th>Group</th><th>Examples</th></tr>
+      <tr><td>Referral and clinical information</td><td>Severity, chief complaint, diagnosis, salary used by the prototype ranking logic, latitude, and longitude.</td></tr>
+      <tr><td>Contact and demographics</td><td>Phone, address, civil status, PhilHealth number, and PhilHealth membership status.</td></tr>
+      <tr><td>Vital signs</td><td>Blood pressure, heart rate, respiratory rate, temperature, oxygen saturation, height, and weight.</td></tr>
+      <tr><td>Patient indicators</td><td>PWD, pregnant, senior citizen, has allergy, and allergy details.</td></tr>
+      <tr><td>Consent information</td><td>Consent status, method, text version, recorded time, witness, signer type, signer name, representative relationship, and document SHA-256 hash.</td></tr>
+    </table>
+
+    <h3>Why extensions are used</h3>
+    <p>FHIR extensions provide a structured way to add information needed by a particular project. Each extension includes a URL that identifies its meaning and a value such as text, a number, or true/false.</p>
+    <pre>{
+  <span class="key">"url"</span>: <span class="str">"http://irdss.gov.ph/fhir/StructureDefinition/isPregnant"</span>,
+  <span class="key">"valueBoolean"</span>: <span class="bool">true</span>
+}</pre>
+    <p>For use outside the current prototype, the IRDSS extension URLs and their rules should be formally published so another FHIR system can interpret them correctly.</p>
+
+    <div class="two">
+      <div class="plain"><span class="tag">CURRENT</span><p>The IOL accepts one combined, FHIR-style referral payload designed for the IRDSS workflow.</p></div>
+      <div class="plain"><span class="tag warning">FUTURE</span><p>Full FHIR exchange should use standalone Patient, Encounter, Condition, Observation, ServiceRequest, Consent, and DocumentReference resources.</p></div>
+    </div>
+    <div class="footer">IRDSS Prototype Reference Paper <span>5</span></div>
+  </section>
+
+  <section class="page">
+    <p class="eyebrow">Data transmission</p>
+    <h2>How POST sends the referral to the IOL</h2>
+    <p><strong>POST</strong> is an HTTP method used when a client asks a server to create or process a new record. In IRDSS, the Mock Hospital uses POST when initiating a referral.</p>
+
+    <div class="flow">
+      <div class="node"><strong>Mock Hospital UI</strong>User submits the referral form</div>
+      <div class="arrow">→</div>
+      <div class="node"><strong>PHP Backend</strong>Creates and signs the JSON</div>
+      <div class="arrow">→</div>
+      <div class="node"><strong>IOL Server</strong>Validates and creates the referral</div>
+    </div>
+
+    <h3>POST request</h3>
+    <pre><span class="str">POST</span> /api/v1/referral/initiate HTTP/1.1
+Host: &lt;iol-server&gt;:8081
+Content-Type: application/json
+X-System-Code: SYSTEM-001
+X-Key-ID: KEY-2026-001
+X-Signature-Timestamp: &lt;current-time&gt;
+X-Request-Nonce: &lt;unique-random-value&gt;
+X-System-Signature: &lt;rsa-signature&gt;
+
+{ "resourceType": "Encounter", "status": "planned", ... }</pre>
+
+    <h3>Processing sequence</h3>
+    <ol>
+      <li>The browser submits ordinary form data to the Mock Hospital PHP backend.</li>
+      <li>The backend reads the selected patient from the local MySQL database.</li>
+      <li>It creates the FHIR-style Encounter and Patient JSON shown in this paper.</li>
+      <li>It calculates a SHA-256 hash of the exact body and signs the request with the hospital’s RSA private key.</li>
+      <li>The IOL verifies the sender, timestamp, unique nonce, signature, and request schema.</li>
+      <li>The IOL stores the referral and returns referral identifiers as JSON.</li>
+    </ol>
+
+    <h3>Example successful response</h3>
+    <pre>{
+  <span class="key">"status"</span>: <span class="str">"success"</span>,
+  <span class="key">"message"</span>: <span class="str">"Referral initiated successfully"</span>,
+  <span class="key">"referral_tracking_id"</span>: <span class="str">"TRK-2026-000123"</span>,
+  <span class="key">"referral_id"</span>: <span class="str">"ref_35b0cfd39e9f"</span>
+}</pre>
+
+    <div class="callout"><strong>Security clarification:</strong> The RSA signature verifies the sender and detects changes to the JSON. It does not hide the patient data. A production deployment must also use HTTPS/TLS.</div>
+
+    <h3>References</h3>
+    <ul class="note">
+      <li>HL7 FHIR R4 JSON Representation — https://hl7.org/fhir/R4/json.html</li>
+      <li>HL7 FHIR R4 RESTful API — https://hl7.org/fhir/R4/http.html</li>
+      <li>IOL schemas — <code>app/schemas/encounter.py</code>, <code>patient_schema.py</code>, and <code>fhir_base_schema.py</code></li>
+      <li>Mock Hospital payload and POST client — <code>backend/send_referral.php</code> and <code>backend/config.php</code></li>
+    </ul>
+    <div class="footer">IRDSS Prototype Reference Paper <span>6</span></div>
+  </section>
+</body>
+</html>

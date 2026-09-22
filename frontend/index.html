@@ -98,10 +98,6 @@
                         </button>
                     </div>
                 </form>
-
-                <p class="text-center text-xs text-slate-400 mt-6">
-                    Facility Admins authenticate via IRDSS • Doctors/Nurses authenticate locally
-                </p>
             </div>
         </div>
 
@@ -169,6 +165,27 @@
                         <span>Incoming Patients</span>
                     </a>
 
+                    <a href="#" id="navTabFhirSend" data-nav-role="staff" class="sidebar-link group flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all text-slate-500">
+                        <i id="navIconFhirSend" class="bi bi-send-plus text-lg transition-colors"></i>
+                        <span>FHIR: Send Test</span>
+                    </a>
+
+                    <a href="#" id="navTabFhirReceive" data-nav-role="staff" class="sidebar-link group flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all text-slate-500">
+                        <i id="navIconFhirReceive" class="bi bi-inboxes text-lg transition-colors"></i>
+                        <span>FHIR: Receive</span>
+                        <span id="navFhirReceiveBadge" class="hidden ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center">0</span>
+                    </a>
+
+                    <a href="#" id="navTabFhirOrgs" data-nav-role="staff" class="sidebar-link group flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all text-slate-500">
+                        <i id="navIconFhirOrgs" class="bi bi-hospital text-lg transition-colors"></i>
+                        <span>FHIR: Organizations</span>
+                    </a>
+
+                    <a href="#" id="navTabFhirPatients" data-nav-role="staff" class="sidebar-link group flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all text-slate-500">
+                        <i id="navIconFhirPatients" class="bi bi-person-vcard text-lg transition-colors"></i>
+                        <span>FHIR: Patients</span>
+                    </a>
+
                     <a href="#" id="navTabUsers" data-nav-role="admin" class="sidebar-link group flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all text-slate-500">
                         <i id="navIconUsers" class="bi bi-people-fill text-lg transition-colors"></i>
                         <span>Manage Users</span>
@@ -223,6 +240,9 @@
                         <div class="flex items-center gap-2">
                             <p class="text-xs text-slate-600 font-mono truncate" id="sidebarHospitalCode">HOSP-000</p>
                             <span id="sidebarFacilityTier" class="hidden px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 flex-shrink-0">--</span>
+                            <span id="fhirStatusBadge" class="hidden inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-400 flex-shrink-0" title="HL7 FHIR Connectathon sandbox connection status">
+                                <i class="bi bi-broadcast"></i> FHIR
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -518,6 +538,33 @@
                                             <option value="No" selected>No</option>
                                             <option value="Yes">Yes</option>
                                         </select>
+                                    </div>
+                                    <div>
+                                        <label for="patPhilsysId" class="block text-xs font-medium text-slate-500 mb-1.5">PhilSys ID <span class="text-slate-400 font-normal">(optional)</span></label>
+                                        <input type="text" id="patPhilsysId" name="philsys_id"
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Next of Kin (optional) -->
+                            <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm mb-6">
+                                <h4 class="block text-lg font-bold text-slate-900 mb-4">Next of Kin <span class="text-slate-400 font-normal text-sm">(optional)</span></h4>
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div>
+                                        <label for="patNokName" class="block text-xs font-medium text-slate-500 mb-1.5">Full Name</label>
+                                        <input type="text" id="patNokName" name="next_of_kin_name"
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                    </div>
+                                    <div>
+                                        <label for="patNokRelationship" class="block text-xs font-medium text-slate-500 mb-1.5">Relationship</label>
+                                        <input type="text" id="patNokRelationship" name="next_of_kin_relationship"
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                    </div>
+                                    <div>
+                                        <label for="patNokPhone" class="block text-xs font-medium text-slate-500 mb-1.5">Phone <span class="text-slate-400 font-normal">(required if name given)</span></label>
+                                        <input type="text" id="patNokPhone" name="next_of_kin_phone"
+                                            class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
                                     </div>
                                 </div>
                             </div>
@@ -1138,6 +1185,646 @@
                         </div>
                     </div>
 
+                    <!-- TAB: FHIR CONNECTATHON -- SEND TEST REFERRAL (separate from IOL/IRDSS flow; see hackathon_tracker/) -->
+                    <div id="tabFhirSendContent" style="display: none;">
+                        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden mb-6">
+                            <div class="flex items-center gap-3 px-6 py-4 border-b border-slate-100">
+                                <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-red-50 text-red-600">
+                                    <i class="bi bi-send-plus text-lg"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-slate-900 text-base">FHIR Connectathon -- Send Test Referral</h3>
+                                    <p class="text-xs text-slate-500">Separate from the IOL/IRDSS referral flow. Test tool only.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="rounded-2xl border border-amber-300 bg-amber-50 text-amber-900 text-sm px-6 py-4 mb-6">
+                            <strong>Test tool only.</strong> This sends data to a public, shared, unauthenticated FHIR sandbox
+                            (<code>cdr.pheref.fhirlab.net</code>) used by other Connectathon participants. Only synthetic/test
+                            patients belong here -- never real patient data. Every identifier/name sent is prefixed
+                            <code>DIWA-IRDSS-TEST-</code> / <code>DiWA-IRDSS Test-</code> so it's identifiable as ours.
+                        </div>
+
+                        <div id="fhirSendErrorBanner" class="hidden rounded-2xl border border-red-300 bg-red-50 text-red-800 text-sm px-6 py-4 mb-6"></div>
+
+                        <form id="fhirSendForm" class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm mb-6 space-y-5" novalidate>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1.5">Patient <span class="text-red-600">*</span></label>
+                                <select id="fhirPatientSelect" name="patient_id" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer" required>
+                                    <option value="">Loading patients...</option>
+                                </select>
+                                <p id="fhirPatientSelectError" class="hidden text-xs text-red-600 mt-1">Field shouldn't be empty.</p>
+                            </div>
+
+                            <div id="fhirPatientDetailsCard" class="hidden bg-slate-50 rounded-xl p-5 border border-slate-200/80">
+                            <h4 class="text-sm font-bold text-slate-900 mb-4">Patient Details <span class="text-slate-400 font-normal">(from local records)</span></h4>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-5">
+                                <div class="col-span-2">
+                                    <p class="text-xs font-medium text-slate-500 mb-1">Full Name</p>
+                                    <p class="text-sm font-bold text-slate-900" id="fhirPatientDetailName">--</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-medium text-slate-500 mb-1">Date of Birth</p>
+                                    <p class="text-sm text-slate-800" id="fhirPatientDetailDob">--</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-medium text-slate-500 mb-1">Age</p>
+                                    <p class="text-sm text-slate-800" id="fhirPatientDetailAge">--</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-medium text-slate-500 mb-1">Gender</p>
+                                    <p class="text-sm text-slate-800" id="fhirPatientDetailGender">--</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-medium text-slate-500 mb-1">Civil Status</p>
+                                    <p class="text-sm text-slate-800" id="fhirPatientDetailCivilStatus">--</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-medium text-slate-500 mb-1">Phone</p>
+                                    <p class="text-sm text-slate-800" id="fhirPatientDetailPhone">--</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-medium text-slate-500 mb-1">PhilHealth</p>
+                                    <p class="text-sm text-slate-800" id="fhirPatientDetailPhilhealth">--</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-medium text-slate-500 mb-1">PhilSys ID</p>
+                                    <p class="text-sm text-slate-800" id="fhirPatientDetailPhilsys">--</p>
+                                </div>
+                                <div class="col-span-2 sm:col-span-4">
+                                    <p class="text-xs font-medium text-slate-500 mb-1">Address / Location</p>
+                                    <p class="text-sm text-slate-800" id="fhirPatientDetailAddress">--</p>
+                                </div>
+                                <div class="col-span-2 sm:col-span-4">
+                                    <p class="text-xs font-medium text-slate-500 mb-1">Next of Kin</p>
+                                    <p class="text-sm text-slate-800" id="fhirPatientDetailNok">--</p>
+                                </div>
+                            </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1.5">Referring Practitioner <span class="text-red-600">*</span></label>
+                                <select id="fhirPractitionerSelect" name="practitioner_id" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer" required>
+                                    <option value="">Loading practitioners...</option>
+                                </select>
+                                <p class="text-xs text-slate-500 mt-1">Defaults to you. Pick a colleague (doctor/nurse at your facility) if you're submitting on their behalf.</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1.5">Receiving Organization <span class="text-slate-400 font-normal">(optional)</span></label>
+                                <select id="fhirReceivingOrgSelect" name="receiving_org_ref" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer">
+                                    <option value="">-- Use placeholder receiving facility --</option>
+                                </select>
+                                <p class="text-xs text-slate-500 mt-1">Pick a real Organization already registered on the sandbox (see the "FHIR: Organizations" tab), or leave blank to use a placeholder.</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1.5">Chief Complaint <span class="text-red-600">*</span></label>
+                                <input type="text" id="fhirChiefComplaint" name="chief_complaint" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all" required>
+                                <p id="fhirChiefComplaintError" class="hidden text-xs text-red-600 mt-1">Field shouldn't be empty.</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1.5">Working Impression / Diagnosis <span class="text-red-600">*</span></label>
+                                <input type="text" id="fhirWorkingImpression" name="working_impression" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all" required>
+                                <p id="fhirWorkingImpressionError" class="hidden text-xs text-red-600 mt-1">Field shouldn't be empty.</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1.5">Clinical History <span class="text-slate-400 font-normal">(optional)</span></label>
+                                <textarea name="clinical_history" rows="2" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all resize-none"></textarea>
+                                <p class="text-xs text-slate-500 mt-1">Narrative/history -- kept separate from Chief Complaint above (<code>Condition.note</code>, not restated symptoms).</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1.5">Referral Category <span class="text-red-600">*</span></label>
+                                <select id="fhirReferralCategory" name="referral_category" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer" required>
+                                    <option value="">Select a category...</option>
+                                    <option value="Emergency">Emergency</option>
+                                    <option value="Outpatient">Outpatient</option>
+                                </select>
+                                <p id="fhirReferralCategoryError" class="hidden text-xs text-red-600 mt-1">Field shouldn't be empty.</p>
+                                <p class="text-xs text-slate-500 mt-1">Maps to <code>ServiceRequest.category</code> -- the only 2 values the PH eReferral IG's own value set actually allows.</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1.5">Service Type <span class="text-red-600">*</span></label>
+                                <select id="fhirServiceType" name="service_type" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all cursor-pointer" required>
+                                    <option value="">Select a service type...</option>
+                                    <option value="Consultation">Consultation</option>
+                                    <option value="Diagnostics">Diagnostics</option>
+                                    <option value="Procedure">Procedure</option>
+                                    <option value="Others">Others</option>
+                                </select>
+                                <p id="fhirServiceTypeError" class="hidden text-xs text-red-600 mt-1">Field shouldn't be empty.</p>
+                                <p class="text-xs text-slate-500 mt-1">Maps to <code>ServiceRequest.reasonCode</code> -- the IG's own "Reason for Referral" field is actually a service-type category, not the specific clinical reason below.</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1.5">Reason for Referral <span class="text-red-600">*</span></label>
+                                <input type="text" id="fhirReasonText" name="reason_text" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all" required>
+                                <p id="fhirReasonTextError" class="hidden text-xs text-red-600 mt-1">Field shouldn't be empty.</p>
+                                <p class="text-xs text-slate-500 mt-1">The specific clinical/capacity reason (e.g. "No Available Specialist") -- goes in <code>ServiceRequest.note</code>, since <code>reasonCode</code> above is a fixed service-type category.</p>
+                            </div>
+
+                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-1.5">BP Systolic</label>
+                                    <input type="number" name="vital_bp_systolic" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-1.5">BP Diastolic</label>
+                                    <input type="number" name="vital_bp_diastolic" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-1.5">Heart Rate</label>
+                                    <input type="number" name="vital_hr" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-1.5">Resp. Rate</label>
+                                    <input type="number" name="vital_rr" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-1.5">Temp (&deg;C)</label>
+                                    <input type="number" step="0.1" name="vital_temp_c" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-1.5">O2 Sat (%)</label>
+                                    <input type="number" name="vital_o2sat" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-1.5">Weight (kg)</label>
+                                    <input type="number" step="0.1" name="vital_weight_kg" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1.5">Treatment Given <span class="text-slate-400 font-normal">(optional)</span></label>
+                                <textarea name="treatment_given" rows="2" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all resize-none"></textarea>
+                                <p class="text-xs text-slate-500 mt-1">Only creates a <code>Procedure</code> resource when filled in -- never fabricated.</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1.5">Laboratory Results <span class="text-slate-400 font-normal">(optional)</span></label>
+                                <textarea name="lab_results" rows="2" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all resize-none"></textarea>
+                                <p class="text-xs text-slate-500 mt-1">Only creates a <code>DiagnosticReport</code> resource when filled in -- never fabricated values.</p>
+                            </div>
+
+                            <div class="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-2">
+                                <button type="submit" id="fhirPreviewBtn" class="h-11 px-5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold transition-colors bg-white w-full sm:w-auto">
+                                    Preview Bundle
+                                </button>
+                                <button type="button" id="fhirConfirmBtn" disabled
+                                    class="h-11 px-6 bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl shadow-sm active:scale-[0.99] transition-all flex items-center justify-center gap-2 w-full sm:w-auto">
+                                    <i class="bi bi-send"></i>
+                                    <span class="truncate">Confirm &amp; Send to FHIR Sandbox</span>
+                                </button>
+                            </div>
+                        </form>
+
+                        <div id="fhirPreviewPanel" class="hidden bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 mb-6">
+                            <h4 class="text-sm font-bold text-slate-900 mb-3">Bundle Preview <span class="text-slate-400 font-normal">(not yet sent)</span></h4>
+                            <pre id="fhirPreviewJson" class="text-xs bg-slate-900 text-slate-100 rounded-xl p-4 overflow-auto max-h-96"></pre>
+                        </div>
+
+                        <div id="fhirResultPanel" class="hidden bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 mb-6">
+                            <h4 class="text-sm font-bold text-slate-900 mb-3">Sandbox Response -- <span id="fhirResultStatus"></span></h4>
+                            <pre id="fhirResultJson" class="text-xs bg-slate-900 text-slate-100 rounded-xl p-4 overflow-auto max-h-96"></pre>
+                        </div>
+
+                        <!-- Local history of what we've sent -- read-only, does not contact the sandbox -->
+                        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                                <h4 class="text-sm font-bold text-slate-900">Previously Sent Referrals <span class="text-slate-400 font-normal">(local record)</span></h4>
+                                <button id="btnRefreshFhirSentHistory" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200 transition-all">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                    <span>Refresh</span>
+                                </button>
+                            </div>
+                            <div class="overflow-x-auto bg-slate-50/50">
+                                <table id="fhirSentHistoryTable" class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="bg-slate-300/60 text-xs uppercase tracking-wider font-bold text-slate-600 border-b border-slate-200/80">
+                                            <th class="w-[20%] py-4 px-6">Patient</th>
+                                            <th class="w-[25%] py-4 px-6">Receiving Facility</th>
+                                            <th class="w-[15%] py-4 px-6">Category</th>
+                                            <th class="w-[15%] py-4 px-6">Service Type</th>
+                                            <th class="w-[15%] py-4 px-6">Sandbox Ref</th>
+                                            <th class="w-[10%] py-4 px-6">Sent At</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="fhirSentHistoryTableBody" class="divide-y divide-slate-100 text-sm"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB: FHIR CONNECTATHON -- RECEIVE (polls the sandbox, filtered by our own Organization) -->
+                    <div id="tabFhirReceiveContent" style="display: none;">
+                        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden mb-6">
+                            <div class="flex items-center gap-3 px-6 py-4 border-b border-slate-100">
+                                <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-red-50 text-red-600">
+                                    <i class="bi bi-inboxes text-lg"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-slate-900 text-base">FHIR Connectathon -- Receive</h3>
+                                    <p class="text-xs text-slate-500">Review referrals sent to our Organization and, when needed, refer the same patient data onward.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="fhirReceiveNotRegisteredBanner" class="hidden rounded-2xl border border-amber-300 bg-amber-50 text-amber-900 text-sm px-6 py-4 mb-6">
+                            Register your facility as an Organization first (<strong>FHIR: Organizations</strong> tab) -- there's nothing to filter incoming referrals by yet.
+                        </div>
+
+                        <div id="fhirReceiveErrorBanner" class="hidden rounded-2xl border border-red-300 bg-red-50 text-red-800 text-sm px-6 py-4 mb-6"></div>
+
+                        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                                <h4 class="text-sm font-bold text-slate-900">Referrals Sent to Our Organization <span id="fhirReceiveOurOrgRef" class="text-slate-400 font-normal"></span></h4>
+                                <button id="btnRefreshFhirReceive" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200 transition-all">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                    <span>Refresh</span>
+                                </button>
+                            </div>
+                            <div class="overflow-x-auto bg-slate-50/50">
+                                <table id="fhirReceiveTable" class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="bg-slate-300/60 text-xs uppercase tracking-wider font-bold text-slate-600 border-b border-slate-200/80">
+                                            <th class="w-[20%] py-4 px-6">Patient</th>
+                                            <th class="w-[15%] py-4 px-6">Category</th>
+                                            <th class="w-[25%] py-4 px-6">Reason</th>
+                                            <th class="w-[10%] py-4 px-6">Status</th>
+                                            <th class="w-[15%] py-4 px-6">Authored On</th>
+                                            <th class="w-[15%] py-4 px-6">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="fhirReceiveTableBody" class="divide-y divide-slate-100 text-sm"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div id="fhirReceiveDetailPanel" class="hidden bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 mt-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h4 class="text-sm font-bold text-slate-900">Referral Detail</h4>
+                                <div class="flex items-center gap-3">
+                                    <button type="button" id="btnSaveFhirIncomingPatient" class="h-10 px-5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl shadow-sm active:scale-[0.99] transition-all flex items-center gap-2">
+                                        <i class="bi bi-person-plus"></i>
+                                        <span>Save to Our Patients</span>
+                                    </button>
+                                    <button type="button" id="btnCloseFhirReceiveDetail" class="h-10 w-10 rounded-xl text-slate-500 hover:bg-slate-100"><i class="bi bi-x-lg"></i></button>
+                                </div>
+                            </div>
+                            <div id="fhirReceiveSaveResult" class="hidden text-xs px-4 py-3 rounded-xl mb-4"></div>
+
+                            <!-- Skeleton shown while fetching; swapped for the real content below on load -->
+                            <div id="fhirReceiveDetailSkeleton" class="hidden animate-pulse">
+                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-5 mb-5">
+                                    <div class="col-span-2 space-y-2">
+                                        <div class="h-3 w-16 bg-slate-200 rounded"></div>
+                                        <div class="h-4 w-40 bg-slate-200 rounded"></div>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <div class="h-3 w-20 bg-slate-200 rounded"></div>
+                                        <div class="h-4 w-24 bg-slate-200 rounded"></div>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <div class="h-3 w-12 bg-slate-200 rounded"></div>
+                                        <div class="h-4 w-28 bg-slate-200 rounded"></div>
+                                    </div>
+                                    <div class="col-span-2 sm:col-span-4 space-y-2">
+                                        <div class="h-3 w-16 bg-slate-200 rounded"></div>
+                                        <div class="h-4 w-full max-w-md bg-slate-200 rounded"></div>
+                                    </div>
+                                    <div class="col-span-2 space-y-2">
+                                        <div class="h-3 w-20 bg-slate-200 rounded"></div>
+                                        <div class="h-4 w-56 bg-slate-200 rounded"></div>
+                                    </div>
+                                    <div class="col-span-2 space-y-2">
+                                        <div class="h-3 w-24 bg-slate-200 rounded"></div>
+                                        <div class="h-4 w-40 bg-slate-200 rounded"></div>
+                                    </div>
+                                </div>
+                                <div class="h-3 w-32 bg-slate-200 rounded mb-2"></div>
+                                <div class="h-64 w-full bg-slate-200 rounded-xl"></div>
+                            </div>
+
+                            <div id="fhirReceiveDetailContent" class="space-y-4">
+                                <div class="bg-slate-50 rounded-xl border border-slate-200/80 p-4">
+                                    <h5 class="text-xs font-bold text-slate-900 mb-3">Patient</h5>
+                                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                        <div class="col-span-2">
+                                            <p class="text-xs font-medium text-slate-500 mb-1">Full Name</p>
+                                            <p class="text-sm font-bold text-slate-900" id="fhirReceiveDetailName">--</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs font-medium text-slate-500 mb-1">Gender / DOB</p>
+                                            <p class="text-sm text-slate-800" id="fhirReceiveDetailGenderDob">--</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs font-medium text-slate-500 mb-1">Phone</p>
+                                            <p class="text-sm text-slate-800" id="fhirReceiveDetailPhone">--</p>
+                                        </div>
+                                        <div class="col-span-2 sm:col-span-4">
+                                            <p class="text-xs font-medium text-slate-500 mb-1">Address</p>
+                                            <p class="text-sm text-slate-800" id="fhirReceiveDetailAddress">--</p>
+                                        </div>
+                                        <div class="col-span-2">
+                                            <p class="text-xs font-medium text-slate-500 mb-1">Identifiers</p>
+                                            <p class="text-sm text-slate-800" id="fhirReceiveDetailIdentifiers">--</p>
+                                        </div>
+                                        <div class="col-span-2">
+                                            <p class="text-xs font-medium text-slate-500 mb-1">Sending Facility</p>
+                                            <p class="text-sm text-slate-800" id="fhirReceiveDetailSourceOrg">--</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="bg-slate-50 rounded-xl border border-slate-200/80 p-4">
+                                    <h5 class="text-xs font-bold text-slate-900 mb-3">Referral</h5>
+                                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                        <div>
+                                            <p class="text-xs font-medium text-slate-500 mb-1">Category</p>
+                                            <p class="text-sm text-slate-800" id="fhirReceiveDetailCategory">--</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs font-medium text-slate-500 mb-1">Priority</p>
+                                            <p class="text-sm text-slate-800" id="fhirReceiveDetailPriority">--</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs font-medium text-slate-500 mb-1">Status</p>
+                                            <p class="text-sm text-slate-800" id="fhirReceiveDetailStatus">--</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs font-medium text-slate-500 mb-1">Authored On</p>
+                                            <p class="text-sm text-slate-800" id="fhirReceiveDetailAuthoredOn">--</p>
+                                        </div>
+                                        <div class="col-span-2">
+                                            <p class="text-xs font-medium text-slate-500 mb-1">Reason / Service Type</p>
+                                            <p class="text-sm text-slate-800" id="fhirReceiveDetailReason">--</p>
+                                        </div>
+                                        <div class="col-span-2">
+                                            <p class="text-xs font-medium text-slate-500 mb-1">Note</p>
+                                            <p class="text-sm text-slate-800" id="fhirReceiveDetailNote">--</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="bg-slate-50 rounded-xl border border-slate-200/80 p-4">
+                                    <h5 class="text-xs font-bold text-slate-900 mb-3">Vitals</h5>
+                                    <div id="fhirReceiveDetailObservations" class="grid grid-cols-2 sm:grid-cols-3 gap-4"></div>
+                                </div>
+
+                                <div class="bg-slate-50 rounded-xl border border-slate-200/80 p-4">
+                                    <h5 class="text-xs font-bold text-slate-900 mb-3">Conditions / Diagnoses</h5>
+                                    <div id="fhirReceiveDetailConditions" class="space-y-1.5 text-sm text-slate-800">--</div>
+                                </div>
+
+                                <div class="bg-slate-50 rounded-xl border border-slate-200/80 p-4">
+                                    <h5 class="text-xs font-bold text-slate-900 mb-3">Treatment / Procedures</h5>
+                                    <div id="fhirReceiveDetailProcedures" class="space-y-1.5 text-sm text-slate-800">--</div>
+                                </div>
+
+                                <div class="bg-slate-50 rounded-xl border border-slate-200/80 p-4">
+                                    <h5 class="text-xs font-bold text-slate-900 mb-3">Laboratory / Diagnostic Reports</h5>
+                                    <div id="fhirReceiveDetailDiagnosticReports" class="space-y-1.5 text-sm text-slate-800">--</div>
+                                </div>
+
+                                <div class="bg-slate-50 rounded-xl border border-slate-200/80 p-4">
+                                    <h5 class="text-xs font-bold text-slate-900 mb-3">Task Status</h5>
+                                    <p class="text-sm text-slate-800" id="fhirReceiveDetailTask">--</p>
+                                </div>
+
+                                <div>
+                                    <h5 class="text-xs font-bold text-slate-900 mb-2">Full Resource Bundle</h5>
+                                    <pre id="fhirReceiveDetailJson" class="text-xs bg-slate-900 text-slate-100 rounded-xl p-4 overflow-auto max-h-96"></pre>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Onward referral modal: same received clinical data, newly selected destination -->
+                        <div id="fhirOnwardModal" class="hidden fixed inset-0 z-[100] bg-slate-950/50 p-4 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="fhirOnwardModalTitle">
+                            <div class="min-h-full flex items-center justify-center">
+                                <div class="w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+                                    <div class="flex items-start justify-between gap-4 px-6 py-5 border-b border-slate-100">
+                                        <div>
+                                            <h4 id="fhirOnwardModalTitle" class="text-lg font-bold text-slate-900">Refer Patient Onward</h4>
+                                            <p class="text-xs text-slate-500 mt-1">Choose a new receiving hospital. The patient and clinical records from the received referral will be reused.</p>
+                                        </div>
+                                        <button type="button" id="btnCloseFhirOnward" class="h-10 w-10 shrink-0 rounded-xl text-slate-500 hover:bg-slate-100" aria-label="Close onward referral"><i class="bi bi-x-lg"></i></button>
+                                    </div>
+
+                                    <div class="p-6 space-y-5">
+                                        <div id="fhirOnwardError" class="hidden rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"></div>
+
+                                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                            <div>
+                                                <p class="text-xs font-medium text-slate-500">Patient</p>
+                                                <p id="fhirOnwardPatientName" class="mt-1 text-sm font-semibold text-slate-900">--</p>
+                                            </div>
+                                            <div>
+                                                <p class="text-xs font-medium text-slate-500">Received From</p>
+                                                <p id="fhirOnwardSourceOrg" class="mt-1 text-sm font-semibold text-slate-900">--</p>
+                                            </div>
+                                            <div>
+                                                <p class="text-xs font-medium text-slate-500">Source ServiceRequest</p>
+                                                <p id="fhirOnwardSourceRef" class="mt-1 text-xs font-mono text-slate-700">--</p>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label for="fhirOnwardReceivingOrg" class="block text-sm font-semibold text-slate-800 mb-2">New Receiving Hospital <span class="text-red-600">*</span></label>
+                                            <select id="fhirOnwardReceivingOrg" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition-all">
+                                                <option value="">Loading hospitals...</option>
+                                            </select>
+                                            <p class="mt-2 text-xs text-slate-500">A new referral will be created and linked to the received referral. The original referral will not be changed.</p>
+                                        </div>
+
+                                        <div id="fhirOnwardPreviewPanel" class="hidden">
+                                            <h5 class="text-xs font-bold text-slate-900 mb-2">Onward FHIR Bundle Preview</h5>
+                                            <pre id="fhirOnwardPreviewJson" class="text-xs bg-slate-900 text-slate-100 rounded-xl p-4 overflow-auto max-h-80"></pre>
+                                        </div>
+                                        <div id="fhirOnwardResultPanel" class="hidden rounded-xl border px-4 py-3">
+                                            <p id="fhirOnwardResultStatus" class="text-sm font-semibold"></p>
+                                            <pre id="fhirOnwardResultJson" class="mt-3 text-xs bg-slate-900 text-slate-100 rounded-xl p-4 overflow-auto max-h-64"></pre>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50">
+                                        <button type="button" id="btnCancelFhirOnward" class="h-11 px-5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-100">Cancel</button>
+                                        <button type="button" id="btnPreviewFhirOnward" class="h-11 px-5 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 text-sm font-semibold hover:bg-blue-100">Preview Bundle</button>
+                                        <button type="button" id="btnConfirmFhirOnward" disabled class="h-11 px-5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"><i class="bi bi-send me-1"></i> Confirm &amp; Send</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB: FHIR CONNECTATHON -- ORGANIZATIONS (browse sandbox orgs, register own facility) -->
+                    <div id="tabFhirOrgsContent" style="display: none;">
+                        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden mb-6">
+                            <div class="flex items-center gap-3 px-6 py-4 border-b border-slate-100">
+                                <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-red-50 text-red-600">
+                                    <i class="bi bi-hospital text-lg"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-slate-900 text-base">FHIR Connectathon -- Organizations</h3>
+                                    <p class="text-xs text-slate-500">Browse Organizations already on the sandbox, or register your own facility.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="rounded-2xl border border-amber-300 bg-amber-50 text-amber-900 text-sm px-6 py-4 mb-6">
+                            <strong>Test tool only.</strong> Reads from and, if you register, writes to the public,
+                            shared, unauthenticated FHIR sandbox (<code>cdr.pheref.fhirlab.net</code>). Registering
+                            uses the same <code>DIWA-IRDSS-TEST-</code> / <code>DiWA-IRDSS Test-</code> identifier
+                            convention as everything else in this tool.
+                        </div>
+
+                        <div id="fhirOrgsErrorBanner" class="hidden rounded-2xl border border-red-300 bg-red-50 text-red-800 text-sm px-6 py-4 mb-6"></div>
+
+                        <!-- Register My Facility -->
+                        <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm mb-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h4 class="text-sm font-bold text-slate-900">Register My Facility</h4>
+                                <span id="fhirOrgRegisteredBadge" class="hidden px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700">Already on sandbox</span>
+                            </div>
+                            <p class="text-xs text-slate-500 mb-4">Facility: <span id="fhirOrgMyFacilityName" class="font-semibold text-slate-700">--</span></p>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-1.5">Facility Address <span class="text-slate-400 font-normal">(optional)</span></label>
+                                    <input type="text" id="fhirOrgAddress" class="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-1.5">Facility Contact Number <span class="text-slate-400 font-normal">(optional)</span></label>
+                                    <input type="text" id="fhirOrgPhone" class="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-3">
+                                <button type="button" id="fhirOrgPreviewBtn" class="h-11 px-5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold transition-colors bg-white">
+                                    Preview
+                                </button>
+                                <button type="button" id="fhirOrgConfirmBtn" disabled
+                                    class="h-11 px-6 bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl shadow-sm active:scale-[0.99] transition-all flex items-center gap-2">
+                                    <i class="bi bi-send"></i>
+                                    <span>Confirm &amp; Register</span>
+                                </button>
+                            </div>
+
+                            <div id="fhirOrgPreviewPanel" class="hidden mt-5">
+                                <h5 class="text-xs font-bold text-slate-900 mb-2">Resource Preview <span class="text-slate-400 font-normal">(not yet sent)</span></h5>
+                                <pre id="fhirOrgPreviewJson" class="text-xs bg-slate-900 text-slate-100 rounded-xl p-4 overflow-auto max-h-72"></pre>
+                            </div>
+
+                            <div id="fhirOrgResultPanel" class="hidden mt-5">
+                                <h5 class="text-xs font-bold text-slate-900 mb-2">Sandbox Response -- <span id="fhirOrgResultStatus"></span></h5>
+                                <pre id="fhirOrgResultJson" class="text-xs bg-slate-900 text-slate-100 rounded-xl p-4 overflow-auto max-h-72"></pre>
+                            </div>
+                        </div>
+
+                        <!-- Search a real, already-registered facility by its NHFR code -->
+                        <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm mb-6">
+                            <h4 class="text-sm font-bold text-slate-900 mb-1">Search by NHFR Code</h4>
+                            <p class="text-xs text-slate-500 mb-4">Look up a real, already-registered facility by its National Health Facility Registry code, to use as the receiving facility on a referral -- instead of scrolling the full list below or falling back to the placeholder.</p>
+                            <div class="flex items-center gap-3">
+                                <input type="text" id="fhirNhfrSearchInput" placeholder="e.g. 0102-0001" class="flex-1 h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                <button type="button" id="fhirNhfrSearchBtn" class="h-11 px-5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold transition-colors flex-shrink-0">
+                                    Search
+                                </button>
+                            </div>
+                            <div id="fhirNhfrSearchResult" class="hidden mt-4"></div>
+                        </div>
+
+                        <!-- Organizations already on the sandbox -->
+                        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                                <h4 class="text-sm font-bold text-slate-900">Organizations on the Sandbox</h4>
+                                <button id="btnRefreshFhirOrgs" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200 transition-all">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                    <span>Refresh</span>
+                                </button>
+                            </div>
+                            <div class="overflow-x-auto bg-slate-50/50">
+                                <table id="fhirOrgsTable" class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="bg-slate-300/60 text-xs uppercase tracking-wider font-bold text-slate-600 border-b border-slate-200/80">
+                                            <th class="w-[45%] py-4 px-6">Name</th>
+                                            <th class="w-[35%] py-4 px-6">Identifiers</th>
+                                            <th class="w-[20%] py-4 px-6">Resource</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="fhirOrgsTableBody" class="divide-y divide-slate-100 text-sm"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB: FHIR CONNECTATHON -- PATIENTS (browse sandbox patients, look up one by id) -->
+                    <div id="tabFhirPatientsContent" style="display: none;">
+                        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden mb-6">
+                            <div class="flex items-center gap-3 px-6 py-4 border-b border-slate-100">
+                                <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-red-50 text-red-600">
+                                    <i class="bi bi-person-vcard text-lg"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-slate-900 text-base">FHIR Connectathon -- Patients</h3>
+                                    <p class="text-xs text-slate-500">Browse Patients already on the sandbox, or look one up by id.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="rounded-2xl border border-amber-300 bg-amber-50 text-amber-900 text-sm px-6 py-4 mb-6">
+                            <strong>Informational only.</strong> This is a read-only browse of the public, shared
+                            <code>cdr.pheref.fhirlab.net</code> sandbox -- it does <strong>not</strong> prevent
+                            duplicates. Our own sends already dedupe via our own identifier, but a different
+                            Connectathon team's same-named patient is still a separate record here; matching only
+                            happens on a shared identifier.
+                        </div>
+
+                        <div id="fhirPatientsErrorBanner" class="hidden rounded-2xl border border-red-300 bg-red-50 text-red-800 text-sm px-6 py-4 mb-6"></div>
+
+                        <!-- Look up by id -->
+                        <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm mb-6">
+                            <h4 class="text-sm font-bold text-slate-900 mb-1">Look Up by ID</h4>
+                            <p class="text-xs text-slate-500 mb-4">Paste a known Patient id (e.g. seen in a ServiceRequest reference elsewhere) to fetch it directly.</p>
+                            <div class="flex items-center gap-3">
+                                <input type="text" id="fhirPatientLookupInput" placeholder="e.g. 23695" class="flex-1 h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-normal focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none transition-all">
+                                <button type="button" id="fhirPatientLookupBtn" class="h-11 px-5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold transition-colors flex-shrink-0">
+                                    Look Up
+                                </button>
+                            </div>
+                            <div id="fhirPatientLookupResult" class="hidden mt-4"></div>
+                        </div>
+
+                        <!-- Patients already on the sandbox -->
+                        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                                <h4 class="text-sm font-bold text-slate-900">Patients on the Sandbox <span class="text-slate-400 font-normal">(most recently updated)</span></h4>
+                                <button id="btnRefreshFhirPatients" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200 transition-all">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                    <span>Refresh</span>
+                                </button>
+                            </div>
+                            <div class="overflow-x-auto bg-slate-50/50">
+                                <table id="fhirPatientsTable" class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="bg-slate-300/60 text-xs uppercase tracking-wider font-bold text-slate-600 border-b border-slate-200/80">
+                                            <th class="w-[30%] py-4 px-6">Name</th>
+                                            <th class="w-[15%] py-4 px-6">Date of Birth</th>
+                                            <th class="w-[15%] py-4 px-6">Gender</th>
+                                            <th class="w-[25%] py-4 px-6">Identifiers</th>
+                                            <th class="w-[15%] py-4 px-6">Resource</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="fhirPatientsTableBody" class="divide-y divide-slate-100 text-sm"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- TAB 6: MANAGE USERS CONTENT (Facility Admin only) -->
                     <div id="tabUsersContent" style="display: none;">
                         <div class="space-y-6">
@@ -1649,8 +2336,14 @@
     <!-- Chart.js CDN (Facility Analytics tab) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <!-- Application JS -->
+    <script src="js/table-skeleton.js"></script>
     <script src="js/service_assessment.js"></script>
-    <script src="js/app.js?v=20260909f"></script>
+    <script src="js/fhir-connectathon-send.js?v=20260916a"></script>
+    <script src="js/fhir-connectathon-organizations.js?v=20260916a"></script>
+    <script src="js/fhir-connectathon-patients.js"></script>
+    <script src="js/fhir-connectathon-receive.js?v=20260916f"></script>
+    <script src="js/fhir-connectathon-status.js?v=20260916b"></script>
+    <script src="js/app.js?v=20260915c"></script>
     <script src="js/consent-scanner.js?v=20260909e"></script>
     <script src="js/electronic-consent.js?v=20260909e"></script>
 

@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IRDSS FHIR, JSON, and POST Method</title>
+  <style>
+    @page { size: A4; margin: 8mm 12mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #172033;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 9.8pt;
+      line-height: 1.34;
+      background: #fff;
+    }
+    .page {
+      height: 275mm;
+      overflow: hidden;
+      position: relative;
+      page-break-after: always;
+      padding-bottom: 14mm;
+    }
+    .page:last-child { page-break-after: auto; }
+    .eyebrow {
+      margin: 0 0 5px;
+      color: #a71920;
+      font-size: 9pt;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 0;
+      color: #79151b;
+      font-size: 29pt;
+      line-height: 1.08;
+      letter-spacing: -0.5px;
+    }
+    h2 {
+      margin: 0 0 10px;
+      color: #79151b;
+      font-size: 20pt;
+      line-height: 1.15;
+    }
+    h3 {
+      margin: 13px 0 6px;
+      color: #263550;
+      font-size: 12.5pt;
+    }
+    p { margin: 6px 0; }
+    ul, ol { margin: 6px 0 6px 21px; padding: 0; }
+    li { margin: 3px 0; }
+    code { font-family: Consolas, "Courier New", monospace; }
+    .hero {
+      margin-top: 30mm;
+      padding: 20mm 16mm;
+      border-top: 7px solid #a71920;
+      background: linear-gradient(135deg, #fff8f5, #f1f5fb);
+    }
+    .subtitle {
+      max-width: 155mm;
+      margin-top: 13px;
+      color: #43516a;
+      font-size: 15pt;
+      line-height: 1.45;
+    }
+    .scope {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 24px;
+    }
+    .scope div {
+      padding: 14px;
+      border: 1px solid #dde4ee;
+      border-radius: 8px;
+      background: #fff;
+    }
+    .scope strong { display: block; color: #8f1920; font-size: 13pt; }
+    .scope span { color: #5c687c; font-size: 9.5pt; }
+    .callout {
+      margin: 12px 0;
+      padding: 10px 14px;
+      border-left: 5px solid #c99316;
+      background: #fff7de;
+      color: #3e3b31;
+    }
+    .definition-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 11px;
+      margin: 11px 0;
+    }
+    .definition {
+      min-height: 118px;
+      padding: 14px;
+      border: 1px solid #dce3ed;
+      border-radius: 9px;
+      background: #f8fafc;
+    }
+    .definition .label {
+      display: inline-block;
+      margin-bottom: 7px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #81171d;
+      color: #fff;
+      font-size: 8.5pt;
+      font-weight: bold;
+    }
+    .definition strong { display: block; font-size: 13pt; }
+    .flow {
+      display: grid;
+      grid-template-columns: 1fr 24px 1.1fr 24px 1.2fr;
+      align-items: center;
+      margin: 11px 0;
+    }
+    .node {
+      padding: 13px 9px;
+      border: 1px solid #ccd6e4;
+      border-radius: 8px;
+      text-align: center;
+      background: #fff;
+    }
+    .node strong { display: block; color: #7d171d; }
+    .arrow { text-align: center; color: #a71920; font-size: 19pt; }
+    pre {
+      margin: 7px 0;
+      padding: 11px 14px;
+      overflow: hidden;
+      border-radius: 8px;
+      background: #101827;
+      color: #e8eef8;
+      font: 8.3pt/1.38 Consolas, "Courier New", monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .key { color: #7dd3fc; }
+    .str { color: #fde68a; }
+    .num { color: #86efac; }
+    .note { color: #5c687c; font-size: 9pt; }
+    table {
+      width: 100%;
+      margin: 8px 0;
+      border-collapse: collapse;
+      font-size: 9.2pt;
+    }
+    th {
+      padding: 8px;
+      color: #fff;
+      text-align: left;
+      background: #263550;
+    }
+    td {
+      padding: 8px;
+      border-bottom: 1px solid #dce3ed;
+      vertical-align: top;
+    }
+    tr:nth-child(even) td { background: #f7f9fc; }
+    .method {
+      display: inline-block;
+      min-width: 42px;
+      padding: 2px 7px;
+      border-radius: 5px;
+      color: #fff;
+      text-align: center;
+      font-weight: bold;
+      background: #16834b;
+    }
+    .steps { counter-reset: item; list-style: none; margin-left: 0; }
+    .steps li {
+      position: relative;
+      min-height: 37px;
+      margin: 9px 0;
+      padding: 7px 8px 7px 43px;
+      border-bottom: 1px solid #e1e6ee;
+    }
+    .steps li::before {
+      counter-increment: item;
+      content: counter(item);
+      position: absolute;
+      left: 0;
+      top: 3px;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      color: #fff;
+      background: #a71920;
+      text-align: center;
+      font-weight: bold;
+      line-height: 30px;
+    }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+    .status-box {
+      padding: 13px;
+      border: 1px solid #d5ddea;
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+    .good { border-top: 4px solid #16834b; }
+    .next { border-top: 4px solid #c99316; }
+    .script {
+      margin-top: 11px;
+      padding: 11px 14px;
+      border: 1px solid #dce3ed;
+      border-radius: 8px;
+      background: #fff;
+      font-size: 10.2pt;
+    }
+    .footer {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      padding-top: 5px;
+      border-top: 1px solid #dce3ed;
+      color: #6a7587;
+      font-size: 8pt;
+    }
+    .footer span { float: right; }
+  </style>
+</head>
+<body>
+  <section class="page">
+    <div class="hero">
+      <p class="eyebrow">Intelligent Referral Decision Support System</p>
+      <h1>FHIR, JSON, and the HTTP POST Method</h1>
+      <p class="subtitle">How the Mock Hospital packages referral information and sends it to the IRDSS Interoperability Layer (IOL).</p>
+      <div class="scope">
+        <div><strong>FHIR</strong><span>Healthcare data structure and meaning</span></div>
+        <div><strong>JSON</strong><span>Machine-readable representation of the data</span></div>
+        <div><strong>POST</strong><span>HTTP method used to submit a new referral</span></div>
+      </div>
+    </div>
+    <div class="callout" style="margin-top:25mm">
+      <strong>Main message:</strong> JSON is the format, FHIR supplies the healthcare structure, and POST delivers the referral to the IOL API.
+    </div>
+    <div class="footer">IRDSS Prototype Technical Brief <span>1</span></div>
+  </section>
+
+  <section class="page">
+    <p class="eyebrow">Part 1</p>
+    <h2>FHIR represented as JSON</h2>
+
+    <div class="definition-grid">
+      <div class="definition"><span class="label">FORMAT</span><strong>JSON</strong><p>A text format composed of named properties, values, objects, and arrays.</p></div>
+      <div class="definition"><span class="label">STANDARD</span><strong>FHIR</strong><p>Defines reusable healthcare resources such as Patient and Encounter.</p></div>
+      <div class="definition"><span class="label">TRANSPORT</span><strong>HTTP POST</strong><p>Sends a new referral representation to a server endpoint.</p></div>
+    </div>
+
+    <h3>Basic FHIR Patient in JSON</h3>
+    <pre>{
+  <span class="key">"resourceType"</span>: <span class="str">"Patient"</span>,
+  <span class="key">"id"</span>: <span class="str">"P-000026"</span>,
+  <span class="key">"name"</span>: [{
+    <span class="key">"family"</span>: <span class="str">"Patient"</span>,
+    <span class="key">"given"</span>: [<span class="str">"Sample"</span>]
+  }],
+  <span class="key">"gender"</span>: <span class="str">"female"</span>,
+  <span class="key">"birthDate"</span>: <span class="str">"1997-05-15"</span>
+}</pre>
+
+    <h3>How to read it</h3>
+    <table>
+      <tr><th>Element</th><th>Explanation</th></tr>
+      <tr><td><code>resourceType</code></td><td>Identifies which FHIR resource is represented.</td></tr>
+      <tr><td><code>id</code></td><td>Logical identifier used to reference this patient.</td></tr>
+      <tr><td><code>name</code></td><td>An array because a patient can have more than one recorded name.</td></tr>
+      <tr><td><code>gender</code></td><td>A coded demographic value.</td></tr>
+      <tr><td><code>birthDate</code></td><td>A FHIR date written as <code>YYYY-MM-DD</code>.</td></tr>
+    </table>
+
+    <div class="callout"><strong>Presentation line:</strong> “FHIR does not replace JSON. FHIR tells us what healthcare fields mean, while JSON is one way of writing those fields for computer exchange.”</div>
+    <p class="note">FHIR also supports XML and RDF, but the IRDSS prototype uses JSON.</p>
+    <div class="footer">IRDSS Prototype Technical Brief <span>2</span></div>
+  </section>
+
+  <section class="page">
+    <p class="eyebrow">Part 2</p>
+    <h2>JSON currently sent by the Mock Hospital</h2>
+    <p>The PHP backend builds an <strong>Encounter</strong> payload and embeds a <strong>Patient</strong> record required by the current IOL request schema.</p>
+
+    <pre>{
+  <span class="key">"resourceType"</span>: <span class="str">"Encounter"</span>,
+  <span class="key">"status"</span>: <span class="str">"planned"</span>,
+  <span class="key">"subject"</span>: {
+    <span class="key">"reference"</span>: <span class="str">"Patient/P-000026"</span>,
+    <span class="key">"display"</span>: <span class="str">"Sample Patient"</span>
+  },
+  <span class="key">"reasonCode"</span>: [{
+    <span class="key">"coding"</span>: [{
+      <span class="key">"system"</span>: <span class="str">"http://irdss.gov.ph/fhir/CodeSystem/referral-reason"</span>,
+      <span class="key">"code"</span>: <span class="str">"NO_AVAILABLE_ICU"</span>,
+      <span class="key">"display"</span>: <span class="str">"No Available Intensive Care Unit"</span>
+    }],
+    <span class="key">"text"</span>: <span class="str">"No Available Intensive Care Unit"</span>
+  }],
+  <span class="key">"patient_record"</span>: {
+    <span class="key">"resourceType"</span>: <span class="str">"Patient"</span>,
+    <span class="key">"id"</span>: <span class="str">"P-000026"</span>,
+    <span class="key">"name"</span>: [{ <span class="key">"family"</span>: <span class="str">"Patient"</span>, <span class="key">"given"</span>: [<span class="str">"Sample"</span>] }],
+    <span class="key">"gender"</span>: <span class="str">"female"</span>,
+    <span class="key">"birthDate"</span>: <span class="str">"1997-05-15"</span>,
+    <span class="key">"extension"</span>: [
+      {
+        <span class="key">"url"</span>: <span class="str">"http://irdss.gov.ph/fhir/StructureDefinition/diagnosis"</span>,
+        <span class="key">"valueString"</span>: <span class="str">"Pneumonia"</span>
+      },
+      {
+        <span class="key">"url"</span>: <span class="str">"http://irdss.gov.ph/fhir/StructureDefinition/vitalHeartRate"</span>,
+        <span class="key">"valueDecimal"</span>: <span class="num">90</span>
+      }
+    ]
+  },
+  <span class="key">"serviceProvider"</span>: {
+    <span class="key">"reference"</span>: <span class="str">"Organization/FAC-000015"</span>,
+    <span class="key">"display"</span>: <span class="str">"Sample Provincial Hospital"</span>
+  }
+}</pre>
+
+    <p class="note"><strong>Accuracy note:</strong> This is a FHIR-style IRDSS payload, not yet a fully standard FHIR transaction. <code>patient_record</code> is an IOL-specific wrapper. Diagnosis and vitals currently use custom extensions.</p>
+    <div class="footer">IRDSS Prototype Technical Brief <span>3</span></div>
+  </section>
+
+  <section class="page">
+    <p class="eyebrow">Part 3</p>
+    <h2>Sending the JSON using POST</h2>
+
+    <div class="flow">
+      <div class="node"><strong>Mock Hospital UI</strong>Referral form</div>
+      <div class="arrow">→</div>
+      <div class="node"><strong>PHP Backend</strong>Builds and signs JSON</div>
+      <div class="arrow">→</div>
+      <div class="node"><strong>IOL API</strong>Validates and creates referral</div>
+    </div>
+
+    <h3>HTTP request</h3>
+    <pre><span class="str">POST</span> /api/v1/referral/initiate HTTP/1.1
+Host: &lt;iol-server&gt;:8081
+Content-Type: application/json
+X-System-Code: SYSTEM-001
+X-Key-ID: KEY-2026-001
+X-Signature-Timestamp: &lt;unix-time&gt;
+X-Request-Nonce: &lt;unique-random-value&gt;
+X-System-Signature: &lt;rsa-signature&gt;
+
+{ "resourceType": "Encounter", "status": "planned", ... }</pre>
+
+    <h3>What happens during the POST request?</h3>
+    <ol class="steps">
+      <li>The user submits the referral form to the Mock Hospital PHP backend.</li>
+      <li>PHP reads the selected patient from the hospital’s local MySQL database.</li>
+      <li>PHP converts the necessary data into the FHIR-style Encounter and Patient JSON.</li>
+      <li>The backend calculates a SHA-256 body hash and signs the request using the hospital’s RSA private key.</li>
+      <li>The IOL verifies the public key signature, timestamp, nonce, facility, and JSON schema.</li>
+      <li>If valid, the IOL creates the referral and returns a JSON response.</li>
+    </ol>
+
+    <h3>Example IOL response</h3>
+    <pre>{
+  <span class="key">"status"</span>: <span class="str">"success"</span>,
+  <span class="key">"message"</span>: <span class="str">"Referral initiated successfully"</span>,
+  <span class="key">"referral_tracking_id"</span>: <span class="str">"TRK-2026-000123"</span>,
+  <span class="key">"referral_id"</span>: <span class="str">"ref_35b0cfd39e9f"</span>
+}</pre>
+    <div class="footer">IRDSS Prototype Technical Brief <span>4</span></div>
+  </section>
+
+  <section class="page">
+    <p class="eyebrow">Part 4</p>
+    <h2>What to emphasize in the report</h2>
+
+    <div class="two-col">
+      <div class="status-box good">
+        <h3 style="margin-top:0">Implemented now</h3>
+        <ul>
+          <li>FHIR-style <code>Encounter</code> and <code>Patient</code> JSON</li>
+          <li>Patient and Organization references</li>
+          <li>Coded primary and additional referral reasons</li>
+          <li>Custom extensions for diagnosis, vitals, flags, and consent</li>
+          <li>POST endpoint for initiating referrals</li>
+          <li>Schema validation on the FastAPI IOL server</li>
+          <li>RSA-signed requests with timestamp and nonce</li>
+        </ul>
+      </div>
+      <div class="status-box next">
+        <h3 style="margin-top:0">Next interoperability step</h3>
+        <ul>
+          <li>Send demographics as a standalone <code>Patient</code></li>
+          <li>Send diagnoses as <code>Condition</code></li>
+          <li>Send each vital sign as <code>Observation</code></li>
+          <li>Represent the referral with <code>ServiceRequest</code></li>
+          <li>Package related resources in a transaction <code>Bundle</code></li>
+          <li>Publish and validate IRDSS profiles and extensions</li>
+          <li>Use HTTPS/TLS in production</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout">
+      <strong>Important:</strong> RSA signing proves the sender and detects changes to the body. It does not encrypt patient data; HTTPS is still required for production confidentiality.
+    </div>
+
+    <h3>Short reporting script</h3>
+    <div class="script">
+      “In IRDSS, FHIR gives our referral data healthcare meaning, JSON makes that information machine-readable, and the HTTP POST method sends a new referral to the IOL. The mock hospital’s PHP backend constructs an Encounter containing a Patient record, referral reasons, hospital reference, and IRDSS extensions. It signs the exact JSON body using the hospital’s private key, then posts it to <code>/api/v1/referral/initiate</code>. The IOL verifies the request, validates the schema, creates the referral, and responds with its referral and tracking identifiers. Our current payload is FHIR-style and designed for this prototype; full external FHIR interoperability will require separate standard resources and a transaction Bundle.”
+    </div>
+
+    <h3>References</h3>
+    <ul class="note">
+      <li>HL7 FHIR R4 JSON Representation — https://hl7.org/fhir/R4/json.html</li>
+      <li>HL7 FHIR R4 RESTful API — https://hl7.org/fhir/R4/http.html</li>
+      <li>Current payload builder — <code>backend/send_referral.php</code></li>
+      <li>Current signed REST client — <code>backend/config.php</code></li>
+      <li>IOL request schema — <code>irdss_project/app/schemas/encounter.py</code></li>
+    </ul>
+    <div class="footer">IRDSS Prototype Technical Brief <span>5</span></div>
+  </section>
+</body>
+</html>

@@ -27,6 +27,15 @@ define('DB_CHARSET', 'utf8mb4');
 define('IOL_SYSTEM_CODE', 'SYSTEM-001');
 define('IOL_KEY_ID', 'KEY-2026-001');
 
+// HL7 FHIR Connectathon sandboxes -- unrelated to IOL/IRDSS above. Open, unauthenticated
+// HAPI FHIR servers used for PH Core / PH eReferral IG conformance testing. See
+// hackathon_tracker/TRACKER.md and connectathon/HL7-FHIR-Connectathon/CODEX.md for context.
+// Configurable via .env so a different sandbox (or eventually a production server) is a
+// config change, not a code change.
+define('FHIR_EREFERRAL_BASE_URL', $_ENV['FHIR_EREFERRAL_BASE_URL'] ?? 'https://cdr.pheref.fhirlab.net/fhir');
+define('FHIR_CORE_BASE_URL', $_ENV['FHIR_CORE_BASE_URL'] ?? 'https://cdr.phcore.fhirlab.net/fhir');
+define('FHIR_TERMINOLOGY_BASE_URL', $_ENV['FHIR_TERMINOLOGY_BASE_URL'] ?? 'https://tx.fhirlab.net/fhir');
+
 /**
  * Signs a request per the IOL 3-layer RSA authentication scheme and sends it,
  * centralizing the crypto boilerplate shared by every backend endpoint that
@@ -176,8 +185,64 @@ function sendSignedIolBinaryRequest($method, $path, $bodyBytes, $contentType, $f
 }
 
 /**
+ * Plain (unauthenticated) FHIR REST call against a FHIRLab-style sandbox --
+ * unlike IOL above, these servers take no signature/auth headers.
+ * $baseUrl is one of the FHIR_*_BASE_URL constants; $path is resource-relative,
+ * e.g. 'metadata', 'Patient?_count=3', or '' for a Bundle transaction POST to the base.
+ * Returns [httpCode, decodedResponseOrRaw, curlErrno, curlError].
+ *
+ * @param string $method
+ * @param string $baseUrl
+ * @param string $path
+ * @param string|null $bodyJson
+ * @param int $timeoutSeconds  Default 60 -- see comment below. Callers doing a
+ *                             cheap single-resource GET (e.g. a connection-status
+ *                             check) should pass a much shorter value so a slow
+ *                             sandbox doesn't pile up long-running requests.
+ * @return array
+ */
+function sendFhirRequest($method, $baseUrl, $path, $bodyJson = null, $timeoutSeconds = 60) {
+    $url = rtrim($baseUrl, '/') . ($path !== '' ? '/' . ltrim($path, '/') : '');
+
+    $headers = ['Accept: application/fhir+json'];
+    if ($bodyJson !== null) {
+        $headers[] = 'Content-Type: application/fhir+json';
+    }
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
+    if ($bodyJson !== null && strtoupper($method) !== 'GET') {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $bodyJson);
+    }
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+    // 60s default, not 20s -- a multi-resource transaction Bundle with several
+    // meta.profile references makes the server do real work per entry
+    // (fetch StructureDefinitions, run terminology/required-binding checks),
+    // and this is a shared public sandbox that can be under load from other
+    // Connectathon participants. Confirmed 2026-09-15: a real 19-entry bundle
+    // hit the old 20s timeout with 0 bytes received (curl_errno 28) even
+    // though the request itself was valid.
+    curl_setopt($ch, CURLOPT_TIMEOUT, $timeoutSeconds);
+
+    $rawResponse = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErrno = curl_errno($ch);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+
+    if ($curlErrno) {
+        return [0, null, $curlErrno, $curlError];
+    }
+
+    $decoded = json_decode($rawResponse, true);
+    return [$httpCode, $decoded !== null ? $decoded : $rawResponse, 0, null];
+}
+
+/**
  * Returns PDO Database Instance
- * 
+ *
  * @return PDO
  */
 function getDbConnection() {

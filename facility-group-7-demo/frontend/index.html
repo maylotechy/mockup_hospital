@@ -1,0 +1,2513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FACILITY-GROUP-7 FHIR Demo</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css" rel="stylesheet">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            25: '#321d31', 50: '#41203b', 100: '#5b234c', 200: '#81255f',
+                            300: '#ad2b78', 400: '#dc3692', 500: '#ff4fa3', 600: '#ec2f8b',
+                            700: '#c91970', 800: '#971455', 900: '#68123d',
+                        },
+                    },
+                    fontFamily: { sans: ['Outfit', 'system-ui', 'sans-serif'] },
+                },
+            },
+        };
+    </script>
+
+    <style>
+        /* DataTables chrome restyled to match the TailAdmin look. Written by
+           hand rather than pulling the DataTables Tailwind integration build,
+           so there's no extra CDN file that could fail to load mid-demo. */
+        .dataTables_wrapper { font-size: 14px; color: #475569; }
+
+        .dataTables_wrapper .dataTables_length,
+        .dataTables_wrapper .dataTables_filter { margin-bottom: 16px; }
+
+        .dataTables_wrapper .dataTables_length select,
+        .dataTables_wrapper .dataTables_filter input {
+            border: 1px solid #e2e8f0; border-radius: 8px; padding: 7px 12px;
+            font-size: 14px; color: #334155; background: #fff; outline: none;
+        }
+        .dataTables_wrapper .dataTables_length select { padding-right: 26px; margin: 0 6px; }
+        .dataTables_wrapper .dataTables_filter input { margin-left: 8px; min-width: 240px; }
+        .dataTables_wrapper .dataTables_length select:focus,
+        .dataTables_wrapper .dataTables_filter input:focus {
+            border-color: #465fff; box-shadow: 0 0 0 3px rgba(70, 95, 255, 0.1);
+        }
+
+        table.dataTable { border-collapse: separate !important; border-spacing: 0; width: 100% !important; }
+        table.dataTable thead th {
+            background: #f9fafb; border-bottom: 1px solid #e5e7eb !important;
+            padding: 12px 20px !important; text-align: left;
+            font-size: 12px; font-weight: 600; color: #64748b; white-space: nowrap;
+        }
+        table.dataTable thead th:first-child { border-top-left-radius: 10px; }
+        table.dataTable thead th:last-child { border-top-right-radius: 10px; }
+        table.dataTable tbody td {
+            padding: 14px 20px !important; border-bottom: 1px solid #f1f5f9;
+            font-size: 14px; color: #334155; vertical-align: middle;
+        }
+        table.dataTable tbody tr:hover { background: #f9fafb; }
+        table.dataTable.no-footer { border-bottom: none !important; }
+
+        .dataTables_wrapper .dataTables_info { padding-top: 16px; font-size: 13px; color: #64748b; }
+        .dataTables_wrapper .dataTables_paginate { padding-top: 12px; }
+        .dataTables_wrapper .dataTables_paginate .paginate_button {
+            border-radius: 8px !important; border: 1px solid #e2e8f0 !important;
+            padding: 6px 12px !important; margin-left: 4px; font-size: 13px;
+            background: #fff !important; color: #475569 !important;
+        }
+        .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+            background: #f1f5f9 !important; border-color: #cbd5e1 !important; color: #334155 !important;
+        }
+        .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+            background: #465fff !important; border-color: #465fff !important; color: #fff !important;
+        }
+        .dataTables_wrapper .dataTables_paginate .paginate_button.disabled { opacity: 0.45; }
+
+        .toast-enter { animation: toastIn 0.25s ease-out; }
+        #toastContainer { pointer-events: none; }
+        #toastContainer .toast-enter {
+            pointer-events: auto;
+            background: #252a38 !important;
+            color: #f3f5fb !important;
+            box-shadow: 0 16px 38px rgba(5, 7, 14, .45);
+        }
+        #toastContainer .toast-success { border-color: #35d07f !important; }
+        #toastContainer .toast-error { border-color: #ff667a !important; }
+        #toastContainer .toast-referral { border-color: #ff4fa3 !important; }
+        #toastContainer .toast-success-title { color: #6ce7a4 !important; }
+        #toastContainer .toast-error-title { color: #ff8b99 !important; }
+        #toastContainer .toast-referral-title { color: #ff75b7 !important; }
+        #toastContainer .toast-message { color: #e1e5f0 !important; }
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateX(24px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @media (max-width: 640px) {
+            #toastContainer {
+                top: 4.75rem !important;
+                left: .75rem !important;
+                right: .75rem !important;
+                width: auto !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 antialiased">
+    <div class="flex h-screen overflow-hidden">
+
+        <!-- ===== Sidebar ===== -->
+        <aside id="sidebar" class="w-[260px] flex-shrink-0 bg-white border-r border-gray-200 flex flex-col overflow-y-auto">
+            <div class="flex items-center gap-3 px-6 h-16 border-b border-gray-200">
+                <div class="w-9 h-9 rounded-lg bg-brand-500 flex items-center justify-center text-white text-lg">
+                    <i class="bi bi-hospital"></i>
+                </div>
+                <div class="leading-tight">
+                    <div class="font-semibold text-[15px] text-gray-800">FACILITY-GROUP-7</div>
+                    <div class="text-[11px] text-gray-400">FHIR Referral Demo</div>
+                </div>
+            </div>
+
+            <nav class="flex-1 px-4 py-5">
+                <p class="px-3 mb-3 text-[11px] font-medium uppercase tracking-wider text-gray-400">Menu</p>
+
+                <a class="nav-item active" data-page="pageReferral" onclick="openReferralPage()">
+                    <i class="bi bi-send"></i><span>Send Referral</span>
+                </a>
+                <a class="nav-item" data-page="pagePatients" onclick="switchPage('pagePatients'); loadPatientsTable();">
+                    <i class="bi bi-people"></i><span>Patients</span>
+                </a>
+                <a class="nav-item" data-page="pagePractitioners" onclick="openPractitionersPage()">
+                    <i class="bi bi-person-badge"></i><span>Practitioners</span>
+                </a>
+                <a class="nav-item" data-page="pageOrg" onclick="switchPage('pageOrg'); loadOrgsTable();">
+                    <i class="bi bi-hospital"></i><span>Register Org</span>
+                </a>
+                <a class="nav-item" data-page="pageReceive" onclick="openReceivePage()">
+                    <i class="bi bi-inbox"></i><span>Receive Referral</span>
+                    <span id="receiveReferralBadge" class="hidden ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-brand-500 text-white text-[11px] font-semibold items-center justify-center">0</span>
+                </a>
+            </nav>
+
+            <div class="px-6 py-4 border-t border-gray-200">
+                <div class="flex items-center gap-2 text-[11px] text-gray-400">
+                    <span class="w-2 h-2 rounded-full bg-green-500"></span> Live on FHIRLab Sandbox
+                </div>
+            </div>
+        </aside>
+
+        <button id="sidebarOverlay" type="button" aria-label="Close navigation" onclick="closeMobileSidebar()"
+                class="hidden fixed inset-0 z-40 bg-black/60"></button>
+
+        <!-- ===== Main column ===== -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+
+            <!-- Navbar -->
+            <header class="h-16 flex-shrink-0 bg-white border-b border-gray-200 flex items-center justify-between px-6">
+                <div class="flex items-center gap-3">
+                    <button id="mobileMenuButton" type="button" onclick="toggleMobileSidebar()"
+                            class="hidden w-10 h-10 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 items-center justify-center"
+                            aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false">
+                        <i class="bi bi-list text-xl"></i>
+                    </button>
+                    <span class="mobile-header-title hidden text-sm font-semibold">FHIR Referral Demo</span>
+                </div>
+                <!-- Notification bell -->
+                <div class="relative">
+                    <button onclick="toggleNotifPanel(event)" class="relative w-10 h-10 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-50 flex items-center justify-center">
+                        <i class="bi bi-bell text-lg"></i>
+                        <span id="notifDot" class="hidden absolute top-2 right-2.5 w-2 h-2 rounded-full bg-orange-500 ring-2 ring-white"></span>
+                    </button>
+                    <div id="notifPanel" class="hidden absolute right-0 mt-2 w-80 bg-white rounded-2xl border border-gray-200 shadow-xl z-50 overflow-hidden">
+                        <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+                            <h5 class="text-sm font-semibold text-gray-800">Notifications</h5>
+                            <button onclick="clearNotifications()" class="text-xs text-gray-400 hover:text-gray-600">Clear all</button>
+                        </div>
+                        <ul id="notifList" class="max-h-80 overflow-y-auto divide-y divide-gray-100">
+                            <li class="px-4 py-6 text-center text-xs text-gray-400">No notifications yet</li>
+                        </ul>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Content -->
+            <main class="flex-1 overflow-y-auto p-6">
+
+                <!-- ===== Add / Edit Patient ===== -->
+                <div class="page hidden" id="pagePatientForm">
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="flex items-center gap-3">
+                            <button type="button" class="btn-icon" onclick="switchPage('pagePatients'); loadPatientsTable();" title="Back to Patients">
+                                <i class="bi bi-arrow-left"></i>
+                            </button>
+                            <h2 class="text-2xl font-semibold text-gray-800" id="patientModalTitle">Add Patient</h2>
+                        </div>
+                        <p class="text-sm text-gray-400">FACILITY-GROUP-7 / Patient Form</p>
+                    </div>
+
+                    <form id="patientForm" onsubmit="handleSavePatient(event)">
+                        <input type="hidden" id="patientEditId" value="">
+
+                        <div class="card">
+                            <div class="card-head">
+                                <h3 class="card-title">Patient Information</h3>
+                                <span class="text-xs text-gray-400">Address uses a live PSGC lookup from tx.fhirlab.net</span>
+                            </div>
+                            <div class="card-body">
+                                <h4 class="section-label">Personal Information</h4>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                                    <div>
+                                        <label class="lbl">First Name <span class="text-red-500">*</span></label>
+                                        <input type="text" name="given_first" class="inp" placeholder="Enter first name" required>
+                                    </div>
+                                    <div>
+                                        <label class="lbl">Middle Name</label>
+                                        <input type="text" name="given_middle" class="inp" placeholder="Enter middle name">
+                                    </div>
+                                    <div>
+                                        <label class="lbl">Last Name <span class="text-red-500">*</span></label>
+                                        <input type="text" name="family" class="inp" placeholder="Enter last name" required>
+                                    </div>
+                                    <div>
+                                        <label class="lbl">Date of Birth <span class="text-red-500">*</span></label>
+                                        <input type="date" name="dob" class="inp" required>
+                                    </div>
+                                    <div>
+                                        <label class="lbl">Gender <span class="text-red-500">*</span></label>
+                                        <select name="gender" class="inp" required>
+                                            <option value="">Select gender</option>
+                                            <option value="male">Male</option>
+                                            <option value="female">Female</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="lbl">Mobile Phone</label>
+                                        <div class="relative">
+                                            <span class="inp-icon"><i class="bi bi-telephone"></i></span>
+                                            <input type="text" name="phone" class="inp pl-11" placeholder="+639000000000">
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="lbl">PhilHealth ID</label>
+                                        <div class="relative">
+                                            <span class="inp-icon"><i class="bi bi-credit-card-2-front"></i></span>
+                                            <input type="text" name="philhealth" class="inp pl-11" placeholder="Enter PhilHealth ID">
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="lbl">PhilSys ID</label>
+                                        <div class="relative">
+                                            <span class="inp-icon"><i class="bi bi-person-vcard"></i></span>
+                                            <input type="text" name="philsys" class="inp pl-11" placeholder="Enter PhilSys ID">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <h4 class="section-label border-t border-gray-100 pt-6">Address (PSGC)</h4>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                                    <div>
+                                        <label class="lbl">Region <span class="text-red-500">*</span></label>
+                                        <select id="patientRegion" class="inp" required onchange="onPatientRegionChange()">
+                                            <option value="">Select region</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="lbl">Province <span class="text-red-500">*</span></label>
+                                        <select id="patientProvince" class="inp" required disabled onchange="onPatientProvinceChange()">
+                                            <option value="">Select region first</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="lbl">City / Municipality <span class="text-red-500">*</span></label>
+                                        <select id="patientCity" class="inp" required disabled onchange="onPatientCityChange()">
+                                            <option value="">Select province first</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="lbl">Barangay <span class="text-red-500">*</span></label>
+                                        <select id="patientBarangay" class="inp" required disabled>
+                                            <option value="">Select city first</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="lbl">Address Line</label>
+                                        <input type="text" name="address_line" class="inp" placeholder="House/street, subdivision">
+                                    </div>
+                                    <div>
+                                        <label class="lbl">Postal Code</label>
+                                        <input type="text" name="postal_code" class="inp" placeholder="9506">
+                                    </div>
+                                </div>
+
+                                <div class="flex gap-3 pt-6 mt-6 border-t border-gray-100">
+                                    <button type="submit" class="btn-primary" id="patientSubmitBtn">Create Patient</button>
+                                    <button type="button" class="btn-outline" onclick="switchPage('pagePatients'); loadPatientsTable();">Cancel</button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- ===== Patients ===== -->
+                <div class="page hidden" id="pagePatients">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-2xl font-semibold text-gray-800">Patients</h2>
+                        <p class="text-sm text-gray-400">FACILITY-GROUP-7 / Patients</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-head">
+                            <h3 class="card-title">Our patient records</h3>
+                            <div class="flex gap-2">
+                                <button class="btn-outline-sm" onclick="loadPatientsTable()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+                                <button class="btn-primary-sm" onclick="openAddPatientModal()"><i class="bi bi-person-plus"></i> Add Patient</button>
+                            </div>
+                        </div>
+                        <div class="card-body overflow-x-auto">
+                            <table id="patientsDataTable" class="w-full">
+                                <thead>
+                                    <tr><th>Name</th><th>DOB</th><th>Gender</th><th>Phone</th><th>Source</th><th>ID</th><th>Actions</th></tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== Practitioners ===== -->
+                <div class="page hidden" id="pagePractitioners">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-2xl font-semibold text-gray-800">Practitioners</h2>
+                        <p class="text-sm text-gray-400">FACILITY-GROUP-7 / Practitioners</p>
+                    </div>
+
+                    <div class="card mb-6">
+                        <div class="card-head"><h3 class="card-title">Add practitioner to our organization</h3></div>
+                        <form id="practitionerForm" class="card-body" onsubmit="handleAddPractitioner(event)">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                                <div>
+                                    <label class="lbl">Title</label>
+                                    <select name="prefix" class="inp">
+                                        <option value="">None</option><option value="Dr.">Dr.</option><option value="Mr.">Mr.</option><option value="Ms.">Ms.</option>
+                                    </select>
+                                </div>
+                                <div><label class="lbl">First Name <span class="text-red-500">*</span></label><input name="given" class="inp" required></div>
+                                <div><label class="lbl">Last Name <span class="text-red-500">*</span></label><input name="family" class="inp" required></div>
+                                <div>
+                                    <label class="lbl">Role <span class="text-red-500">*</span></label>
+                                    <select name="role" class="inp" required>
+                                        <option value="">Select role</option><option value="doctor">Doctor</option><option value="nurse">Nurse</option>
+                                        <option value="midwife">Midwife</option><option value="pharmacist">Pharmacist</option>
+                                        <option value="medtech">Medical Technologist</option><option value="dentist">Dentist</option>
+                                        <option value="bhw">Barangay Health Worker</option><option value="pcw">Primary Care Worker</option>
+                                    </select>
+                                </div>
+                                <div><label class="lbl">License Number</label><input name="license_number" class="inp" placeholder="Optional"></div>
+                            </div>
+                            <div class="flex flex-wrap gap-3 pt-6 mt-6 border-t border-gray-100">
+                                <button id="addPractitionerBtn" type="submit" class="btn-primary"><i class="bi bi-person-plus"></i> Add Practitioner</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-head">
+                            <h3 class="card-title">Organization practitioners</h3>
+                            <button class="btn-outline-sm" onclick="loadPractitionersTable()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+                        </div>
+                        <div class="card-body overflow-x-auto">
+                            <table id="practitionersDataTable" class="w-full">
+                                <thead><tr><th>Name</th><th>Role</th><th>License No.</th><th>Practitioner ID</th><th>Role ID</th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== Register Organization ===== -->
+                <div class="page hidden" id="pageOrg">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-2xl font-semibold text-gray-800">Register Organization</h2>
+                        <p class="text-sm text-gray-400">FACILITY-GROUP-7 / Organizations</p>
+                    </div>
+
+                    <div class="card mb-6">
+                        <div class="card-head">
+                            <h3 class="card-title">Our facility</h3>
+                            <button class="btn-primary-sm" onclick="handleRegisterOrg()">
+                                <i class="bi bi-hospital"></i> Register FACILITY-GROUP-7 Hospital
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3">
+                                <p id="orgStatus" class="text-sm text-gray-600">Not registered in this session yet.</p>
+                            </div>
+                            <p class="mt-3 text-xs text-gray-400">
+                                Registering (re)uses the same organization record on every click -- safe to press again if you lose the id.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-head">
+                            <h3 class="card-title">All organizations on the FHIR server</h3>
+                            <button class="btn-outline-sm" onclick="loadOrgsTable()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+                        </div>
+                        <div class="card-body overflow-x-auto">
+                            <table id="orgsDataTable" class="w-full">
+                                <thead>
+                                    <tr><th>Name</th><th>ID</th><th>Identifiers</th><th>Actions</th></tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== Send Referral ===== -->
+                <div class="page" id="pageReferral">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-2xl font-semibold text-gray-800">Send Referral</h2>
+                        <p class="text-sm text-gray-400">FACILITY-GROUP-7 / Send Referral</p>
+                    </div>
+
+                    <form id="referralForm" onsubmit="handleSendReferral(event)" novalidate>
+                        <input type="hidden" name="source_service_request_id" id="sourceServiceRequestId">
+                        <div class="card mb-6">
+                            <div class="card-head">
+                                <h3 class="card-title">New Referral</h3>
+                                <span class="text-xs text-gray-400">
+                                    Sends as <strong id="referralSendingOrgHint" class="text-gray-600">not registered yet</strong>
+                                </span>
+                            </div>
+                            <div id="onwardReferralBanner" class="hidden mx-6 mt-5 rounded-xl border border-brand-200 bg-brand-25 px-4 py-3">
+                                <div class="flex items-start gap-3">
+                                    <i class="bi bi-arrow-right-circle-fill mt-0.5 text-brand-500"></i>
+                                    <div>
+                                        <p class="text-sm font-semibold text-gray-800">Refer Patient Onward</p>
+                                        <p id="onwardReferralText" class="mt-0.5 text-xs text-gray-500"></p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <h4 class="section-label">Referral Details</h4>
+                                <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-5">
+                                    <div class="lg:col-span-2">
+                                        <label class="lbl">Patient <span class="text-red-500">*</span></label>
+                                        <div class="relative mb-2">
+                                            <span class="inp-icon"><i class="bi bi-search"></i></span>
+                                            <input type="text" id="patientSearchInput" class="inp pl-11" placeholder="Search by name, ID, DOB..." oninput="filterPatientSelect()">
+                                        </div>
+                                        <div class="flex gap-2">
+                                            <select id="referralPatientSelect" class="inp flex-1" onchange="onReferralPatientChange()">
+                                                <option value="">Loading patients...</option>
+                                            </select>
+                                            <button type="button" class="btn-icon" onclick="loadPatientsForSelect()" title="Refresh patient list">
+                                                <i class="bi bi-arrow-clockwise"></i>
+                                            </button>
+                                        </div>
+                                        <input type="hidden" name="patient_id" id="referralPatientId">
+                                        <!-- "required" on a hidden input is silently ignored by every browser's
+                                             native constraint validation (hidden inputs are spec'd as "barred
+                                             from constraint validation") -- the visible #referralPatientSelect
+                                             is what actually gets validated in handleSendReferral(). -->
+                                        <p id="referralPatientError" class="hidden text-xs text-red-500 mt-1"></p>
+                                        <div id="selectedPatientPanel" class="hidden mt-3 rounded-xl bg-brand-25 border border-brand-100 px-4 py-3 text-sm text-gray-700"></div>
+                                    </div>
+
+                                    <div>
+                                        <label class="lbl">Practitioner Name <span class="text-red-500">*</span></label>
+                                        <select name="practitioner_name" id="referralPractitionerSelect" class="inp" required onchange="onReferralPractitionerChange()">
+                                            <option value="">Loading organization practitioners...</option>
+                                        </select>
+                                        <input type="hidden" name="practitioner_role_id" id="referralPractitionerRoleId">
+                                    </div>
+                                    <div>
+                                        <label class="lbl">Practitioner Role</label>
+                                        <input type="text" id="referralPractitionerRoleDisplay" class="inp" placeholder="Select a practitioner first" disabled>
+                                        <input type="hidden" name="practitioner_role" id="referralPractitionerRole">
+                                    </div>
+
+                                    <div class="lg:col-span-2">
+                                        <label class="lbl">Receiving Organization <span class="text-red-500">*</span></label>
+                                        <div class="flex gap-2">
+                                            <select name="receiving_org_id" id="receivingOrgSelect" class="inp flex-1" required onchange="if(this.value) clearFieldInvalid(this)">
+                                                <option value="">Loading organizations...</option>
+                                            </select>
+                                            <button type="button" class="btn-icon" onclick="loadReceivingOrgs()" title="Refresh list">
+                                                <i class="bi bi-arrow-clockwise"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label class="lbl">Category <span class="text-red-500">*</span></label>
+                                        <select name="category" class="inp" required>
+                                            <option value="emergency">Emergency</option>
+                                            <option value="outpatient">Outpatient</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="lbl">Service Type <span class="text-red-500">*</span></label>
+                                        <select name="service_type" class="inp" required>
+                                            <option value="consultation">Consultation</option>
+                                            <option value="diagnostics">Diagnostics</option>
+                                            <option value="procedure">Procedure</option>
+                                            <option value="others">Others</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <h4 class="section-label border-t border-gray-100 pt-6">Clinical Information</h4>
+                                <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-5">
+                                    <div>
+                                        <label class="lbl-sm">BP Systolic</label>
+                                        <input type="number" name="vital_bp_systolic" class="inp-sm" placeholder="120">
+                                    </div>
+                                    <div>
+                                        <label class="lbl-sm">BP Diastolic</label>
+                                        <input type="number" name="vital_bp_diastolic" class="inp-sm" placeholder="80">
+                                    </div>
+                                    <div>
+                                        <label class="lbl-sm">Heart Rate</label>
+                                        <input type="number" name="vital_hr" class="inp-sm" placeholder="bpm">
+                                    </div>
+                                    <div>
+                                        <label class="lbl-sm">Resp. Rate</label>
+                                        <input type="number" name="vital_rr" class="inp-sm" placeholder="br/min">
+                                    </div>
+                                    <div>
+                                        <label class="lbl-sm">Temp (&deg;C)</label>
+                                        <input type="number" step="0.1" name="vital_temp_c" class="inp-sm" placeholder="36.5">
+                                    </div>
+                                    <div>
+                                        <label class="lbl-sm">O2 Sat (%)</label>
+                                        <input type="number" name="vital_o2sat" class="inp-sm" placeholder="98">
+                                    </div>
+                                    <div>
+                                        <label class="lbl-sm">Weight (kg)</label>
+                                        <input type="number" step="0.1" name="vital_weight_kg" class="inp-sm" placeholder="65">
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                                    <div>
+                                        <label class="lbl">Chief Complaint <span class="text-red-500">*</span></label>
+                                        <textarea name="chief_complaint" rows="2" class="inp" placeholder="Reason the patient presented" required></textarea>
+                                    </div>
+                                    <div>
+                                        <label class="lbl">Working Impression <span class="text-red-500">*</span></label>
+                                        <textarea name="working_impression" rows="2" class="inp" placeholder="Provisional diagnosis" required></textarea>
+                                    </div>
+                                    <div>
+                                        <label class="lbl">Reason for Referral <span class="text-red-500">*</span></label>
+                                        <textarea name="reason_text" rows="2" class="inp" placeholder="Why the patient is being referred" required></textarea>
+                                    </div>
+                                </div>
+
+                                <div class="flex flex-wrap gap-3 pt-6 mt-6 border-t border-gray-100">
+                                    <button type="submit" class="btn-primary" id="sendReferralBtn"><i class="bi bi-send"></i> Send Referral</button>
+                                    <button type="button" class="btn-outline" onclick="handlePreviewBundle(event)">Preview Bundle</button>
+                                    <button type="button" class="btn-outline" onclick="switchPage('pageOrg'); loadOrgsTable();">Cancel</button>
+                                </div>
+
+                                <div id="bundlePreview" class="hidden mt-5">
+                                    <p class="lbl">Bundle Preview</p>
+                                    <pre id="bundleJson" class="max-h-72 overflow-auto rounded-xl bg-gray-900 p-4 text-[11px] leading-relaxed text-green-300"></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+
+                    <div class="card">
+                        <div class="card-head">
+                            <h3 class="card-title">My sent referrals</h3>
+                            <button class="btn-outline-sm" onclick="loadMyReferralsTable()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+                        </div>
+                        <div class="card-body overflow-x-auto">
+                            <table id="myReferralsDataTable" class="w-full">
+                                <thead>
+                                    <tr><th>Patient</th><th>Category</th><th>Status</th><th>Task Status</th><th>Sent</th><th>Track</th></tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== Receive Referrals ===== -->
+                <div class="page hidden" id="pageReceive">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-2xl font-semibold text-gray-800">Receive Referrals</h2>
+                        <p class="text-sm text-gray-400">FACILITY-GROUP-7 / Receive</p>
+                    </div>
+
+                    <div class="card mb-6">
+                        <div class="card-head"><h3 class="card-title">Poll incoming referrals</h3></div>
+                        <div class="card-body">
+                            <div class="flex flex-wrap items-end gap-3">
+                                <div class="flex-1 min-w-[240px]">
+                                    <label class="lbl">Your Organization ID</label>
+                                    <div class="relative">
+                                        <span class="inp-icon"><i class="bi bi-hospital"></i></span>
+                                        <input type="text" id="receiveOrgId" class="inp pl-11" placeholder="From registration">
+                                    </div>
+                                </div>
+                                <button class="btn-primary" onclick="handleReceiveReferrals(this)">
+                                    <i class="bi bi-arrow-repeat"></i> Poll Referrals
+                                </button>
+                            </div>
+                            <p class="mt-3 text-xs text-gray-400">
+                                Each referral advances one FHIR step per click: requested &rarr; received &rarr; accepted &rarr; encounter &rarr; completed.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-head">
+                            <h3 class="card-title">Incoming referrals</h3>
+                            <span id="receiveCount" class="text-xs text-gray-400"></span>
+                        </div>
+                        <div class="card-body overflow-x-auto">
+                            <table id="receiveDataTable" class="w-full">
+                                <thead>
+                                    <tr><th>Patient</th><th>Category</th><th>Status</th><th>Date</th><th>Details</th><th>Next Step</th></tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- ===== Toasts (green / red boxes) ===== -->
+    <div id="toastContainer" class="fixed top-20 right-6 z-[9999] w-80 space-y-3"></div>
+
+    <!-- ===== Referral Timeline popup ===== -->
+    <div id="timelineModal" class="hidden fixed inset-0 z-[9998] bg-black/50 items-center justify-center p-5">
+        <div class="w-full max-w-lg max-h-[82vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
+                <h2 class="text-lg font-semibold text-gray-800">Referral Timeline</h2>
+                <button onclick="closeModal('timelineModal')" class="w-8 h-8 rounded-lg text-gray-400 hover:bg-gray-100 flex items-center justify-center">
+                    <i class="bi bi-x-lg text-sm"></i>
+                </button>
+            </div>
+            <p id="timelineSubtitle" class="mb-5 text-xs text-gray-400"></p>
+            <ul id="timelineList" class="space-y-0"></ul>
+        </div>
+    </div>
+
+    <!-- ===== Full Referral Details popup (review before accepting) ===== -->
+    <div id="referralDetailsModal" class="hidden fixed inset-0 z-[9998] bg-black/50 items-center justify-center p-5">
+        <div class="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
+                <h2 class="text-lg font-semibold text-gray-800">Referral Details</h2>
+                <button onclick="closeModal('referralDetailsModal')" class="w-8 h-8 rounded-lg text-gray-400 hover:bg-gray-100 flex items-center justify-center">
+                    <i class="bi bi-x-lg text-sm"></i>
+                </button>
+            </div>
+            <div id="referralDetailsBody" class="space-y-5"></div>
+        </div>
+    </div>
+
+    <style type="text/tailwindcss">
+        @layer components {
+            .nav-item {
+                @apply flex items-center gap-3 px-3 py-2.5 mb-1 rounded-lg text-sm font-medium text-gray-600 cursor-pointer transition hover:bg-gray-50;
+            }
+            .nav-item i { @apply text-base w-5 text-center; }
+            .nav-item.active { @apply bg-brand-50 text-brand-600 font-semibold; }
+
+            .card { @apply rounded-2xl border border-gray-200 bg-white; }
+            .card-head { @apply flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-6 py-4; }
+            .card-title { @apply text-base font-semibold text-gray-800; }
+            .card-body { @apply p-6; }
+            .section-label { @apply mb-4 text-sm font-semibold text-gray-700; }
+
+            .lbl { @apply mb-1.5 block text-sm font-medium text-gray-700; }
+            .lbl-sm { @apply mb-1 block text-xs font-medium text-gray-500; }
+
+            .inp {
+                @apply w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800
+                       placeholder:text-gray-400 outline-none transition
+                       focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10
+                       disabled:bg-gray-50 disabled:text-gray-400;
+            }
+            .inp-sm {
+                @apply w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800
+                       placeholder:text-gray-400 outline-none transition
+                       focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10;
+            }
+            .inp-icon { @apply absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none; }
+
+            .btn-primary {
+                @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-5 py-2.5
+                       text-sm font-medium text-white transition hover:bg-brand-600
+                       disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-brand-500;
+            }
+            .btn-primary-sm {
+                @apply inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2
+                       text-sm font-medium text-white transition hover:bg-brand-600;
+            }
+            .btn-outline {
+                @apply inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-5 py-2.5
+                       text-sm font-medium text-gray-700 transition hover:bg-gray-50;
+            }
+            .btn-outline-sm {
+                @apply inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5
+                       text-xs font-medium text-gray-600 transition hover:bg-gray-50;
+            }
+            .btn-icon {
+                @apply inline-flex h-[42px] w-[42px] flex-shrink-0 items-center justify-center rounded-lg
+                       border border-gray-300 bg-white text-gray-500 transition hover:bg-gray-50;
+            }
+            .icon-btn {
+                @apply inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200
+                       bg-white text-gray-500 cursor-pointer transition hover:border-brand-500 hover:bg-brand-50 hover:text-brand-600;
+            }
+
+            .tile {
+                @apply flex flex-col items-center justify-center gap-3 rounded-2xl border border-gray-200 bg-white
+                       px-4 py-7 text-sm font-medium text-gray-700 transition
+                       hover:border-brand-500 hover:bg-brand-25 hover:text-brand-600;
+            }
+            .tile i { @apply text-2xl; }
+
+            .chip { @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium; }
+            .chip-green { @apply bg-green-50 text-green-700; }
+            .chip-amber { @apply bg-amber-50 text-amber-700; }
+        }
+    </style>
+
+    <!-- Postman-inspired dark palette for this standalone demo only. -->
+    <style>
+        :root {
+            color-scheme: dark;
+            --fg7-bg: #202331;
+            --fg7-sidebar: #292c3c;
+            --fg7-panel: #282b3a;
+            --fg7-panel-soft: #303445;
+            --fg7-input: #242735;
+            --fg7-border: #414659;
+            --fg7-border-soft: #35394a;
+            --fg7-text: #f3f5fb;
+            --fg7-muted: #a8afc5;
+            --fg7-faint: #777f99;
+            --fg7-pink: #ff4fa3;
+            --fg7-pink-hover: #ec2f8b;
+            --fg7-cyan: #00b8d9;
+            --fg7-green: #35d07f;
+            --fg7-amber: #e0bd4f;
+        }
+
+        html, body { background: var(--fg7-bg) !important; color: var(--fg7-text) !important; }
+        body { background-image: radial-gradient(circle at 78% 0%, rgba(0,184,217,.055), transparent 28%); }
+
+        #sidebar { background: var(--fg7-sidebar) !important; border-color: var(--fg7-border) !important; }
+        header { background: #262938 !important; border-color: var(--fg7-border) !important; }
+        main { background: var(--fg7-bg); }
+
+        .card,
+        #notifPanel,
+        #timelineModal > div,
+        #referralDetailsModal > div {
+            background: var(--fg7-panel) !important;
+            border-color: var(--fg7-border) !important;
+            box-shadow: 0 16px 40px rgba(8, 10, 18, .25);
+        }
+        #notifList { background: var(--fg7-panel) !important; }
+        #notifList > li {
+            background: var(--fg7-panel) !important;
+            border-color: var(--fg7-border-soft) !important;
+        }
+        #notifList > li:hover { background: var(--fg7-panel-soft) !important; }
+        .card-head,
+        .border-gray-200,
+        .border-gray-100 { border-color: var(--fg7-border-soft) !important; }
+
+        .text-gray-800, .text-gray-700, .text-gray-600 { color: var(--fg7-text) !important; }
+        .text-gray-500, .text-gray-400 { color: var(--fg7-muted) !important; }
+        .text-gray-300 { color: var(--fg7-faint) !important; }
+        .card-title, .section-label, .lbl { color: var(--fg7-text) !important; }
+        .lbl-sm, .inp-icon { color: var(--fg7-muted) !important; }
+
+        .bg-white { background-color: var(--fg7-panel) !important; }
+        .bg-gray-50, .bg-gray-100 { background-color: var(--fg7-panel-soft) !important; }
+        .bg-gray-200 { background-color: #454a5d !important; }
+
+        .nav-item { color: var(--fg7-muted) !important; }
+        .nav-item:hover { background: #343849 !important; color: var(--fg7-text) !important; }
+        .nav-item.active {
+            background: rgba(0, 184, 217, .16) !important;
+            color: #ffffff !important;
+            box-shadow: none !important;
+        }
+        .nav-item.active i { color: var(--fg7-cyan) !important; }
+        #receiveReferralBadge {
+            background: var(--fg7-pink) !important;
+            color: #fff !important;
+            box-shadow: 0 0 0 3px rgba(255, 79, 163, .14);
+        }
+
+        .inp, .inp-sm,
+        .dataTables_wrapper .dataTables_length select,
+        .dataTables_wrapper .dataTables_filter input {
+            background: var(--fg7-input) !important;
+            border-color: var(--fg7-border) !important;
+            color: var(--fg7-text) !important;
+        }
+        .inp::placeholder, .inp-sm::placeholder,
+        .dataTables_wrapper input::placeholder { color: var(--fg7-faint) !important; }
+        .inp:focus, .inp-sm:focus,
+        .dataTables_wrapper .dataTables_length select:focus,
+        .dataTables_wrapper .dataTables_filter input:focus {
+            border-color: var(--fg7-cyan) !important;
+            box-shadow: 0 0 0 3px rgba(0, 184, 217, .16) !important;
+        }
+        .inp.border-red-500, .inp-sm.border-red-500 {
+            border-color: #ff667a !important;
+            box-shadow: 0 0 0 3px rgba(255, 102, 122, .15) !important;
+        }
+        .inp:disabled { background: #303343 !important; color: #70778d !important; }
+        select option { background: var(--fg7-input); color: var(--fg7-text); }
+
+        .btn-primary, .btn-primary-sm {
+            background: var(--fg7-pink) !important;
+            color: #fff !important;
+            box-shadow: 0 7px 18px rgba(255, 79, 163, .16);
+        }
+        .btn-primary:hover, .btn-primary-sm:hover { background: var(--fg7-pink-hover) !important; }
+        .btn-outline, .btn-outline-sm, .btn-icon, .icon-btn {
+            background: var(--fg7-panel-soft) !important;
+            border-color: var(--fg7-border) !important;
+            color: var(--fg7-text) !important;
+        }
+        .btn-outline:hover, .btn-outline-sm:hover, .btn-icon:hover, .icon-btn:hover {
+            border-color: var(--fg7-cyan) !important;
+            background: #353a4c !important;
+            color: var(--fg7-cyan) !important;
+        }
+
+        .dataTables_wrapper { color: var(--fg7-muted) !important; }
+        table.dataTable thead th {
+            background: #303445 !important;
+            border-color: var(--fg7-border) !important;
+            color: #bdc4d8 !important;
+        }
+        table.dataTable tbody td {
+            background: var(--fg7-panel) !important;
+            border-color: var(--fg7-border-soft) !important;
+            color: #e1e5f0 !important;
+        }
+        table.dataTable tbody tr:hover td { background: #303445 !important; }
+        .dataTables_wrapper .dataTables_info { color: var(--fg7-muted) !important; }
+        .dataTables_wrapper .dataTables_paginate .paginate_button {
+            background: var(--fg7-panel-soft) !important;
+            border-color: var(--fg7-border) !important;
+            color: var(--fg7-muted) !important;
+        }
+        .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+            background: #393d50 !important;
+            border-color: var(--fg7-cyan) !important;
+            color: var(--fg7-cyan) !important;
+        }
+        .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+            background: var(--fg7-pink) !important;
+            border-color: var(--fg7-pink) !important;
+            color: #fff !important;
+        }
+
+        .bg-brand-25, .bg-brand-50 { background-color: #3b263b !important; }
+        .border-brand-100, .border-brand-200 { border-color: #74305c !important; }
+        .text-brand-400, .text-brand-500, .text-brand-600, .text-brand-700, .text-brand-800 { color: #ff75b7 !important; }
+        .chip-green, .bg-green-50 { background: rgba(53,208,127,.13) !important; }
+        .chip-green, .text-green-700 { color: #6ce7a4 !important; }
+        .chip-amber, .bg-amber-50 { background: rgba(224,189,79,.13) !important; }
+        .chip-amber, .text-amber-700 { color: #efd272 !important; }
+        .bg-red-50 { background: rgba(244,85,104,.13) !important; }
+        .text-red-500, .text-red-600, .text-red-700 { color: #ff7586 !important; }
+
+        #timelineModal, #referralDetailsModal { backdrop-filter: blur(3px); }
+        .swal2-popup { background: var(--fg7-panel) !important; color: var(--fg7-text) !important; }
+        .swal2-title, .swal2-html-container { color: var(--fg7-text) !important; }
+
+        * { scrollbar-color: #555b70 var(--fg7-bg); }
+        *::-webkit-scrollbar { width: 10px; height: 10px; }
+        *::-webkit-scrollbar-track { background: var(--fg7-bg); }
+        *::-webkit-scrollbar-thumb { background: #555b70; border-radius: 999px; border: 2px solid var(--fg7-bg); }
+
+        /* Responsive layout */
+        @media (max-width: 767px) {
+            #sidebar {
+                position: fixed;
+                inset: 0 auto 0 0;
+                z-index: 50;
+                width: min(82vw, 280px) !important;
+                transform: translateX(-100%);
+                transition: transform .22s ease;
+                box-shadow: 18px 0 45px rgba(5, 7, 14, .35);
+            }
+            #sidebar.mobile-open { transform: translateX(0); }
+            #sidebarOverlay.mobile-open { display: block !important; }
+            #mobileMenuButton, .mobile-header-title { display: flex !important; }
+
+            header { padding-left: 1rem !important; padding-right: 1rem !important; }
+            main { padding: 1rem !important; }
+
+            .card { border-radius: 1rem !important; }
+            .card-head { padding: 1rem !important; }
+            .card-body { padding: 1rem !important; }
+
+            .page > .flex.items-center.justify-between.mb-6 {
+                align-items: flex-start;
+                gap: .75rem;
+                margin-bottom: 1rem;
+            }
+            .page > .flex.items-center.justify-between.mb-6 > p { display: none; }
+            .page h2 { font-size: 1.25rem !important; line-height: 1.75rem !important; }
+
+            .btn-primary, .btn-outline { padding-left: 1rem !important; padding-right: 1rem !important; }
+            form .card-body > .flex:last-child,
+            .card-body > .flex.flex-wrap:last-child { gap: .65rem !important; }
+
+            .dataTables_wrapper .dataTables_length,
+            .dataTables_wrapper .dataTables_filter {
+                float: none !important;
+                width: 100%;
+                text-align: left !important;
+            }
+            .dataTables_wrapper .dataTables_filter input {
+                width: 100%;
+                min-width: 0;
+                margin: .4rem 0 0 !important;
+            }
+            .dataTables_wrapper .dataTables_info,
+            .dataTables_wrapper .dataTables_paginate {
+                float: none !important;
+                width: 100%;
+                text-align: center !important;
+            }
+            table.dataTable { min-width: 680px; }
+            table.dataTable thead th,
+            table.dataTable tbody td { padding: .75rem !important; }
+
+            #notifPanel {
+                position: fixed !important;
+                top: 4.25rem;
+                left: 1rem;
+                right: 1rem;
+                width: auto !important;
+                margin-top: 0 !important;
+            }
+            #timelineModal, #referralDetailsModal { padding: .75rem !important; }
+            #timelineModal > div, #referralDetailsModal > div {
+                max-height: calc(100dvh - 1.5rem) !important;
+                padding: 1rem !important;
+                border-radius: 1rem !important;
+            }
+        }
+
+        @media (max-width: 420px) {
+            main { padding: .75rem !important; }
+            .mobile-header-title { font-size: .8rem !important; }
+            .grid.grid-cols-2 { grid-template-columns: minmax(0, 1fr) !important; }
+            .btn-primary, .btn-outline { width: 100%; }
+        }
+    </style>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        const API_BASE = '../backend';
+
+        let currentOrgId = sessionStorage.getItem('fg7_org_id') || null;
+        let currentOrgName = sessionStorage.getItem('fg7_org_name') || null;
+        let patients = [];
+        let organizationPractitioners = [];
+
+        function toggleMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            const button = document.getElementById('mobileMenuButton');
+            const isOpen = sidebar.classList.toggle('mobile-open');
+            overlay.classList.toggle('mobile-open', isOpen);
+            button.setAttribute('aria-expanded', String(isOpen));
+        }
+
+        function closeMobileSidebar() {
+            document.getElementById('sidebar').classList.remove('mobile-open');
+            document.getElementById('sidebarOverlay').classList.remove('mobile-open');
+            document.getElementById('mobileMenuButton').setAttribute('aria-expanded', 'false');
+        }
+
+        window.addEventListener('resize', () => {
+            if (window.innerWidth >= 768) closeMobileSidebar();
+        });
+        let notifications = [];
+        let unreadReferralCount = 0;
+
+        function updateReceiveReferralBadge(increment = 0) {
+            unreadReferralCount = Math.max(0, unreadReferralCount + increment);
+            const badge = document.getElementById('receiveReferralBadge');
+            badge.textContent = unreadReferralCount > 99 ? '99+' : String(unreadReferralCount);
+            badge.classList.toggle('hidden', unreadReferralCount === 0);
+            badge.classList.toggle('flex', unreadReferralCount > 0);
+        }
+
+        function clearReceiveReferralBadge() {
+            unreadReferralCount = 0;
+            updateReceiveReferralBadge();
+        }
+
+        function setCurrentOrgId(orgId, orgName) {
+            currentOrgId = orgId;
+            currentOrgName = orgName || currentOrgName;
+            sessionStorage.setItem('fg7_org_id', orgId);
+            if (currentOrgName) sessionStorage.setItem('fg7_org_name', currentOrgName);
+            document.getElementById('receiveOrgId').value = orgId;
+            document.getElementById('orgStatus').innerHTML =
+                `<span class="font-medium text-green-600"><i class="bi bi-check-circle-fill"></i> Registered</span>
+                 &nbsp;&middot;&nbsp; Organization/<strong>${orgId}</strong>`;
+            document.getElementById('referralSendingOrgHint').textContent = `Organization/${orgId}`;
+            startReferralPolling(orgId);
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (currentOrgId) {
+                document.getElementById('receiveOrgId').value = currentOrgId;
+                document.getElementById('orgStatus').innerHTML =
+                    `<span class="font-medium text-green-600"><i class="bi bi-check-circle-fill"></i> Using existing</span>
+                     &nbsp;&middot;&nbsp; Organization/<strong>${currentOrgId}</strong>`;
+                document.getElementById('referralSendingOrgHint').textContent = `Organization/${currentOrgId}`;
+                startReferralPolling(currentOrgId);
+            }
+            openReferralPage(); // Send Referral is the landing page
+        });
+
+        // ---- Alarm sound (generated via Web Audio, not a hosted file -- so
+        // there's no CDN/audio-asset dependency that could fail to load) ----
+        let audioCtx = null;
+
+        // Browsers block audio until a user gesture occurs on the page; this
+        // creates/resumes the context on the very first click so the alarm is
+        // ready by the time a referral actually arrives.
+        document.addEventListener('click', function primeAudio() {
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                else if (audioCtx.state === 'suspended') audioCtx.resume();
+            } catch (e) { /* Web Audio unavailable -- notifications still show visually */ }
+        }, { once: true });
+
+        const ALARM_DURATION_SECONDS = 10;
+        const ALARM_REPEAT_INTERVAL = 0.55; // one two-tone chime every 0.55s for the full duration
+
+        function playAlarmSound() {
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const start = audioCtx.currentTime;
+
+                // Schedule every repeat up front against the audio clock rather
+                // than looping with setInterval -- stays accurate even if the
+                // tab is throttled in the background.
+                for (let t = 0; t < ALARM_DURATION_SECONDS; t += ALARM_REPEAT_INTERVAL) {
+                    [0, 0.22].forEach((offset, i) => {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.value = i === 0 ? 880 : 1046.5; // two-tone chime (A5 -> C6)
+                        const at = start + t + offset;
+                        gain.gain.setValueAtTime(0.0001, at);
+                        gain.gain.exponentialRampToValueAtTime(0.3, at + 0.02);
+                        gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.18);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(at);
+                        osc.stop(at + 0.2);
+                    });
+                }
+            } catch (e) { /* silent fallback -- toast + bell badge still notify visually */ }
+        }
+
+        // ---- Poll the FHIR server for referrals sent to us; alert on new arrivals ----
+        let referralPollTimer = null;
+        let referralPollInFlight = false;
+        const REFERRAL_POLL_INTERVAL_MS = 10000;
+
+        // null return means "never polled before in this browser session" --
+        // used to suppress alarms on the very first check (existing referrals
+        // aren't "new" just because we started watching).
+        function getSeenReferralIds(orgId) {
+            try {
+                const raw = sessionStorage.getItem(`fg7_seen_referrals_${orgId}`);
+                return raw ? new Set(JSON.parse(raw)) : null;
+            } catch (e) { return null; }
+        }
+
+        function saveSeenReferralIds(orgId, idSet) {
+            sessionStorage.setItem(`fg7_seen_referrals_${orgId}`, JSON.stringify([...idSet]));
+        }
+
+        async function checkForNewReferrals(orgId) {
+            if (referralPollInFlight) return;
+            referralPollInFlight = true;
+            try {
+                const res = await fetch(`${API_BASE}/fhir_receive_referrals.php?org_id=${encodeURIComponent(orgId)}`);
+                const body = await res.json();
+                if (!body.success) return;
+
+                const referrals = body.referrals || [];
+                let seen = getSeenReferralIds(orgId);
+                const isBaseline = seen === null;
+                if (isBaseline) seen = new Set();
+
+                const newOnes = referrals.filter(r => !seen.has(String(r.service_request_id)));
+                referrals.forEach(r => seen.add(String(r.service_request_id)));
+                saveSeenReferralIds(orgId, seen);
+
+                if (isBaseline || !newOnes.length) return;
+
+                newOnes.forEach(r => {
+                    notify('referral', `New referral for ${r.patient_name} (${r.category}, ${r.priority})`, orgId);
+                });
+                playAlarmSound();
+
+                // Refresh the live table if the user is already looking at it
+                const isReceivePageOpen = document.getElementById('receiveOrgId').value.trim() === String(orgId)
+                    && !document.getElementById('pageReceive').classList.contains('hidden');
+                if (isReceivePageOpen) {
+                    handleReceiveReferrals();
+                } else {
+                    updateReceiveReferralBadge(newOnes.length);
+                }
+            } catch (err) {
+                // A failed background poll shouldn't interrupt the user with an
+                // error toast every 10 seconds -- stay silent and retry next tick.
+            } finally {
+                referralPollInFlight = false;
+            }
+        }
+
+        function startReferralPolling(orgId) {
+            if (referralPollTimer) clearInterval(referralPollTimer);
+            checkForNewReferrals(orgId);
+            referralPollTimer = setInterval(() => checkForNewReferrals(orgId), REFERRAL_POLL_INTERVAL_MS);
+        }
+
+        // ---- Navigation ----
+        function switchPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+            document.getElementById(pageId).classList.remove('hidden');
+            document.querySelectorAll('.nav-item').forEach(l => l.classList.toggle('active', l.dataset.page === pageId));
+            closeMobileSidebar();
+        }
+
+        function openReferralPage() {
+            clearOnwardReferralMode();
+            switchPage('pageReferral');
+            clearReferralFieldErrors();
+            loadReceivingOrgs();
+            loadPatientsForSelect();
+            loadPractitionersForSelect();
+            if (currentOrgId) loadMyReferralsTable();
+        }
+
+        function clearReferralFieldErrors() {
+            getReferralRequiredFields().forEach(el => clearFieldInvalid(el));
+        }
+
+        function openModal(modalId) {
+            const m = document.getElementById(modalId);
+            m.classList.remove('hidden');
+            m.classList.add('flex');
+        }
+        function closeModal(modalId) {
+            const m = document.getElementById(modalId);
+            m.classList.add('hidden');
+            m.classList.remove('flex');
+        }
+
+        // ---- Toast + navbar notifications (green / red / brand boxes) ----
+        const NOTIFY_STYLES = {
+            success:  { title: 'Success',      wrap: 'toast-success',  icon: 'bi-check-circle-fill text-green-500',          head: 'toast-success-title',  body: 'toast-message', btn: 'text-green-400 hover:text-green-600', dot: 'bg-green-500' },
+            error:    { title: 'Error',        wrap: 'toast-error',    icon: 'bi-exclamation-octagon-fill text-red-500',     head: 'toast-error-title',    body: 'toast-message', btn: 'text-red-400 hover:text-red-600',     dot: 'bg-red-500' },
+            referral: { title: 'New Referral', wrap: 'toast-referral', icon: 'bi-inbox-fill text-brand-500',                 head: 'toast-referral-title', body: 'toast-message', btn: 'text-brand-400 hover:text-brand-600', dot: 'bg-brand-500' },
+        };
+
+        // orgId is set only for 'referral' notifications -- clicking one jumps
+        // straight to Receive Referral and polls that org, so a new referral is
+        // one click away instead of a manual page hunt.
+        function notify(type, message, orgId = null) {
+            const box = NOTIFY_STYLES[type] || NOTIFY_STYLES.success;
+
+            const el = document.createElement('div');
+            el.className = `toast-enter flex items-start gap-3 rounded-xl border ${box.wrap} p-4 shadow-lg`;
+            el.innerHTML = `
+                <i class="bi ${box.icon} text-lg leading-none mt-0.5"></i>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold ${box.head}">${box.title}</p>
+                    <p class="mt-0.5 text-xs ${box.body} break-words">${escapeHtml(message)}</p>
+                </div>
+                <button class="${box.btn}" onclick="this.parentElement.remove()"><i class="bi bi-x-lg text-xs"></i></button>
+            `;
+            if (orgId) {
+                el.querySelector('.flex-1').classList.add('cursor-pointer');
+                el.querySelector('.flex-1').addEventListener('click', () => { goToReceiveAndPoll(orgId); el.remove(); });
+            }
+            const container = document.getElementById('toastContainer');
+            container.appendChild(el);
+            setTimeout(() => el.remove(), 6000);
+
+            notifications.unshift({ type, message, time: new Date(), orgId });
+            if (notifications.length > 20) notifications.pop();
+            renderNotifications();
+        }
+
+        function showSuccess(msg) { notify('success', msg); }
+        function showError(msg) { notify('error', msg); }
+
+        function goToReceiveAndPoll(orgId) {
+            clearReceiveReferralBadge();
+            switchPage('pageReceive');
+            document.getElementById('receiveOrgId').value = orgId;
+            handleReceiveReferrals();
+            document.getElementById('notifPanel').classList.add('hidden');
+        }
+
+        function renderNotifications() {
+            const list = document.getElementById('notifList');
+            document.getElementById('notifDot').classList.toggle('hidden', notifications.length === 0);
+            if (!notifications.length) {
+                list.innerHTML = '<li class="px-4 py-6 text-center text-xs text-gray-400">No notifications yet</li>';
+                return;
+            }
+            list.innerHTML = notifications.map((n, i) => {
+                const dot = (NOTIFY_STYLES[n.type] || NOTIFY_STYLES.success).dot;
+                return `
+                <li class="flex gap-3 px-4 py-3 hover:bg-gray-50 ${n.orgId ? 'cursor-pointer' : ''}" ${n.orgId ? `onclick="goToReceiveAndPoll('${n.orgId}')"` : ''}>
+                    <span class="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${dot}"></span>
+                    <div class="min-w-0">
+                        <p class="text-xs text-gray-700 break-words">${escapeHtml(n.message)}</p>
+                        <p class="mt-0.5 text-[10px] text-gray-400">${n.time.toLocaleTimeString()}</p>
+                    </div>
+                </li>`;
+            }).join('');
+        }
+
+        function toggleNotifPanel(e) {
+            e.stopPropagation();
+            document.getElementById('notifPanel').classList.toggle('hidden');
+        }
+
+        function clearNotifications() {
+            notifications = [];
+            renderNotifications();
+        }
+
+        document.addEventListener('click', (e) => {
+            const panel = document.getElementById('notifPanel');
+            if (!panel.classList.contains('hidden') && !panel.contains(e.target)) panel.classList.add('hidden');
+        });
+
+        function escapeHtml(str) {
+            return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        function formatPatientAge(dateOfBirth) {
+            const match = String(dateOfBirth || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (!match) return '--';
+
+            const birthYear = Number(match[1]);
+            const birthMonth = Number(match[2]) - 1;
+            const birthDay = Number(match[3]);
+            const birth = new Date(birthYear, birthMonth, birthDay);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            if (Number.isNaN(birth.getTime()) || birth > today) return '--';
+
+            let years = today.getFullYear() - birthYear;
+            if (today.getMonth() < birthMonth || (today.getMonth() === birthMonth && today.getDate() < birthDay)) years--;
+            if (years >= 1) return `${years} ${years === 1 ? 'year' : 'years'} old`;
+
+            let months = (today.getFullYear() - birthYear) * 12 + today.getMonth() - birthMonth;
+            if (today.getDate() < birthDay) months--;
+            if (months >= 1) return `${months} ${months === 1 ? 'month' : 'months'} old`;
+
+            const birthUtc = Date.UTC(birthYear, birthMonth, birthDay);
+            const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+            const days = Math.max(0, Math.floor((todayUtc - birthUtc) / 86400000));
+            return `${days} ${days === 1 ? 'day' : 'days'} old`;
+        }
+
+        // ---- Skeleton loading while a table's data is in flight ----
+        function showTableSkeleton(tableId, columns, rows = 5) {
+            if ($.fn.DataTable.isDataTable('#' + tableId)) {
+                $('#' + tableId).DataTable().destroy();
+            }
+            const tbody = document.querySelector(`#${tableId} tbody`);
+            tbody.innerHTML = Array.from({ length: rows }, () =>
+                `<tr>${Array.from({ length: columns }, () =>
+                    '<td class="px-5 py-4"><div class="h-3 w-full rounded bg-gray-200 animate-pulse"></div></td>'
+                ).join('')}</tr>`
+            ).join('');
+        }
+
+        // ---- PSGC cascading dropdowns (region -> province -> city -> barangay) ----
+        async function fetchPsgc(level, parent) {
+            const qs = parent ? `level=${level}&parent=${encodeURIComponent(parent)}` : `level=${level}`;
+            const res = await fetch(`${API_BASE}/fhir_psgc_lookup.php?${qs}`);
+            return res.json();
+        }
+
+        function fillPsgcSelect(selectEl, results, placeholder) {
+            if (!results || !results.length) {
+                selectEl.innerHTML = `<option value="">No results found</option>`;
+                selectEl.disabled = true;
+                return;
+            }
+            selectEl.innerHTML = `<option value="">${placeholder}</option>`;
+            results.forEach(r => {
+                const opt = document.createElement('option');
+                opt.value = r.code;
+                opt.textContent = r.display;
+                opt.dataset.display = r.display;
+                selectEl.appendChild(opt);
+            });
+            selectEl.disabled = false;
+        }
+
+        async function loadPsgcRegions() {
+            const sel = document.getElementById('patientRegion');
+            if (sel.options.length > 1) return; // already loaded
+            try {
+                const body = await fetchPsgc('regions');
+                if (body.success) fillPsgcSelect(sel, body.results, 'Select region');
+            } catch (err) {
+                showError('Could not load PSGC regions: ' + err.message);
+            }
+        }
+
+        async function onPatientRegionChange() {
+            const regionCode = document.getElementById('patientRegion').value;
+            const provinceSel = document.getElementById('patientProvince');
+            const citySel = document.getElementById('patientCity');
+            const barangaySel = document.getElementById('patientBarangay');
+            fillPsgcSelect(citySel, [], ''); citySel.disabled = true;
+            fillPsgcSelect(barangaySel, [], ''); barangaySel.disabled = true;
+            if (!regionCode) { fillPsgcSelect(provinceSel, [], ''); provinceSel.disabled = true; return; }
+            provinceSel.innerHTML = '<option value="">Loading...</option>';
+            try {
+                const body = await fetchPsgc('provinces', regionCode);
+                if (body.success) fillPsgcSelect(provinceSel, body.results, 'Select province');
+                else showError(body.message || 'Could not load provinces');
+            } catch (err) {
+                showError('Could not load provinces: ' + err.message);
+            }
+        }
+
+        async function onPatientProvinceChange() {
+            const provinceCode = document.getElementById('patientProvince').value;
+            const citySel = document.getElementById('patientCity');
+            const barangaySel = document.getElementById('patientBarangay');
+            fillPsgcSelect(barangaySel, [], ''); barangaySel.disabled = true;
+            if (!provinceCode) { fillPsgcSelect(citySel, [], ''); citySel.disabled = true; return; }
+            citySel.innerHTML = '<option value="">Loading...</option>';
+            try {
+                const body = await fetchPsgc('cities', provinceCode);
+                if (body.success) fillPsgcSelect(citySel, body.results, 'Select city/municipality');
+                else showError(body.message || 'Could not load cities');
+            } catch (err) {
+                showError('Could not load cities: ' + err.message);
+            }
+        }
+
+        async function onPatientCityChange() {
+            const cityCode = document.getElementById('patientCity').value;
+            const barangaySel = document.getElementById('patientBarangay');
+            if (!cityCode) { fillPsgcSelect(barangaySel, [], ''); barangaySel.disabled = true; return; }
+            barangaySel.innerHTML = '<option value="">Loading...</option>';
+            try {
+                const body = await fetchPsgc('barangays', cityCode);
+                if (body.success) fillPsgcSelect(barangaySel, body.results, 'Select barangay');
+                else showError(body.message || 'Could not load barangays');
+            } catch (err) {
+                showError('Could not load barangays: ' + err.message);
+            }
+        }
+
+        function resetPsgcDropdowns() {
+            const prov = document.getElementById('patientProvince');
+            const city = document.getElementById('patientCity');
+            const brgy = document.getElementById('patientBarangay');
+            prov.innerHTML = '<option value="">Select region first</option>'; prov.disabled = true;
+            city.innerHTML = '<option value="">Select province first</option>'; city.disabled = true;
+            brgy.innerHTML = '<option value="">Select city first</option>'; brgy.disabled = true;
+            document.getElementById('patientRegion').value = '';
+        }
+
+        // ---- Add / Edit Patient ----
+        function openAddPatientModal() {
+            document.getElementById('patientForm').reset();
+            document.getElementById('patientEditId').value = '';
+            document.getElementById('patientModalTitle').textContent = 'Add Patient';
+            document.getElementById('patientSubmitBtn').textContent = 'Create Patient';
+            resetPsgcDropdowns();
+            switchPage('pagePatientForm');
+            loadPsgcRegions();
+        }
+
+        // Sets a PSGC select's value once its options are loaded, injecting the
+        // option if the list didn't happen to include it (defensive -- keeps a
+        // stale/edited-elsewhere code from silently blanking the field).
+        function setPsgcSelectValue(selectEl, code, display) {
+            if (!code) return;
+            if (![...selectEl.options].some(o => o.value === code)) {
+                const opt = document.createElement('option');
+                opt.value = code;
+                opt.textContent = display || code;
+                opt.dataset.display = display || code;
+                selectEl.appendChild(opt);
+            }
+            selectEl.value = code;
+            selectEl.disabled = false;
+        }
+
+        // Edit mode, prefilled from the server -- walks the region -> province ->
+        // city -> barangay chain sequentially since each level's options depend
+        // on the previous selection.
+        async function openEditPatientModal(patientId) {
+            try {
+                const res = await fetch(`${API_BASE}/fhir_patient_crud.php?action=get&id=${encodeURIComponent(patientId)}`);
+                const body = await res.json();
+                if (!body.success) { showError(body.message || 'Could not load patient'); return; }
+                const p = body.patient;
+
+                document.getElementById('patientForm').reset();
+                document.getElementById('patientEditId').value = p.id;
+                document.getElementById('patientModalTitle').textContent = `Edit Patient (${p.id})`;
+                document.getElementById('patientSubmitBtn').textContent = 'Save Changes';
+                switchPage('pagePatientForm');
+
+                const f = document.getElementById('patientForm');
+                f.given_first.value = p.given_first || '';
+                f.given_middle.value = p.given_middle || '';
+                f.family.value = p.family || '';
+                f.dob.value = p.dob || '';
+                f.gender.value = p.gender || '';
+                f.phone.value = p.phone || '';
+                f.philhealth.value = p.philhealth || '';
+                f.philsys.value = p.philsys || '';
+                f.address_line.value = p.address_line || '';
+                f.postal_code.value = p.postal_code || '';
+
+                await loadPsgcRegions();
+                setPsgcSelectValue(document.getElementById('patientRegion'), p.region_code, p.region_display);
+
+                const provinceSel = document.getElementById('patientProvince');
+                if (p.region_code) {
+                    const provBody = await fetchPsgc('provinces', p.region_code);
+                    if (provBody.success) fillPsgcSelect(provinceSel, provBody.results, 'Select province');
+                    setPsgcSelectValue(provinceSel, p.province_code, p.province_display);
+                }
+
+                const citySel = document.getElementById('patientCity');
+                if (p.province_code) {
+                    const cityBody = await fetchPsgc('cities', p.province_code);
+                    if (cityBody.success) fillPsgcSelect(citySel, cityBody.results, 'Select city/municipality');
+                    setPsgcSelectValue(citySel, p.city_code, p.city_display);
+                }
+
+                const barangaySel = document.getElementById('patientBarangay');
+                if (p.city_code) {
+                    const brgyBody = await fetchPsgc('barangays', p.city_code);
+                    if (brgyBody.success) fillPsgcSelect(barangaySel, brgyBody.results, 'Select barangay');
+                    setPsgcSelectValue(barangaySel, p.barangay_code, p.barangay_display);
+                }
+            } catch (err) {
+                showError('Could not load patient: ' + err.message);
+            }
+        }
+
+        // Add or Update Patient (mode decided by whether patientEditId is set)
+        async function handleSavePatient(e) {
+            e.preventDefault();
+            const editId = document.getElementById('patientEditId').value;
+            const form = new FormData(document.getElementById('patientForm'));
+            const data = Object.fromEntries(form);
+
+            const regionSel = document.getElementById('patientRegion');
+            const provinceSel = document.getElementById('patientProvince');
+            const citySel = document.getElementById('patientCity');
+            const barangaySel = document.getElementById('patientBarangay');
+
+            if (!regionSel.value || !provinceSel.value || !citySel.value || !barangaySel.value) {
+                showError('Please select region, province, city, and barangay');
+                return;
+            }
+
+            data.region_code = regionSel.value;
+            data.region_display = regionSel.selectedOptions[0].dataset.display;
+            data.province_code = provinceSel.value;
+            data.province_display = provinceSel.selectedOptions[0].dataset.display;
+            data.city_code = citySel.value;
+            data.city_display = citySel.selectedOptions[0].dataset.display;
+            data.barangay_code = barangaySel.value;
+            data.barangay_display = barangaySel.selectedOptions[0].dataset.display;
+
+            const url = editId
+                ? `${API_BASE}/fhir_patient_crud.php?action=update&id=${encodeURIComponent(editId)}`
+                : `${API_BASE}/fhir_patient_crud.php?action=create`;
+            const method = editId ? 'PUT' : 'POST';
+
+            try {
+                const res = await fetch(url, { method, body: JSON.stringify(data) });
+                const body = await res.json();
+                if (body.success) {
+                    showSuccess(editId ? `Patient ${body.patient_id} updated` : `Patient created: ${body.patient_id}`);
+                    document.getElementById('patientForm').reset();
+                    document.getElementById('patientEditId').value = '';
+                    resetPsgcDropdowns();
+                    switchPage('pagePatients');
+                    loadPatientsTable(body.patient_id);
+                } else {
+                    showError(body.message || 'Failed to save patient');
+                }
+            } catch (err) {
+                showError('Could not reach backend: ' + err.message);
+            }
+        }
+
+        async function fetchPatientList() {
+            const orgParam = currentOrgId ? `&org_id=${encodeURIComponent(currentOrgId)}` : '';
+            const res = await fetch(`${API_BASE}/fhir_patient_crud.php?action=list${orgParam}`);
+            const body = await res.json();
+            if (!body.success) throw new Error(body.message || 'Failed to load patients');
+            return body.patients || [];
+        }
+
+        // ---- Patients DataTable ----
+        // expectId: id of a record we just wrote. The sandbox's search index can
+        // lag a beat behind a create, so retry once before rendering a list that
+        // would be missing the patient the user just added.
+        async function loadPatientsTable(expectId = null) {
+            showTableSkeleton('patientsDataTable', 7);
+            try {
+                let list = await fetchPatientList();
+                if (expectId && !list.some(p => String(p.id) === String(expectId))) {
+                    await new Promise(r => setTimeout(r, 1200));
+                    list = await fetchPatientList();
+                }
+                patients = list;
+
+                document.querySelector('#patientsDataTable tbody').innerHTML = patients.map(p => `
+                    <tr>
+                        <td class="font-medium text-gray-800">${escapeHtml(p.name)}</td>
+                        <td>${p.dob || '--'}</td>
+                        <td class="capitalize">${p.gender || '--'}</td>
+                        <td>${p.phone || '--'}</td>
+                        <td>${p.record_source === 'received_referral'
+                            ? '<span class="chip bg-brand-50 text-brand-700">Received referral</span>'
+                            : '<span class="chip bg-gray-100 text-gray-600">Registered here</span>'}</td>
+                        <td class="text-gray-400">${p.id}</td>
+                        <td class="whitespace-nowrap">
+                            ${p.record_source === 'received_referral'
+                                ? '<span class="icon-btn mr-1 opacity-40 cursor-not-allowed" title="Imported records are read-only"><i class="bi bi-lock"></i></span>'
+                                : `<a class="icon-btn mr-1" title="Edit patient" onclick="openEditPatientModal('${p.id}')"><i class="bi bi-pencil"></i></a>`}
+                            <a class="icon-btn" title="Use for referral" onclick="referPatient('${p.id}')"><i class="bi bi-send"></i></a>
+                        </td>
+                    </tr>
+                `).join('');
+                $('#patientsDataTable').DataTable({ order: [], pageLength: 10 });
+            } catch (err) {
+                showError('Could not reach backend: ' + err.message);
+            }
+        }
+
+        // ---- Organizations DataTable ----
+        async function loadOrgsTable() {
+            showTableSkeleton('orgsDataTable', 4);
+            try {
+                const res = await fetch(`${API_BASE}/fhir_organization_crud.php?action=list`);
+                const body = await res.json();
+                if (!body.success) { showError(body.message || 'Failed to load organizations'); return; }
+
+                const orgs = body.organizations || [];
+                document.querySelector('#orgsDataTable tbody').innerHTML = orgs.map(o => `
+                    <tr>
+                        <td class="font-medium text-gray-800">${escapeHtml(o.name)}</td>
+                        <td class="text-gray-400">${o.id}</td>
+                        <td class="text-xs text-gray-400">${escapeHtml((o.identifiers || []).join(', ')) || '--'}</td>
+                        <td class="whitespace-nowrap">
+                            <a class="icon-btn mr-1" title="Use as receiving organization" onclick="useOrgAsReceiver('${o.id}')"><i class="bi bi-send"></i></a>
+                            <a class="icon-btn" title="Poll referrals sent to this org" onclick="pollOrgReferrals('${o.id}')"><i class="bi bi-inbox"></i></a>
+                        </td>
+                    </tr>
+                `).join('');
+                $('#orgsDataTable').DataTable({ order: [], pageLength: 10 });
+            } catch (err) {
+                showError('Could not reach backend: ' + err.message);
+            }
+        }
+
+        async function useOrgAsReceiver(orgId) {
+            switchPage('pageReferral');
+            loadPatientsForSelect();
+            if (currentOrgId) loadMyReferralsTable();
+            await loadReceivingOrgs();
+            const sel = document.getElementById('receivingOrgSelect');
+            sel.value = orgId;
+            if (sel.value !== orgId) showError(`Organization ${orgId} is not in the list -- try refreshing`);
+        }
+
+        function pollOrgReferrals(orgId) {
+            clearReceiveReferralBadge();
+            switchPage('pageReceive');
+            document.getElementById('receiveOrgId').value = orgId;
+            handleReceiveReferrals();
+        }
+
+        // Visiting the page shouldn't require a manual click if we already know
+        // which org to poll (background polling only refreshes the table when
+        // you're already sitting on this page -- this covers "just arrived here").
+        function openReceivePage() {
+            clearReceiveReferralBadge();
+            switchPage('pageReceive');
+            const orgId = document.getElementById('receiveOrgId').value.trim() || currentOrgId;
+            if (orgId) {
+                document.getElementById('receiveOrgId').value = orgId;
+                handleReceiveReferrals();
+            }
+        }
+
+        // ---- Patient picker on the Send Referral form (dropdown + live search) ----
+        async function loadPatientsForSelect() {
+            const sel = document.getElementById('referralPatientSelect');
+            sel.innerHTML = '<option value="">Loading patients...</option>';
+            try {
+                patients = await fetchPatientList();
+                renderPatientOptions(patients);
+            } catch (err) {
+                sel.innerHTML = '<option value="">Could not reach backend</option>';
+            }
+        }
+
+        function renderPatientOptions(list) {
+            const sel = document.getElementById('referralPatientSelect');
+            const previous = document.getElementById('referralPatientId').value;
+            if (!list.length) {
+                sel.innerHTML = '<option value="">No patients found</option>';
+                return;
+            }
+            sel.innerHTML = '<option value="">Select patient</option>' + list.map(p =>
+                `<option value="${p.id}">${escapeHtml(p.name)} — ${p.dob || 'no DOB'} (${p.id})</option>`
+            ).join('');
+            if (previous && list.some(p => String(p.id) === String(previous))) sel.value = previous;
+        }
+
+        // Live filter over the already-loaded patient list -- no extra requests
+        function filterPatientSelect() {
+            const q = document.getElementById('patientSearchInput').value.trim().toLowerCase();
+            if (!q) { renderPatientOptions(patients); return; }
+            renderPatientOptions(patients.filter(p =>
+                [p.name, p.dob, p.gender, p.phone, String(p.id)]
+                    .some(v => String(v ?? '').toLowerCase().includes(q))
+            ));
+        }
+
+        function onReferralPatientChange() {
+            const selectEl = document.getElementById('referralPatientSelect');
+            const id = selectEl.value;
+            const panel = document.getElementById('selectedPatientPanel');
+            document.getElementById('referralPatientId').value = id;
+            if (id) clearFieldInvalid(selectEl);
+            const p = patients.find(x => String(x.id) === String(id));
+            if (!p) { panel.classList.add('hidden'); panel.innerHTML = ''; return; }
+            panel.classList.remove('hidden');
+            panel.innerHTML = `
+                <div class="flex flex-wrap items-center gap-x-5 gap-y-1">
+                    <span class="font-semibold text-gray-800">${escapeHtml(p.name)}</span>
+                    <span class="text-xs text-gray-500">DOB: ${p.dob || '--'}</span>
+                    <span class="text-xs text-gray-500 capitalize">Gender: ${p.gender || '--'}</span>
+                    <span class="text-xs text-gray-500">Phone: ${p.phone || '--'}</span>
+                    <span class="text-xs text-gray-400">ID: ${p.id}</span>
+                </div>`;
+        }
+
+        // "Use for referral" icon from the Patients table
+        async function referPatient(patientId) {
+            clearOnwardReferralMode();
+            switchPage('pageReferral');
+            loadReceivingOrgs();
+            if (currentOrgId) loadMyReferralsTable();
+            await loadPatientsForSelect();
+            document.getElementById('patientSearchInput').value = '';
+            renderPatientOptions(patients);
+            document.getElementById('referralPatientSelect').value = patientId;
+            onReferralPatientChange();
+        }
+
+        function resetReferralPatientSelection() {
+            document.getElementById('referralPatientId').value = '';
+            document.getElementById('referralPatientSelect').value = '';
+            document.getElementById('patientSearchInput').value = '';
+            const panel = document.getElementById('selectedPatientPanel');
+            panel.classList.add('hidden');
+            panel.innerHTML = '';
+        }
+
+        async function fetchOrganizationPractitioners() {
+            if (!currentOrgId) throw new Error('Register your organization first');
+            const res = await fetch(`${API_BASE}/fhir_practitioner_crud.php?action=list&org_id=${encodeURIComponent(currentOrgId)}`);
+            const body = await res.json();
+            if (!body.success) throw new Error(body.message || 'Could not load practitioners');
+            organizationPractitioners = body.practitioners || [];
+            return organizationPractitioners;
+        }
+
+        async function loadPractitionersForSelect() {
+            const select = document.getElementById('referralPractitionerSelect');
+            document.getElementById('referralPractitionerRoleId').value = '';
+            document.getElementById('referralPractitionerRole').value = '';
+            document.getElementById('referralPractitionerRoleDisplay').value = '';
+            if (!currentOrgId) {
+                select.innerHTML = '<option value="">Register your organization first</option>';
+                return;
+            }
+            select.innerHTML = '<option value="">Loading practitioners...</option>';
+            try {
+                const list = await fetchOrganizationPractitioners();
+                select.innerHTML = '<option value="">Select practitioner</option>';
+                list.forEach(practitioner => {
+                    const option = document.createElement('option');
+                    option.value = practitioner.name;
+                    option.textContent = practitioner.name;
+                    option.dataset.roleId = practitioner.practitioner_role_id;
+                    option.dataset.roleKey = practitioner.role_key;
+                    option.dataset.roleDisplay = practitioner.role_display;
+                    select.appendChild(option);
+                });
+                if (!list.length) select.innerHTML = '<option value="">Add a practitioner first</option>';
+            } catch (err) {
+                select.innerHTML = '<option value="">Could not load practitioners</option>';
+            }
+        }
+
+        function onReferralPractitionerChange() {
+            const select = document.getElementById('referralPractitionerSelect');
+            const selected = select.selectedOptions[0];
+            document.getElementById('referralPractitionerRoleId').value = selected?.dataset.roleId || '';
+            document.getElementById('referralPractitionerRole').value = selected?.dataset.roleKey || '';
+            document.getElementById('referralPractitionerRoleDisplay').value = selected?.dataset.roleDisplay || '';
+            if (select.value) clearFieldInvalid(select);
+        }
+
+        function openPractitionersPage() {
+            switchPage('pagePractitioners');
+            loadPractitionersTable();
+        }
+
+        async function handleAddPractitioner(event) {
+            event.preventDefault();
+            if (!currentOrgId) { showError('Register your organization first'); return; }
+            const form = event.currentTarget;
+            const data = Object.fromEntries(new FormData(form));
+            data.organization_id = currentOrgId;
+            const button = document.getElementById('addPractitionerBtn');
+            const originalHtml = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '<i class="bi bi-arrow-repeat animate-spin"></i> Adding...';
+            try {
+                const res = await fetch(`${API_BASE}/fhir_practitioner_crud.php?action=create`, { method: 'POST', body: JSON.stringify(data) });
+                const body = await res.json();
+                if (!body.success) { showError(body.message || 'Could not add practitioner'); return; }
+                showSuccess('Practitioner added to your organization');
+                form.reset();
+                await loadPractitionersTable();
+            } catch (err) {
+                showError('Could not reach backend: ' + err.message);
+            } finally {
+                button.disabled = false;
+                button.innerHTML = originalHtml;
+            }
+        }
+
+        async function loadPractitionersTable() {
+            showTableSkeleton('practitionersDataTable', 5);
+            if (!currentOrgId) {
+                showError('Register your organization first');
+                return;
+            }
+            try {
+                const list = await fetchOrganizationPractitioners();
+                document.querySelector('#practitionersDataTable tbody').innerHTML = list.map(practitioner => `
+                    <tr>
+                        <td class="font-medium text-gray-800">${escapeHtml(practitioner.name)}</td>
+                        <td>${escapeHtml(practitioner.role_display)}</td>
+                        <td>${escapeHtml(practitioner.license_number || '--')}</td>
+                        <td class="text-gray-400">${escapeHtml(practitioner.practitioner_id)}</td>
+                        <td class="text-gray-400">${escapeHtml(practitioner.practitioner_role_id)}</td>
+                    </tr>`).join('');
+                $('#practitionersDataTable').DataTable({ order: [], pageLength: 10 });
+            } catch (err) {
+                showError(err.message);
+            }
+        }
+
+        // ---- Receiving organizations dropdown ----
+        async function loadReceivingOrgs() {
+            const sel = document.getElementById('receivingOrgSelect');
+            sel.innerHTML = '<option value="">Loading organizations...</option>';
+            try {
+                const res = await fetch(`${API_BASE}/fhir_organization_crud.php?action=list`);
+                const body = await res.json();
+                if (!body.success) { sel.innerHTML = '<option value="">Could not load organizations</option>'; return; }
+                const orgs = body.organizations || [];
+                if (!orgs.length) { sel.innerHTML = '<option value="">No organizations found</option>'; return; }
+                sel.innerHTML = '<option value="">Select organization</option>';
+                orgs.forEach(o => {
+                    const opt = document.createElement('option');
+                    opt.value = o.id;
+                    opt.textContent = `${o.name} (${o.id})`;
+                    sel.appendChild(opt);
+                });
+            } catch (err) {
+                sel.innerHTML = '<option value="">Could not reach backend</option>';
+            }
+        }
+
+        function clearOnwardReferralMode() {
+            const sourceInput = document.getElementById('sourceServiceRequestId');
+            const banner = document.getElementById('onwardReferralBanner');
+            if (sourceInput) sourceInput.value = '';
+            if (banner) banner.classList.add('hidden');
+        }
+
+        function referralVitalValue(vitals, label) {
+            const vital = (vitals || []).find(item => item.label === label);
+            return vital ? vital.value : '';
+        }
+
+        async function prepareReferOnward(serviceRequestId, triggerButton = null) {
+            if (!currentOrgId) {
+                showError('Register or select your organization first');
+                return;
+            }
+
+            const originalButtonHtml = triggerButton ? triggerButton.innerHTML : '';
+            if (triggerButton) {
+                triggerButton.disabled = true;
+                triggerButton.innerHTML = '<i class="bi bi-arrow-repeat animate-spin"></i>';
+            }
+
+            try {
+                const detailsResponse = await fetch(`${API_BASE}/fhir_referral_details.php?service_request_id=${encodeURIComponent(serviceRequestId)}`);
+                const details = await detailsResponse.json();
+                if (!details.success || !details.patient) throw new Error(details.message || 'Could not load the referral details');
+
+                switchPage('pageReferral');
+                await Promise.all([loadReceivingOrgs(), loadPatientsForSelect(), loadPractitionersForSelect()]);
+
+                // The same FHIR Patient is reused. Add it to the picker in case
+                // it has not yet been linked into this facility's record list.
+                if (!patients.some(p => String(p.id) === String(details.patient.id))) {
+                    patients.push(details.patient);
+                    renderPatientOptions(patients);
+                }
+
+                const form = document.getElementById('referralForm');
+                form.reset();
+                document.getElementById('sourceServiceRequestId').value = serviceRequestId;
+                document.getElementById('referralPatientSelect').value = details.patient.id;
+                onReferralPatientChange();
+
+                form.elements.category.value = String(details.category || 'outpatient').toLowerCase();
+                form.elements.service_type.value = String(details.service_type || 'consultation').toLowerCase();
+                form.elements.chief_complaint.value = details.chief_complaint || '';
+                form.elements.working_impression.value = details.working_impression || '';
+                form.elements.reason_text.value = details.reason_text || '';
+
+                const bp = String(referralVitalValue(details.vitals, 'Blood Pressure')).split('/');
+                form.elements.vital_bp_systolic.value = bp.length === 2 ? bp[0] : '';
+                form.elements.vital_bp_diastolic.value = bp.length === 2 ? bp[1] : '';
+                form.elements.vital_hr.value = referralVitalValue(details.vitals, 'Heart Rate');
+                form.elements.vital_rr.value = referralVitalValue(details.vitals, 'Respiratory Rate');
+                form.elements.vital_temp_c.value = referralVitalValue(details.vitals, 'Temperature');
+                form.elements.vital_o2sat.value = referralVitalValue(details.vitals, 'Oxygen Saturation');
+                form.elements.vital_weight_kg.value = referralVitalValue(details.vitals, 'Weight');
+
+                const receivingSelect = document.getElementById('receivingOrgSelect');
+                const ownOption = Array.from(receivingSelect.options).find(option => option.value === String(currentOrgId));
+                if (ownOption) ownOption.remove();
+                receivingSelect.value = '';
+
+                document.getElementById('onwardReferralText').textContent =
+                    `${details.patient.name}'s patient and clinical information has been copied. Select your clinician and a new receiving hospital.`;
+                document.getElementById('onwardReferralBanner').classList.remove('hidden');
+                clearReferralFieldErrors();
+                document.querySelector('main').scrollTo({ top: 0, behavior: 'smooth' });
+            } catch (err) {
+                showError(err.message || 'Could not prepare onward referral');
+            } finally {
+                if (triggerButton && triggerButton.isConnected) {
+                    triggerButton.disabled = false;
+                    triggerButton.innerHTML = originalButtonHtml;
+                }
+            }
+        }
+
+        // ---- Register Organization ----
+        async function handleRegisterOrg() {
+            try {
+                const res = await fetch(`${API_BASE}/fhir_organization_crud.php?action=register`, { method: 'POST' });
+                const body = await res.json();
+                if (body.success) {
+                    setCurrentOrgId(body.org_id, body.org_name);
+                    showSuccess('Organization registered successfully');
+                    loadOrgsTable();
+                } else {
+                    showError(body.message || 'Failed to register organization');
+                }
+            } catch (err) {
+                showError('Could not reach backend: ' + err.message);
+            }
+        }
+
+        // ---- Send Referral ----
+        async function handlePreviewBundle(e) {
+            e.preventDefault();
+            if (!currentOrgId) { showError('Register your organization first'); return; }
+
+            if (!validateRequiredFields(getReferralRequiredFields())) {
+                showError('Please fill in all required fields before previewing');
+                return;
+            }
+
+            const data = Object.fromEntries(new FormData(document.getElementById('referralForm')));
+            data.sending_org_id = currentOrgId;
+            data.dry_run = true;
+
+            try {
+                const res = await fetch(`${API_BASE}/fhir_send_referral.php`, { method: 'POST', body: JSON.stringify(data) });
+                const body = await res.json();
+                if (body.success) {
+                    document.getElementById('bundleJson').textContent = JSON.stringify(body.bundle, null, 2);
+                    document.getElementById('bundlePreview').classList.remove('hidden');
+                    showSuccess('Bundle preview generated');
+                } else {
+                    showError(body.message || 'Failed to preview bundle');
+                }
+            } catch (err) {
+                showError('Could not reach backend: ' + err.message);
+            }
+        }
+
+        // ---- SweetAlert2 confirmation, used before sending a referral or
+        // running any receiving-side lifecycle action ----
+        async function confirmAction({ title, text, confirmText = 'Yes, proceed', icon = 'question' }) {
+            const result = await Swal.fire({
+                title, text, icon,
+                showCancelButton: true,
+                confirmButtonText: confirmText,
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#465fff',
+                cancelButtonColor: '#6b7280',
+                reverseButtons: true,
+                focusCancel: true,
+            });
+            return result.isConfirmed;
+        }
+
+        // ---- Field-level validation (red border + inline "required" message) ----
+        // Native HTML validation can't be relied on here: the patient field's
+        // real value lives in a type="hidden" input, and hidden inputs are
+        // spec'd as "barred from constraint validation" -- every browser
+        // silently ignores `required` on them, so an empty patient could slip
+        // straight past native checks into the backend. The form now carries
+        // novalidate and this runs the same explicit check for every
+        // required field instead, so behavior doesn't depend on which field
+        // happens to be backed by a visible vs. hidden input.
+        function fieldErrorElement(el) {
+            if (el.id === 'referralPatientSelect') {
+                return document.getElementById('referralPatientError');
+            }
+            const existing = document.querySelector(`.field-error-msg[data-error-for="${el.name || el.id}"]`);
+            if (existing) return existing;
+
+            const msgEl = document.createElement('p');
+            msgEl.className = 'field-error-msg text-xs text-red-500 mt-1';
+            msgEl.dataset.errorFor = el.name || el.id;
+            // Patient/organization selects sit in a horizontal control row. Put
+            // the message below that row instead of between the select/button.
+            const anchor = el.parentElement.classList.contains('flex') ? el.parentElement : el;
+            anchor.insertAdjacentElement('afterend', msgEl);
+            return msgEl;
+        }
+
+        function setFieldInvalid(el) {
+            el.classList.add('border-red-500', 'ring-2', 'ring-red-500/20');
+            const msgEl = fieldErrorElement(el);
+            msgEl.textContent = "Field shouldn't be empty.";
+            msgEl.classList.remove('hidden');
+        }
+
+        function clearFieldInvalid(el) {
+            el.classList.remove('border-red-500', 'ring-2', 'ring-red-500/20');
+            const msgEl = el.id === 'referralPatientSelect'
+                ? document.getElementById('referralPatientError')
+                : document.querySelector(`.field-error-msg[data-error-for="${el.name || el.id}"]`);
+            if (!msgEl) return;
+            if (el.id === 'referralPatientSelect') {
+                msgEl.textContent = '';
+                msgEl.classList.add('hidden');
+            } else {
+                msgEl.remove();
+            }
+        }
+
+        function getReferralRequiredFields() {
+            const fields = [document.getElementById('referralPatientSelect')];
+            document.querySelectorAll('#referralForm [required]').forEach(el => {
+                if (el.type !== 'hidden' && !fields.includes(el)) fields.push(el);
+            });
+            return fields;
+        }
+
+        function clearCorrectedReferralField(e) {
+            const el = e.target;
+            if (el.matches('#referralPatientSelect, #referralForm [required]') && el.value && el.value.trim()) {
+                clearFieldInvalid(el);
+            }
+        }
+        document.getElementById('referralForm').addEventListener('input', clearCorrectedReferralField);
+        document.getElementById('referralForm').addEventListener('change', clearCorrectedReferralField);
+
+        // fields: [{ el, label }] -- returns true only if every field has a
+        // non-empty value; otherwise highlights each empty one in red with an
+        // inline message and scrolls/focuses the first one.
+        function validateRequiredFields(fields) {
+            let firstInvalid = null;
+            fields.forEach(el => {
+                if (!el.value || !el.value.trim()) {
+                    setFieldInvalid(el);
+                    if (!firstInvalid) firstInvalid = el;
+                } else {
+                    clearFieldInvalid(el);
+                }
+            });
+            if (firstInvalid) {
+                firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                firstInvalid.focus();
+                return false;
+            }
+            return true;
+        }
+
+        async function handleSendReferral(e) {
+            e.preventDefault();
+            if (!currentOrgId) { showError('Register your organization first'); return; }
+
+            const isValid = validateRequiredFields(getReferralRequiredFields());
+            if (!isValid) { showError('Please fill in all required fields before sending'); return; }
+
+            const data = Object.fromEntries(new FormData(document.getElementById('referralForm')));
+            data.sending_org_id = currentOrgId;
+            const isOnwardReferral = Boolean(data.source_service_request_id);
+
+            const selectedPatient = patients.find(p => String(p.id) === String(data.patient_id));
+            const confirmed = await confirmAction({
+                title: isOnwardReferral ? 'Refer this patient onward?' : 'Send this referral?',
+                text: `A FHIR transaction bundle will be submitted for ${selectedPatient ? selectedPatient.name : 'the selected patient'} to the new receiving organization.`,
+                confirmText: isOnwardReferral ? 'Yes, refer onward' : 'Yes, send it',
+            });
+            if (!confirmed) return;
+
+            const btn = document.getElementById('sendReferralBtn');
+            const originalBtnHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="bi bi-arrow-clockwise animate-spin"></i> Sending...';
+
+            try {
+                const res = await fetch(`${API_BASE}/fhir_send_referral.php`, { method: 'POST', body: JSON.stringify(data) });
+                const body = await res.json();
+                if (body.success) {
+                    showSuccess(isOnwardReferral ? 'Patient referred onward successfully' : 'Referral sent successfully');
+                    document.getElementById('referralForm').reset();
+                    resetReferralPatientSelection();
+                    clearReferralFieldErrors();
+                    document.getElementById('bundlePreview').classList.add('hidden');
+                    clearOnwardReferralMode();
+                    // service_request_ref looks like "ServiceRequest/24835/_history/1"
+                    const newId = body.service_request_ref ? body.service_request_ref.split('/')[1] : null;
+                    loadMyReferralsTable(newId);
+                } else {
+                    showError(body.message || 'Failed to send referral');
+                }
+            } catch (err) {
+                showError('Could not reach backend: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalBtnHtml;
+            }
+        }
+
+        // ---- Receive Referrals ----
+        async function handleReceiveReferrals(triggerButton = null) {
+            const orgId = document.getElementById('receiveOrgId').value.trim();
+            if (!orgId) { showError('Please enter your organization ID'); return; }
+
+            const originalButtonHtml = triggerButton ? triggerButton.innerHTML : '';
+            if (triggerButton) {
+                triggerButton.disabled = true;
+                triggerButton.innerHTML = '<i class="bi bi-arrow-repeat animate-spin"></i> Loading...';
+            }
+
+            showTableSkeleton('receiveDataTable', 6);
+            try {
+                const res = await fetch(`${API_BASE}/fhir_receive_referrals.php?org_id=${encodeURIComponent(orgId)}`);
+                const body = await res.json();
+                if (!body.success) { showError(body.message || 'Failed to receive referrals'); return; }
+
+                const referrals = body.referrals || [];
+                document.getElementById('receiveCount').textContent = `${body.referral_count} referral(s)`;
+                document.querySelector('#receiveDataTable tbody').innerHTML = referrals.map(r => {
+                    const done = r.status === 'completed';
+                    const label = done ? r.status : `${r.status}${r.task_status ? ' / ' + r.task_status : ''}`;
+                    return `
+                        <tr>
+                            <td class="font-medium text-gray-800">${escapeHtml(r.patient_name)}</td>
+                            <td>${escapeHtml(r.category)}</td>
+                            <td><span class="chip ${done ? 'chip-green' : 'chip-amber'}">${escapeHtml(label)}</span></td>
+                            <td>${r.authored_on ? r.authored_on.split('T')[0] : '--'}</td>
+                            <td class="whitespace-nowrap">
+                                <a class="icon-btn mr-1" title="View full referral" onclick="openReferralDetails('${r.service_request_id}')"><i class="bi bi-eye"></i></a>
+                                ${r.task_status && r.task_status !== 'requested'
+                                    ? `<button type="button" class="icon-btn" title="Refer patient onward" onclick="prepareReferOnward('${r.service_request_id}', this)"><i class="bi bi-arrow-right-circle"></i></button>`
+                                    : ''}
+                            </td>
+                            <td class="whitespace-nowrap">${referralActionButton(r)}</td>
+                        </tr>`;
+                }).join('');
+                $('#receiveDataTable').DataTable({ order: [], pageLength: 10 });
+            } catch (err) {
+                showError('Could not reach backend: ' + err.message);
+            } finally {
+                if (triggerButton) {
+                    triggerButton.disabled = false;
+                    triggerButton.innerHTML = originalButtonHtml;
+                }
+            }
+        }
+
+        // Drives a referral through its FHIR lifecycle one step at a time:
+        // requested -> received -> accepted -> (Encounter created) -> completed
+        // (Task) -> completed (ServiceRequest). Each button runs exactly one
+        // backend action, then re-polls to pick up the new state.
+        function referralActionButton(r) {
+            const sr = JSON.stringify(r).replace(/"/g, '&quot;');
+            if (r.status === 'completed') {
+                return '<span class="inline-flex items-center gap-1 text-xs font-medium text-green-600"><i class="bi bi-check-circle-fill"></i> Done</span>';
+            }
+            let label, action;
+            if (!r.task_status || r.task_status === 'requested') { label = 'Mark Received'; action = 'mark_received'; }
+            else if (r.task_status === 'received') { label = 'Accept'; action = 'accept'; }
+            else if (r.task_status === 'accepted' && !r.encounter_id) { label = 'Add to Patient Records'; action = 'create_encounter'; }
+            else if (r.task_status === 'accepted' && r.encounter_id) { label = 'Complete Task'; action = 'complete_task'; }
+            else if (r.task_status === 'completed') { label = 'Close Referral'; action = 'complete_referral'; }
+            else { return '--'; }
+            return `<button type="button" class="btn-outline-sm" onclick='runReferralAction("${action}", ${sr}, this)'>${label}</button>`;
+        }
+
+        const REFERRAL_ACTION_CONFIRM = {
+            mark_received:     { title: 'Mark as received?', text: 'This confirms the referral has arrived at our facility and is pending review.' },
+            accept:            { title: 'Accept this referral?', text: 'This confirms our facility will take on this patient\'s care.' },
+            create_encounter:  { title: 'Add to patient records?', text: 'This links the existing FHIR patient to our facility through a receiving encounter without creating a duplicate.' },
+            complete_task:     { title: 'Complete this task?', text: 'This marks the referral task as done, linked to the encounter just created.' },
+            complete_referral: { title: 'Close this referral?', text: 'This marks the referral fully completed on the sending facility\'s side too.' },
+        };
+
+        async function runReferralAction(action, r, triggerButton = null) {
+            const cfg = REFERRAL_ACTION_CONFIRM[action] || { title: 'Proceed with this step?', text: 'Confirm this action.' };
+            const confirmed = await confirmAction({
+                title: cfg.title,
+                text: `${cfg.text} Patient: ${r.patient_name}.`,
+                confirmText: 'Yes, proceed',
+            });
+            if (!confirmed) return;
+
+            const originalButtonHtml = triggerButton ? triggerButton.innerHTML : '';
+            if (triggerButton) {
+                triggerButton.disabled = true;
+                triggerButton.innerHTML = '<i class="bi bi-arrow-repeat animate-spin"></i> Processing...';
+            }
+
+            const orgId = document.getElementById('receiveOrgId').value.trim();
+            const payload = { service_request_id: r.service_request_id };
+            if (action === 'mark_received') {
+                payload.receiving_org_id = orgId;
+                if (currentOrgName) payload.receiving_org_name = currentOrgName;
+            } else if (action === 'create_encounter') {
+                payload.patient_id = r.patient_id;
+                payload.receiving_org_id = orgId;
+            } else if (action === 'complete_task') {
+                payload.receiving_encounter_id = r.encounter_id;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/fhir_referral_actions.php?action=${action}`, {
+                    method: 'POST',
+                    body: JSON.stringify(payload),
+                });
+                const body = await res.json();
+                if (body.success) {
+                    showSuccess(body.message || 'Step completed');
+                    await handleReceiveReferrals();
+                } else {
+                    showError(body.message || 'Step failed');
+                }
+            } catch (err) {
+                showError('Could not reach backend: ' + err.message);
+            } finally {
+                if (triggerButton && triggerButton.isConnected) {
+                    triggerButton.disabled = false;
+                    triggerButton.innerHTML = originalButtonHtml;
+                }
+            }
+        }
+
+        // ---- Sent referrals + timeline ----
+        async function fetchMySentReferrals() {
+            const res = await fetch(`${API_BASE}/fhir_my_sent_referrals.php?org_id=${encodeURIComponent(currentOrgId)}`);
+            const body = await res.json();
+            if (!body.success) throw new Error(body.message || 'Failed to load referrals');
+            return body.referrals || [];
+        }
+
+        // expectId: id of a ServiceRequest we just sent. The sandbox's search
+        // index (both the PractitionerRole->organization lookup and the
+        // ServiceRequest->requester lookup this endpoint chains together) can
+        // lag a beat behind a create -- verified live, a referral sent moments
+        // earlier was briefly missing from this exact list. Retry once before
+        // rendering a table that would be missing the referral just sent.
+        async function loadMyReferralsTable(expectId = null) {
+            if (!currentOrgId) { showError('Register your organization first'); return; }
+            showTableSkeleton('myReferralsDataTable', 6);
+            try {
+                let referrals = await fetchMySentReferrals();
+                if (expectId && !referrals.some(r => String(r.service_request_id) === String(expectId))) {
+                    await new Promise(r => setTimeout(r, 1500));
+                    referrals = await fetchMySentReferrals();
+                }
+
+                document.querySelector('#myReferralsDataTable tbody').innerHTML = referrals.map(r => `
+                    <tr>
+                        <td class="font-medium text-gray-800">${escapeHtml(r.patient_name)}</td>
+                        <td>${escapeHtml(r.category)}</td>
+                        <td><span class="chip ${r.status === 'completed' ? 'chip-green' : 'chip-amber'}">${escapeHtml(r.status)}</span></td>
+                        <td class="text-gray-500">${r.task_status || '--'}</td>
+                        <td>${r.authored_on ? r.authored_on.split('T')[0] : '--'}</td>
+                        <td><a class="icon-btn" title="Track this referral" onclick="openTimeline('${r.service_request_id}')"><i class="bi bi-clock-history"></i></a></td>
+                    </tr>
+                `).join('');
+                $('#myReferralsDataTable').DataTable({ order: [[4, 'desc']], pageLength: 10 });
+            } catch (err) {
+                showError('Could not reach backend: ' + err.message);
+            }
+        }
+
+        // Shopee-style order tracker: a fixed set of milestones is always shown
+        // in full (not just whatever has happened so far), with completed
+        // steps lit up in brand color and connected by a solid line, and
+        // everything after the current point greyed out as "pending" -- so a
+        // referral that was only just sent still shows the whole journey
+        // ahead, with the receiving hospital named immediately.
+        async function openTimeline(serviceRequestId) {
+            openModal('timelineModal');
+            document.getElementById('timelineSubtitle').textContent = `ServiceRequest/${serviceRequestId}`;
+            document.getElementById('timelineList').innerHTML =
+                '<li class="space-y-2"><div class="h-3 w-1/3 rounded bg-gray-200 animate-pulse"></div><div class="h-3 w-2/3 rounded bg-gray-200 animate-pulse"></div></li>';
+            try {
+                const res = await fetch(`${API_BASE}/fhir_referral_timeline.php?service_request_id=${encodeURIComponent(serviceRequestId)}`);
+                const body = await res.json();
+                if (!body.success) {
+                    document.getElementById('timelineList').innerHTML = `<li class="text-sm text-gray-500">${escapeHtml(body.message || 'Could not load timeline')}</li>`;
+                    return;
+                }
+
+                document.getElementById('timelineSubtitle').innerHTML = body.receiving_organization_name
+                    ? `ServiceRequest/${serviceRequestId} &nbsp;&middot;&nbsp; Sent to <strong class="text-gray-600">${escapeHtml(body.receiving_organization_name)}</strong>`
+                    : `ServiceRequest/${serviceRequestId}`;
+
+                const steps = body.steps || [];
+                document.getElementById('timelineList').innerHTML = steps.map((s, i) => {
+                    const isLast = i === steps.length - 1;
+                    const lineColor = s.completed ? 'bg-brand-500' : 'bg-gray-200';
+                    const circle = s.completed
+                        ? `<span class="relative z-10 flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-white"><i class="bi bi-check-lg text-xs"></i></span>`
+                        : `<span class="relative z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 border-gray-300 bg-white"></span>`;
+                    return `
+                        <li class="relative flex gap-4 ${isLast ? 'pb-0' : 'pb-8'}">
+                            ${!isLast ? `<span class="absolute left-3 top-6 -ml-px h-full w-0.5 ${lineColor}"></span>` : ''}
+                            ${circle}
+                            <div class="flex-1 -mt-0.5">
+                                <p class="text-sm font-semibold ${s.completed ? 'text-gray-800' : 'text-gray-400'}">${escapeHtml(s.label)}</p>
+                                <p class="text-[11px] ${s.completed ? 'text-gray-400' : 'text-gray-300'}">${s.time ? new Date(s.time).toLocaleString() : 'Pending'}</p>
+                                ${s.detail ? `<p class="mt-1 text-xs ${s.completed ? 'text-gray-500' : 'text-gray-300'}">${escapeHtml(s.detail)}</p>` : ''}
+                            </div>
+                        </li>`;
+                }).join('') || '<li class="text-sm text-gray-500">No timeline available.</li>';
+            } catch (err) {
+                document.getElementById('timelineList').innerHTML = `<li class="text-sm text-gray-500">Could not reach backend: ${escapeHtml(err.message)}</li>`;
+            }
+        }
+
+        // Full clinical picture for one referral -- chief complaint, working
+        // impression, vitals, reason -- so the receiving facility can review
+        // before committing to Accept.
+        async function openReferralDetails(serviceRequestId) {
+            openModal('referralDetailsModal');
+            document.getElementById('referralDetailsBody').innerHTML = `
+                <div class="space-y-3">
+                    <div class="h-4 w-1/2 rounded bg-gray-200 animate-pulse"></div>
+                    <div class="h-4 w-1/3 rounded bg-gray-200 animate-pulse"></div>
+                    <div class="h-20 w-full rounded bg-gray-200 animate-pulse"></div>
+                </div>`;
+            try {
+                const res = await fetch(`${API_BASE}/fhir_referral_details.php?service_request_id=${encodeURIComponent(serviceRequestId)}`);
+                const body = await res.json();
+                if (!body.success) {
+                    document.getElementById('referralDetailsBody').innerHTML = `<p class="text-sm text-gray-500">${escapeHtml(body.message || 'Could not load referral')}</p>`;
+                    return;
+                }
+
+                const p = body.patient;
+                const vitalsHtml = (body.vitals || []).length
+                    ? `<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        ${body.vitals.map(v => `
+                            <div class="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+                                <p class="text-[11px] text-gray-500">${escapeHtml(v.label)}</p>
+                                <p class="text-sm font-semibold text-gray-800">${escapeHtml(v.value)} <span class="text-xs font-normal text-gray-500">${escapeHtml(v.unit)}</span></p>
+                            </div>`).join('')}
+                       </div>`
+                    : '<p class="text-sm text-gray-400">No vital signs recorded.</p>';
+
+                let patientRecordActionHtml = '';
+                if (body.receiving_encounter_id) {
+                    patientRecordActionHtml = `
+                        <div class="inline-flex items-center gap-2 text-sm font-medium text-green-600">
+                            <i class="bi bi-check-circle-fill"></i> Already in Patient Records
+                        </div>`;
+                } else if (['accepted', 'completed'].includes(body.task_status) && p && p.id) {
+                    patientRecordActionHtml = `
+                        <button type="button" class="btn-primary"
+                                data-service-request-id="${escapeHtml(serviceRequestId)}"
+                                data-patient-id="${escapeHtml(p.id)}"
+                                onclick="addReferralPatientToRecords(this)">
+                            <i class="bi bi-person-plus"></i> Add to Patient Records
+                        </button>`;
+                } else {
+                    patientRecordActionHtml = `
+                        <div class="inline-flex items-center gap-2 text-xs text-gray-400">
+                            <i class="bi bi-lock"></i> Patient can be added after the referral is accepted.
+                        </div>`;
+                }
+                const onwardActionHtml = body.task_status && body.task_status !== 'requested'
+                    ? `<button type="button" class="btn-outline"
+                               data-service-request-id="${escapeHtml(serviceRequestId)}"
+                               onclick="prepareReferOnward(this.dataset.serviceRequestId, this); closeModal('referralDetailsModal')">
+                           <i class="bi bi-arrow-right-circle"></i> Refer Onward
+                       </button>`
+                    : '';
+
+                document.getElementById('referralDetailsBody').innerHTML = `
+                    <section class="rounded-xl bg-brand-25 border border-brand-100 p-4">
+                        <p class="text-[11px] font-semibold uppercase tracking-wider text-brand-500">Patient</p>
+                        <p class="mt-1 text-lg font-semibold text-gray-800">${escapeHtml(p ? p.name : 'Unknown patient')}</p>
+                        <div class="mt-3 grid grid-cols-2 sm:grid-cols-5 gap-3">
+                            <div><p class="text-[11px] text-gray-500">Patient ID</p><p class="mt-0.5 text-sm text-gray-700">${escapeHtml(p ? p.id || '--' : '--')}</p></div>
+                            <div><p class="text-[11px] text-gray-500">Date of Birth</p><p class="mt-0.5 text-sm text-gray-700">${escapeHtml(p ? p.dob || '--' : '--')}</p></div>
+                            <div><p class="text-[11px] text-gray-500">Age</p><p class="mt-0.5 text-sm text-gray-700">${escapeHtml(formatPatientAge(p ? p.dob : ''))}</p></div>
+                            <div><p class="text-[11px] text-gray-500">Gender</p><p class="mt-0.5 text-sm text-gray-700 capitalize">${escapeHtml(p ? p.gender || '--' : '--')}</p></div>
+                            <div><p class="text-[11px] text-gray-500">Phone</p><p class="mt-0.5 text-sm text-gray-700">${escapeHtml(p ? p.phone || '--' : '--')}</p></div>
+                        </div>
+                    </section>
+
+                    <section class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                        <div>
+                            <p class="text-sm font-semibold text-gray-800">Receiving Facility Record</p>
+                            <p class="mt-0.5 text-xs text-gray-500">Link this patient to your facility without creating a duplicate.</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            ${patientRecordActionHtml}
+                            ${onwardActionHtml}
+                        </div>
+                    </section>
+
+                    <section>
+                        <p class="section-label">Referral Classification</p>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div class="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3">
+                                <p class="text-[11px] uppercase tracking-wide text-gray-500">Category</p>
+                                <p class="mt-1 text-sm font-semibold text-brand-500 capitalize">${escapeHtml(body.category || '--')}</p>
+                            </div>
+                            <div class="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3">
+                                <p class="text-[11px] uppercase tracking-wide text-gray-500">Priority</p>
+                                <p class="mt-1 text-sm font-semibold ${body.priority === 'stat' ? 'text-red-500 uppercase' : 'text-gray-800 capitalize'}">${escapeHtml(body.priority || 'routine')}</p>
+                            </div>
+                            <div class="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3">
+                                <p class="text-[11px] uppercase tracking-wide text-gray-500">Service Type</p>
+                                <p class="mt-1 text-sm font-semibold text-gray-800 capitalize">${escapeHtml(body.service_type || '--')}</p>
+                            </div>
+                            <div class="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3">
+                                <p class="text-[11px] uppercase tracking-wide text-gray-500">Referral Date</p>
+                                <p class="mt-1 text-sm font-semibold text-gray-800">${body.authored_on ? escapeHtml(new Date(body.authored_on).toLocaleString()) : '--'}</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="border-t border-gray-100 pt-5">
+                        <p class="section-label">Clinical Summary</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="rounded-xl border border-gray-200 p-4">
+                                <p class="text-xs font-semibold text-gray-500">Chief Complaint</p>
+                                <p class="mt-2 text-sm text-gray-700">${escapeHtml(body.chief_complaint || 'Not recorded')}</p>
+                            </div>
+                            <div class="rounded-xl border border-gray-200 p-4">
+                                <p class="text-xs font-semibold text-gray-500">Working Impression</p>
+                                <p class="mt-2 text-sm text-gray-700">${escapeHtml(body.working_impression || 'Not recorded')}</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section>
+                        <p class="section-label">Vital Signs</p>
+                        ${vitalsHtml}
+                    </section>
+
+                    <section>
+                        <p class="section-label">Reason for Referral</p>
+                        <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                            <p class="text-sm text-gray-700">${escapeHtml(body.reason_text || 'Not recorded')}</p>
+                        </div>
+                    </section>
+
+                `;
+            } catch (err) {
+                document.getElementById('referralDetailsBody').innerHTML = `<p class="text-sm text-gray-500">Could not reach backend: ${escapeHtml(err.message)}</p>`;
+            }
+        }
+
+        async function addReferralPatientToRecords(button) {
+            const serviceRequestId = button.dataset.serviceRequestId;
+            const patientId = button.dataset.patientId;
+            const orgId = currentOrgId || document.getElementById('receiveOrgId').value.trim();
+            if (!orgId) {
+                showError('Register or select your organization first');
+                return;
+            }
+
+            const confirmed = await confirmAction({
+                title: 'Add to patient records?',
+                text: 'The existing FHIR patient will be linked to this facility through a receiving encounter. No duplicate Patient resource will be created.',
+                confirmText: 'Yes, add patient',
+            });
+            if (!confirmed) return;
+
+            const originalHtml = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '<i class="bi bi-arrow-repeat animate-spin"></i> Adding...';
+            try {
+                const res = await fetch(`${API_BASE}/fhir_referral_actions.php?action=create_encounter`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        service_request_id: serviceRequestId,
+                        patient_id: patientId,
+                        receiving_org_id: orgId,
+                    }),
+                });
+                const body = await res.json();
+                if (!body.success) {
+                    showError(body.message || 'Could not add patient to records');
+                    button.disabled = false;
+                    button.innerHTML = originalHtml;
+                    return;
+                }
+
+                showSuccess('Patient added to your records');
+                await openReferralDetails(serviceRequestId);
+                handleReceiveReferrals();
+            } catch (err) {
+                showError('Could not reach backend: ' + err.message);
+                button.disabled = false;
+                button.innerHTML = originalHtml;
+            }
+        }
+
+        // Close popups on background click
+        ['timelineModal', 'referralDetailsModal'].forEach(id => {
+            document.getElementById(id).addEventListener('click', function (e) {
+                if (e.target === this) closeModal(id);
+            });
+        });
+    </script>
+</body>
+</html>

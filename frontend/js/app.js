@@ -73,6 +73,9 @@ $(document).ready(function () {
             }
         });
     }
+    // Exposed so the separate fhir-connectathon-*.js modules can reuse the same
+    // toast styling instead of re-implementing it -- see hackathon_tracker/TRACKER.md.
+    window.showToast = showToast;
 
     /**
      * Check active staff session on page load
@@ -159,6 +162,11 @@ $(document).ready(function () {
         $('#sidebarHospitalCode').text(currentHospital.code);
         $('#sidebarFacilityTier').text(currentHospital.tier_level || '--').removeClass('hidden');
 
+        // FHIR Connectathon sandbox status badge -- separate module, see fhir-connectathon-status.js
+        if (window.FhirConnectathonStatus) {
+            window.FhirConnectathonStatus.init();
+        }
+
         // edit logo
         updateHospitalLogo(currentHospital.code);
 
@@ -221,7 +229,7 @@ $(document).ready(function () {
             .removeClass('text-red-600')
             .addClass('text-slate-500');
 
-        const $allTabs = $('#tabPatientsContent, #tabAddPatientContent, #tabReferPatientContent, #tabPendingContent, #tabReferralsContent, #tabIncomingContent, #tabUsersContent, #tabAssessmentContent, #tabAnalyticsContent, #tabLogsContent');
+        const $allTabs = $('#tabPatientsContent, #tabAddPatientContent, #tabReferPatientContent, #tabPendingContent, #tabReferralsContent, #tabIncomingContent, #tabFhirSendContent, #tabFhirReceiveContent, #tabFhirOrgsContent, #tabFhirPatientsContent, #tabUsersContent, #tabAssessmentContent, #tabAnalyticsContent, #tabLogsContent');
 
         if (tabName === 'patients') {
             $('#navTabPatients')
@@ -278,6 +286,50 @@ $(document).ready(function () {
             $allTabs.hide();
             $('#tabIncomingContent').fadeIn(200);
             loadAcceptedPatients();
+        } else if (tabName === 'fhirSend') {
+            $('#navTabFhirSend')
+                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
+                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
+            $('#navIconFhirSend')
+                .removeClass('text-slate-500')
+                .addClass('text-red-600');
+            $('#mainHeaderTitle').text('FHIR Connectathon -- Send Test');
+            $allTabs.hide();
+            $('#tabFhirSendContent').fadeIn(200);
+            if (window.FhirConnectathonSend) window.FhirConnectathonSend.init();
+        } else if (tabName === 'fhirReceive') {
+            $('#navTabFhirReceive')
+                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
+                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
+            $('#navIconFhirReceive')
+                .removeClass('text-slate-500')
+                .addClass('text-red-600');
+            $('#mainHeaderTitle').text('FHIR Connectathon -- Receive');
+            $allTabs.hide();
+            $('#tabFhirReceiveContent').fadeIn(200);
+            if (window.FhirConnectathonReceive) window.FhirConnectathonReceive.init();
+        } else if (tabName === 'fhirOrgs') {
+            $('#navTabFhirOrgs')
+                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
+                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
+            $('#navIconFhirOrgs')
+                .removeClass('text-slate-500')
+                .addClass('text-red-600');
+            $('#mainHeaderTitle').text('FHIR Connectathon -- Organizations');
+            $allTabs.hide();
+            $('#tabFhirOrgsContent').fadeIn(200);
+            if (window.FhirConnectathonOrgs) window.FhirConnectathonOrgs.init();
+        } else if (tabName === 'fhirPatients') {
+            $('#navTabFhirPatients')
+                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
+                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
+            $('#navIconFhirPatients')
+                .removeClass('text-slate-500')
+                .addClass('text-red-600');
+            $('#mainHeaderTitle').text('FHIR Connectathon -- Patients');
+            $allTabs.hide();
+            $('#tabFhirPatientsContent').fadeIn(200);
+            if (window.FhirConnectathonPatients) window.FhirConnectathonPatients.init();
         } else if (tabName === 'users') {
             $('#navTabUsers')
                 .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
@@ -362,6 +414,26 @@ $(document).ready(function () {
     $('#navTabIncoming').on('click', function (e) {
         e.preventDefault();
         switchTab('incoming');
+    });
+
+    $('#navTabFhirSend').on('click', function (e) {
+        e.preventDefault();
+        switchTab('fhirSend');
+    });
+
+    $('#navTabFhirReceive').on('click', function (e) {
+        e.preventDefault();
+        switchTab('fhirReceive');
+    });
+
+    $('#navTabFhirOrgs').on('click', function (e) {
+        e.preventDefault();
+        switchTab('fhirOrgs');
+    });
+
+    $('#navTabFhirPatients').on('click', function (e) {
+        e.preventDefault();
+        switchTab('fhirPatients');
     });
 
     $('#navTabUsers').on('click', function (e) {
@@ -513,14 +585,7 @@ $(document).ready(function () {
      */
     function loadPatients() {
         const $tableBody = $('#patientsTableBody');
-        $tableBody.html(`
-            <tr>
-                <td colspan="6" class="text-center py-4 text-muted">
-                    <div class="spinner-border spinner-border-sm me-2 text-primary" role="status"></div>
-                    Loading hospital patient records...
-                </td>
-            </tr>
-        `);
+        if (window.TableSkeleton) window.TableSkeleton.renderRows('#patientsTableBody', 7);
 
         $.ajax({
             url: `${API_BASE}/get_patients.php`,
@@ -1877,14 +1942,7 @@ $(document).ready(function () {
 
     function loadSystemLogs() {
         const $tableBody = $('#logsTableBody');
-        $tableBody.html(`
-            <tr>
-                <td colspan="7" class="text-center py-8 text-slate-400 font-normal">
-                    <div class="inline-block animate-spin rounded-full h-5 w-5 border-2 border-red-600 border-t-transparent mr-2"></div>
-                    Loading activity log...
-                </td>
-            </tr>
-        `);
+        if (window.TableSkeleton) window.TableSkeleton.renderRows('#logsTableBody', 7);
 
         $.ajax({
             url: `${API_BASE}/get_audit_logs.php`,
@@ -2980,6 +3038,7 @@ $(document).ready(function () {
         if (!currentHospital) return;
 
         const $tableBody = $('#referralsTableBody');
+        if (window.TableSkeleton) window.TableSkeleton.renderRows('#referralsTableBody', 8);
 
         $.ajax({
             url: `${API_BASE}/get_my_referrals.php`,
@@ -4048,7 +4107,11 @@ $(document).ready(function () {
             philhealth_member: $('#patPhilhealthMember').val(),
             philhealth_number: $('#patPhilhealthNumber').val(),
             philhealth_status_type: $('#patPhilhealthStatus').val(),
-            is_4ps_member: $('#pat4psMember').val()
+            is_4ps_member: $('#pat4psMember').val(),
+            philsys_id: $('#patPhilsysId').val(),
+            next_of_kin_name: $('#patNokName').val(),
+            next_of_kin_relationship: $('#patNokRelationship').val(),
+            next_of_kin_phone: $('#patNokPhone').val()
         };
 
         submitPatientForm($submitBtn, originalBtnHtml, formData);
