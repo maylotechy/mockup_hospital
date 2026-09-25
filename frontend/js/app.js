@@ -11,345 +11,22 @@ $(document).ready(function () {
         }
     });
 
-    // API Base URL (auto-detect PhpStorm/IntelliJ built-in preview server, ports 63342/63343)
-    const isIdeServer = location.port === '63342' || location.port === '63343';
-    const API_BASE = isIdeServer ? 'http://localhost/mock_hospitals/backend' : '../backend';
-    window.API_BASE = API_BASE;
-    const API_V1_REFERRAL = isIdeServer ? 'http://localhost/mock_hospitals/api/v1/referral' : '../api/v1/referral';
+    const IRDSS = window.IRDSS;
+    const state = IRDSS.state;
+    const { API_BASE, API_V1_REFERRAL } = IRDSS.config;
+    const {
+        escapeHtml,
+        formatPatientName,
+        formatDateTime12h,
+        formatAgeDisplay,
+        printableValue,
+        printableWithUnit,
+        calculatePrintableAge,
+        consentRecordedText
+    } = IRDSS.formatters;
+    const { showToast, cleanErrorMessage, buildErrorNoteHtml } = IRDSS.ui;
 
-    // Cache-buster appended to logo URLs so replacing a logo file (e.g. _default.png)
-    // shows up on next page load instead of silently serving the browser's old cached copy
-    const ASSET_CACHE_BUST = Date.now();
-
-
-    // Active Facility State (kept as `currentHospital` since referral/inventory/outcomes
-    // code throughout this file already treats it as the logged-in facility's own record)
-    let currentHospital = null;
-    // Active Staff User State (role-based nav & assessment lockout)
-    let currentUser = null;
-    // Full local patient record currently loaded into the referral form.
-    let currentReferralPatient = null;
-
-    const TOAST_STYLE = {
-        success: { bg: '#5cb85c', bar: '#4a9440', title: 'Success' },
-        info:    { bg: '#4a9fc4', bar: '#3d84a3', title: 'Info' },
-        warning: { bg: '#f0a030', bar: '#cf8620', title: 'Warning' },
-        error:   { bg: '#c0504d', bar: '#a4423f', title: 'Error' }
-    };
-
-    /**
-     * Shows a corner toast notification in the shared design: solid colored card,
-     * icon, bold category title, a message line below it, and a bottom timer bar
-     * that drains as it counts down. Replaces every ad-hoc `Swal.fire({toast:true})`
-     * call so all transient notifications look and behave the same way.
-     *
-     * @param {'success'|'info'|'warning'|'error'} type
-     * @param {string} message - plain text; escaped internally, never pass raw HTML
-     * @param {number} [duration=3000] - ms before auto-dismiss
-     */
-    function showToast(type, message, duration) {
-        const style = TOAST_STYLE[type] || TOAST_STYLE.info;
-
-        Swal.fire({
-            toast: true,
-            position: 'top-end',
-            showConfirmButton: false,
-            timer: duration || 3000,
-            timerProgressBar: true,
-            background: style.bg,
-            color: '#ffffff',
-            html: `
-                <div class="text-start" style="min-width: 240px; max-width: 340px;">
-                    <div style="font-weight: 700; font-size: 0.95rem; line-height: 1.25;">${style.title}</div>
-                    <div style="font-size: 0.82rem; opacity: 0.95; line-height: 1.3;">${escapeHtml(message)}</div>
-                </div>
-            `,
-            customClass: { popup: 'toast-notification-popup' },
-            didOpen: (toastEl) => {
-                const bar = toastEl.querySelector('.swal2-timer-progress-bar');
-                if (bar) bar.style.backgroundColor = style.bar;
-                toastEl.onmouseenter = Swal.stopTimer;
-                toastEl.onmouseleave = Swal.resumeTimer;
-            }
-        });
-    }
-
-    /**
-     * Check active staff session on page load
-     */
-    function checkSession() {
-        $.ajax({
-            url: `${API_BASE}/login.php`,
-            type: 'GET',
-            dataType: 'json',
-            success: function (response) {
-                if (response.authenticated && response.user && response.facility) {
-                    currentUser = response.user;
-                    currentHospital = response.facility;
-                    showDashboardView();
-                } else {
-                    currentUser = null;
-                    currentHospital = null;
-                    showLoginView();
-                }
-            },
-            error: function () {
-                showLoginView();
-            }
-        });
-    }
-
-    /**
-     * Mobile sidebar: off-canvas on small screens (toggled via hamburger + backdrop),
-     * always visible on lg+ via the `lg:translate-x-0` class already on #sidebar --
-     * these open/close calls are simply no-ops on desktop since that class wins there.
-     */
-    function openSidebar() {
-        $('#sidebar').removeClass('-translate-x-full');
-        $('#sidebarBackdrop').removeClass('hidden');
-    }
-    function closeSidebar() {
-        $('#sidebar').addClass('-translate-x-full');
-        $('#sidebarBackdrop').addClass('hidden');
-    }
-    $('#btnSidebarToggle').on('click', function () {
-        if ($('#sidebar').hasClass('-translate-x-full')) openSidebar(); else closeSidebar();
-    });
-    $('#sidebarBackdrop').on('click', closeSidebar);
-    $(document).on('click', '.sidebar-link', closeSidebar);
-
-    /**
-     * Update hospital logo based on hospital code
-     */
-    function getHospitalLogoPath(hospitalCode) {
-        const logoMap = {
-            'HOSP-DRMC': 'assets/logos/hospitals/DRMC.png',
-            'HOSP-CVPHL': 'assets/logos/hospitals/CVPHL.png',
-            'HOSP-MMH': 'assets/logos/hospitals/MMH.png',
-            // add more hospitals
-        };
-
-        return logoMap[hospitalCode] || 'assets/logos/hospitals/_default.png';
-    }
-
-    function updateHospitalLogo(hospitalCode) {
-        const logo = getHospitalLogoPath(hospitalCode);
-        $('#hospitalLogo').attr('src', `${logo}?v=${ASSET_CACHE_BUST}`);
-    }
-
-    /**
-     * Show Dashboard View (Authenticated State)
-     */
-    function showDashboardView() {
-        const isAdmin = currentUser && currentUser.role === 'facility_admin';
-        const isAssessed = !!(currentHospital && currentHospital.is_assessment_completed);
-
-        // Non-admin staff at a facility that hasn't completed its Service Assessment
-        // can't use the system at all yet -- they don't have a way to fill it in.
-        if (!isAdmin && !isAssessed) {
-            $('#loginView, #dashboardView').hide();
-            $('#lockedNoticeView').fadeIn(200);
-            return;
-        }
-
-        $('#loginView, #lockedNoticeView').hide();
-        $('#dashboardView').fadeIn(200);
-
-        $('#sidebarHospitalName, #headerHospitalName').text(currentHospital.name);
-        $('#sidebarHospitalCode').text(currentHospital.code);
-        $('#sidebarFacilityTier').text(currentHospital.tier_level || '--').removeClass('hidden');
-
-        // edit logo
-        updateHospitalLogo(currentHospital.code);
-
-        applyRoleBasedNav();
-
-        if (isAdmin && !isAssessed) {
-            // Facility admin must complete the Service Assessment before anything unlocks
-            $('#assessmentLockBanner').removeClass('hidden');
-            switchTab('assessment');
-        } else if (isAdmin) {
-            $('#assessmentLockBanner').addClass('hidden');
-            switchTab('users');
-        } else {
-            $('#assessmentLockBanner').addClass('hidden');
-            switchTab('patients');
-            loadPatients();
-            checkAndPollRecommendations();
-            connectReferralWebSocket();
-        }
-    }
-
-    /**
-     * Show/hide sidebar nav links based on the logged-in user's role -- Facility Admins
-     * manage staff & the Service Assessment, Doctors/Nurses handle patients & referrals.
-     * Also locks everything but Service Assessment for a facility_admin whose facility
-     * hasn't completed its assessment yet.
-     */
-    function applyRoleBasedNav() {
-        const isAdmin = currentUser && currentUser.role === 'facility_admin';
-        const isAssessed = !!(currentHospital && currentHospital.is_assessment_completed);
-
-        $('[data-nav-role="staff"]').toggle(!isAdmin);
-
-        if (isAdmin && !isAssessed) {
-            $('[data-nav-role="admin"]').hide();
-            $('#navTabAssessment').show();
-            return;
-        }
-
-        $('[data-nav-role="admin"]').toggle(isAdmin);
-    }
-
-    /**
-     * Show Login View (Unauthenticated State)
-     */
-    function showLoginView() {
-        $('#dashboardView, #lockedNoticeView').hide();
-        $('#loginView').fadeIn(200);
-        disconnectReferralWebSocket();
-    }
-
-    /**
-     * Sidebar Tab Switcher
-     */
-    function switchTab(tabName) {
-        $('.sidebar-link')
-            .removeClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60')
-            .addClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70');
-        $('.sidebar-link i')
-            .removeClass('text-red-600')
-            .addClass('text-slate-500');
-
-        const $allTabs = $('#tabPatientsContent, #tabAddPatientContent, #tabReferPatientContent, #tabPendingContent, #tabReferralsContent, #tabIncomingContent, #tabUsersContent, #tabAssessmentContent, #tabAnalyticsContent, #tabLogsContent');
-
-        if (tabName === 'patients') {
-            $('#navTabPatients')
-                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
-                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
-            $('#navIconPatients')
-                .removeClass('text-slate-500')
-                .addClass('text-red-600');
-            $('#mainHeaderTitle').text('Patient Records');
-            $allTabs.hide();
-            $('#tabPatientsContent').fadeIn(200);
-        } else if (tabName === 'addPatient') {
-            $('#mainHeaderTitle').text('Register Patient');
-            $allTabs.hide();
-            $('#tabAddPatientContent').fadeIn(200, function () {
-                patientLocationCascade.init();
-            });
-        } else if (tabName === 'referPatient') {
-            $('#mainHeaderTitle').text('Refer Patient');
-            $allTabs.hide();
-            $('#tabReferPatientContent').fadeIn(200);
-        } else if (tabName === 'referrals') {
-            $('#navTabReferrals')
-                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
-                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
-            $('#navIconReferrals')
-                .removeClass('text-slate-500')
-                .addClass('text-red-600');
-            $('#mainHeaderTitle').text('My Referrals');
-            $allTabs.hide();
-            $('#tabReferralsContent').fadeIn(200);
-            loadMyReferrals();
-            checkAndPollRecommendations();
-        } else if (tabName === 'pending') {
-            $('#navTabPending')
-                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
-                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
-            $('#navIconPending')
-                .removeClass('text-slate-500')
-                .addClass('text-red-600');
-            $('#mainHeaderTitle').text('Pending Referrals');
-            $allTabs.hide();
-            $('#tabPendingContent').fadeIn(200);
-            stopAlarmSound();
-            pollIncomingReferrals();
-        } else if (tabName === 'incoming') {
-            $('#navTabIncoming')
-                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
-                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
-            $('#navIconIncoming')
-                .removeClass('text-slate-500')
-                .addClass('text-red-600');
-            $('#mainHeaderTitle').text('Incoming Patients');
-            $allTabs.hide();
-            $('#tabIncomingContent').fadeIn(200);
-            loadAcceptedPatients();
-        } else if (tabName === 'users') {
-            $('#navTabUsers')
-                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
-                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
-            $('#navIconUsers')
-                .removeClass('text-slate-500')
-                .addClass('text-red-600');
-            $('#mainHeaderTitle').text('Manage Users');
-            $allTabs.hide();
-            $('#tabUsersContent').fadeIn(200);
-            loadUsers();
-        } else if (tabName === 'assessment') {
-            $('#navTabAssessment')
-                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
-                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
-            $('#navIconAssessment')
-                .removeClass('text-slate-500')
-                .addClass('text-red-600');
-            $('#mainHeaderTitle').text('Service Assessment');
-            $allTabs.hide();
-            $('#tabAssessmentContent').fadeIn(200);
-            loadServiceAssessment();
-        } else if (tabName === 'analytics') {
-            $('#navTabAnalytics')
-                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
-                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
-            $('#navIconAnalytics')
-                .removeClass('text-slate-500')
-                .addClass('text-red-600');
-            $('#mainHeaderTitle').text('Analytics');
-            $allTabs.hide();
-            $('#tabAnalyticsContent').fadeIn(200);
-            loadFacilityAnalytics();
-        } else if (tabName === 'logs') {
-            $('#navTabLogs')
-                .removeClass('text-slate-500 hover:bg-slate-200/80 active:bg-slate-300/70')
-                .addClass('bg-red-600/20 text-red-600 font-semibold shadow shadow-red-600/10 hover:bg-red-600/40 active:bg-red-600/60');
-            $('#navIconLogs')
-                .removeClass('text-slate-500')
-                .addClass('text-red-600');
-            $('#mainHeaderTitle').text('System Logs');
-            $allTabs.hide();
-            $('#tabLogsContent').fadeIn(200);
-            loadSystemLogs();
-        }
-    }
-
-    function loadServiceAssessment() {
-        const doh = window.DOHAssessment || (typeof DOHAssessment !== 'undefined' ? DOHAssessment : null);
-        if (doh && typeof doh.loadForm === 'function') {
-            doh.loadForm();
-        } else {
-            console.error('DOHAssessment module not found on window object!');
-        }
-    }
-
-
-
-    $('#navTabPatients').on('click', function (e) {
-        e.preventDefault();
-        switchTab('patients');
-    });
-
-    $('#navTabReferrals').on('click', function (e) {
-        e.preventDefault();
-        switchTab('referrals');
-    });
-
-    $('#navTabPending').on('click', function (e) {
-        e.preventDefault();
-        switchTab('pending');
-    });
+    const { switchTab, getHospitalLogoPath } = IRDSS.navigation;
 
     $(document).on('click', '#btnRefreshPending', function () {
         pollIncomingReferrals();
@@ -357,26 +34,6 @@ $(document).ready(function () {
 
     $(document).on('click', '#btnTestAlarm', function () {
         playAlarmSound();
-    });
-
-    $('#navTabIncoming').on('click', function (e) {
-        e.preventDefault();
-        switchTab('incoming');
-    });
-
-    $('#navTabUsers').on('click', function (e) {
-        e.preventDefault();
-        switchTab('users');
-    });
-
-    $('#navTabAssessment').on('click', function (e) {
-        e.preventDefault();
-        switchTab('assessment');
-    });
-
-    $('#navTabAnalytics').on('click', function (e) {
-        e.preventDefault();
-        switchTab('analytics');
     });
 
     $(document).on('click', '#btnApplyAnalyticsDates', function () {
@@ -392,120 +49,8 @@ $(document).ready(function () {
         exportFacilityAnalyticsCsv();
     });
 
-    $('#navTabLogs').on('click', function (e) {
-        e.preventDefault();
-        switchTab('logs');
-    });
-
     $(document).on('click', '#btnRefreshLogs', function () {
         loadSystemLogs();
-    });
-
-    /**
-     * Handle Login Form Submission
-     */
-    $('#loginForm').on('submit', function (e) {
-        e.preventDefault();
-
-        const username = $('#loginUsername').val();
-        const password = $('#loginPassword').val();
-        const $btn = $('#btnLoginSubmit');
-
-        $btn.html('<span class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent me-2"></span> Signing In...').prop('disabled', true);
-
-        $.ajax({
-            url: `${API_BASE}/login.php`,
-            type: 'POST',
-            data: { username: username, password: password },
-            dataType: 'json',
-            success: function (response) {
-                $btn.html('<span>Sign In</span> <i class="bi bi-arrow-right"></i>').prop('disabled', false);
-
-                if (response.success && response.user && response.facility) {
-                    currentUser = response.user;
-                    currentHospital = response.facility;
-                    showDashboardView();
-
-                    showToast('success', `Welcome back, ${response.user.full_name}!`, 3000);
-                } else {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Authentication Failed',
-                        text: response.message || 'Invalid credentials.',
-                        confirmButtonColor: '#0d6efd'
-                    });
-                }
-            },
-            error: function (xhr) {
-                $btn.html('<span>Sign In</span> <i class="bi bi-arrow-right"></i>').prop('disabled', false);
-
-                let errMsg = 'Failed to connect to authentication server.';
-                if (xhr.responseJSON && xhr.responseJSON.message) {
-                    errMsg = xhr.responseJSON.message;
-                }
-
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Login Error',
-                    text: errMsg,
-                    confirmButtonColor: '#0d6efd'
-                });
-            }
-        });
-    });
-
-    /**
-     * Handle Logout Button Click
-     */
-    $(document).on('click', '#btnLogoutBtn, #btnLockedLogout', function () {
-        Swal.fire({
-            title: 'Log Out?',
-            text: 'Are you sure you want to sign out?',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#dc3545',
-            cancelButtonColor: '#6c757d',
-            confirmButtonText: '<i class="bi bi-box-arrow-right me-1"></i> Yes, Log Out',
-            cancelButtonText: 'Cancel',
-            reverseButtons: true,
-            buttonsStyling: false,
-            customClass: {
-                popup: 'logout-popup',
-                title: 'logout-title',
-                htmlContainer: 'logout-text',
-                confirmButton: 'logout-confirm',
-                cancelButton: 'logout-cancel'
-            }
-        }).then((result) => {
-            if (result.isConfirmed) {
-                $.ajax({
-                    url: `${API_BASE}/logout.php`,
-                    type: 'POST',
-                    dataType: 'json',
-                    success: function () {
-                        currentHospital = null;
-                        currentUser = null;
-                        window.activeInitiatedReferralId = null;
-
-                        // Clear referral notification state so the next login starts fresh
-                        stopAlarmSound();
-                        notifiedReferralIds.clear();
-                        incomingNotifications.clear();
-                        renderNotificationBell();
-
-                        // Explicitly remove active referral key & wipe local storage
-                        try {
-                            localStorage.removeItem('active_initiated_referral');
-                            localStorage.clear();
-                        } catch(e) {}
-
-                        showLoginView();
-
-                        showToast('info', 'Signed out successfully.', 2500);
-                    }
-                });
-            }
-        });
     });
 
     /**
@@ -720,7 +265,7 @@ $(document).ready(function () {
 
                 if (response.success && response.data) {
                     const patient = response.data;
-                    currentReferralPatient = patient;
+                    state.currentReferralPatient = patient;
 
                     // Clean slate every time -- without this, a partially-filled-then-
                     // abandoned re-referral (with prefilled vitals) could leak into the
@@ -1089,44 +634,14 @@ $(document).ready(function () {
         return isValid;
     }
 
-    function printableValue(value) {
-        const text = String(value || '').trim();
-        return escapeHtml(text || '--');
-    }
-
-    function printableWithUnit(value, unit) {
-        const text = printableValue(value);
-        return (text === '--' || text === '--/--') ? text : `${text} ${unit}`;
-    }
-
-    function calculatePrintableAge(dateOfBirth) {
-        const match = String(dateOfBirth || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-        if (!match) return '--';
-        const birthDate = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-        const today = new Date();
-        let years = today.getFullYear() - birthDate.getFullYear();
-        const birthdayPassed = today.getMonth() > birthDate.getMonth()
-            || (today.getMonth() === birthDate.getMonth() && today.getDate() >= birthDate.getDate());
-        if (!birthdayPassed) years -= 1;
-        return `${Math.max(0, years)} year${years === 1 ? '' : 's'} old`;
-    }
-
-    function consentRecordedText(consentStatus, consentMethod) {
-        if (String(consentStatus || '').toUpperCase() !== 'GRANTED') return 'Not recorded';
-        const method = String(consentMethod || '').toUpperCase();
-        if (method === 'ELECTRONIC') return 'Electronic consent recorded';
-        if (method === 'PAPER') return 'Paper consent recorded';
-        return 'Consent recorded';
-    }
-
     window.getReferralConsentSnapshot = function () {
         const primaryReason = $('#modalReasonText').val() || $('#modalReasonSelect').val();
-        const isDoctor = String(currentUser?.role || '').toLowerCase() === 'doctor';
-        const clinicianBaseName = currentUser?.full_name || currentUser?.name || currentUser?.username || 'Clinical staff';
+        const isDoctor = String(state.currentUser?.role || '').toLowerCase() === 'doctor';
+        const clinicianBaseName = state.currentUser?.full_name || state.currentUser?.name || state.currentUser?.username || 'Clinical staff';
         const clinicianName = isDoctor && !/^(dr\.?|doctor)\s+/i.test(String(clinicianBaseName).trim())
             ? `Dr. ${clinicianBaseName}`
             : clinicianBaseName;
-        const isPhilHealthMember = String(currentReferralPatient?.philhealth_member || '').toLowerCase() === 'yes';
+        const isPhilHealthMember = String(state.currentReferralPatient?.philhealth_member || '').toLowerCase() === 'yes';
         const hasAllergy = $('#modalHasAllergy').is(':checked');
         const gender = String($('#modalPatientGender').text() || '').trim();
 
@@ -1142,9 +657,9 @@ $(document).ready(function () {
             hasAllergy: hasAllergy ? 'Yes' : 'No',
             allergyDetails: hasAllergy ? String($('#modalAllergyDetails').val() || 'Not specified').trim() : 'Not applicable',
             philHealthMember: isPhilHealthMember ? 'Yes' : 'No',
-            philHealthType: isPhilHealthMember ? String(currentReferralPatient?.philhealth_status_type || 'Not specified').trim() : 'Not applicable',
-            philHealthNumber: isPhilHealthMember ? String(currentReferralPatient?.philhealth_number || '').trim() : '',
-            referringHospital: currentHospital?.name || 'Referring facility',
+            philHealthType: isPhilHealthMember ? String(state.currentReferralPatient?.philhealth_status_type || 'Not specified').trim() : 'Not applicable',
+            philHealthNumber: isPhilHealthMember ? String(state.currentReferralPatient?.philhealth_number || '').trim() : '',
+            referringHospital: state.currentHospital?.name || 'Referring facility',
             receivingHospital: 'To be determined through IRDSS',
             chiefComplaint: String($('#modalChiefComplaint').val() || '').trim(),
             diagnosis: String($('#modalDiagnosis').val() || 'Not specified').trim(),
@@ -1161,8 +676,8 @@ $(document).ready(function () {
             },
             clinicianName,
             clinicianRole: isDoctor ? 'Referring Doctor' : 'Referring Nurse',
-            clinicianLicenseNumber: currentUser?.license_number || 'Not recorded',
-            hospitalLogoUrl: new URL(getHospitalLogoPath(currentHospital?.code), window.location.href).href,
+            clinicianLicenseNumber: state.currentUser?.license_number || 'Not recorded',
+            hospitalLogoUrl: new URL(getHospitalLogoPath(state.currentHospital?.code), window.location.href).href,
             irdssLogoUrl: new URL('assets/logos/IRDSS_long.png', window.location.href).href
         };
     };
@@ -1182,24 +697,24 @@ $(document).ready(function () {
         const primaryReason = $('#modalReasonText').val() || $('#modalReasonSelect').val();
         const reasons = [primaryReason, ...getAdditionalReferralReasons()].filter(Boolean);
         const severityText = $('#modalSeverity option:selected').text();
-        const isDoctor = String(currentUser?.role || '').toLowerCase() === 'doctor';
-        const clinicianBaseName = currentUser?.full_name || currentUser?.name || currentUser?.username || 'Clinical staff';
+        const isDoctor = String(state.currentUser?.role || '').toLowerCase() === 'doctor';
+        const clinicianBaseName = state.currentUser?.full_name || state.currentUser?.name || state.currentUser?.username || 'Clinical staff';
         const clinician = isDoctor && !/^(dr\.?|doctor)\s+/i.test(String(clinicianBaseName).trim())
             ? `Dr. ${clinicianBaseName}`
             : clinicianBaseName;
         const clinicianRole = isDoctor ? 'Referring Doctor' : 'Referring Nurse';
-        const licenseNumber = currentUser?.license_number || 'Not recorded';
-        const facility = currentHospital?.name || 'Referring facility';
+        const licenseNumber = state.currentUser?.license_number || 'Not recorded';
+        const facility = state.currentHospital?.name || 'Referring facility';
         const patientLocation = $('#displayResolvedAddress').text();
         const dateOfBirth = $('#modalPatientDob').text();
         const patientAge = calculatePrintableAge(dateOfBirth);
-        const isPhilHealthMember = String(currentReferralPatient?.philhealth_member || '').toLowerCase() === 'yes';
+        const isPhilHealthMember = String(state.currentReferralPatient?.philhealth_member || '').toLowerCase() === 'yes';
         const philHealthMembership = isPhilHealthMember ? 'Yes' : 'No';
         const philHealthType = isPhilHealthMember
-            ? (currentReferralPatient?.philhealth_status_type || 'Not specified')
+            ? (state.currentReferralPatient?.philhealth_status_type || 'Not specified')
             : 'Not applicable';
         const philHealthNumber = isPhilHealthMember
-            ? String(currentReferralPatient?.philhealth_number || '').trim()
+            ? String(state.currentReferralPatient?.philhealth_number || '').trim()
             : '';
         const pwdStatus = $('#modalIsPwd').is(':checked') ? 'Yes' : 'No';
         const pregnancyStatus = $('#modalIsPregnant').is(':checked') ? 'Yes' : 'No';
@@ -1211,7 +726,7 @@ $(document).ready(function () {
         const bp = `${$('#modalVitalBpSystolic').val() || '--'}/${$('#modalVitalBpDiastolic').val() || '--'}`;
         const createdAt = new Intl.DateTimeFormat('en-PH', { dateStyle: 'long', timeStyle: 'short' }).format(new Date());
         const rows = reasons.map((reason, index) => `<li>${index === 0 ? '<strong>Primary:</strong> ' : ''}${printableValue(reason)}</li>`).join('');
-        const hospitalLogoUrl = new URL(getHospitalLogoPath(currentHospital?.code), window.location.href).href;
+        const hospitalLogoUrl = new URL(getHospitalLogoPath(state.currentHospital?.code), window.location.href).href;
         const irdssLogoUrl = new URL('assets/logos/IRDSS_long.png', window.location.href).href;
         const patientFileName = String($('#modalPatientName').text() || 'patient')
             .trim()
@@ -1381,7 +896,7 @@ $(document).ready(function () {
             consent_method: consentMethod,
             consent_text_version: 'referral-consent-2026-09-v1',
             consent_recorded_at: consentMethod === 'ELECTRONIC' ? $('#consentRecordedAt').val() : new Date().toISOString(),
-            consent_witnessed_by: currentUser?.full_name || currentUser?.name || currentUser?.username || 'Clinical staff',
+            consent_witnessed_by: state.currentUser?.full_name || state.currentUser?.name || state.currentUser?.username || 'Clinical staff',
             consent_signer_type: consentMethod === 'ELECTRONIC' ? $('#consentSignerType').val() : '',
             consent_signer_name: consentMethod === 'ELECTRONIC' ? $('#consentSignerName').val() : '',
             consent_representative_relationship: consentMethod === 'ELECTRONIC' ? $('#consentRepresentativeRelationship').val() : '',
@@ -1426,7 +941,7 @@ $(document).ready(function () {
 
                     if (refId) {
                         const activeRefData = { id: refId, patientName: patientName, status: 'AWAITING' };
-                        window.activeInitiatedReferralId = refId;
+                        state.activeInitiatedReferralId = refId;
                         try {
                             localStorage.setItem('active_initiated_referral', JSON.stringify(activeRefData));
                         } catch(e) {}
@@ -1521,8 +1036,8 @@ $(document).ready(function () {
     };
 
     function loadAcceptedPatients() {
-        const isClinicalUser = currentUser && (currentUser.role === 'doctor' || currentUser.role === 'nurse');
-        if (!currentHospital || !isClinicalUser) return;
+        const isClinicalUser = state.currentUser && (state.currentUser.role === 'doctor' || state.currentUser.role === 'nurse');
+        if (!state.currentHospital || !isClinicalUser) return;
 
         const $list = $('#acceptedPatientsList');
 
@@ -1624,7 +1139,7 @@ $(document).ready(function () {
     let latestAnalyticsExport = null;
 
     function loadFacilityAnalytics() {
-        if (!currentUser || currentUser.role !== 'facility_admin') return;
+        if (!state.currentUser || state.currentUser.role !== 'facility_admin') return;
 
         const startDate = $('#analyticsStartDate').val();
         const endDate = $('#analyticsEndDate').val();
@@ -2405,12 +1920,12 @@ $(document).ready(function () {
      * Poll GET /api/v1/referral/{referral_id}/recommendations for accepting hospitals
      */
     function checkAndPollRecommendations() {
-        if (!currentHospital) {
+        if (!state.currentHospital) {
             $('#acceptedHospitalsCard').hide();
             return;
         }
 
-        let referralId = window.activeInitiatedReferralId || null;
+        let referralId = state.activeInitiatedReferralId || null;
         let patientName = 'Patient';
 
         if (!referralId) {
@@ -2430,7 +1945,7 @@ $(document).ready(function () {
             $('#acceptedHospitalsCard').fadeIn(200);
             $('#activeReferralIdText').text(referralId);
             $('#activeReferralPatientText').text(patientName);
-            fetchRecommendationsForReferral(referralId, currentHospital.api_key || '');
+            fetchRecommendationsForReferral(referralId, state.currentHospital.api_key || '');
             return;
         }
 
@@ -2452,14 +1967,14 @@ $(document).ready(function () {
                 }
 
                 const rehydrated = awaitingFinalization[0];
-                window.activeInitiatedReferralId = rehydrated.referral_id;
+                state.activeInitiatedReferralId = rehydrated.referral_id;
                 const rehydratedName = 'Patient';
                 localStorage.setItem('active_initiated_referral', JSON.stringify({ id: rehydrated.referral_id, patientName: rehydratedName }));
 
                 $('#acceptedHospitalsCard').fadeIn(200);
                 $('#activeReferralIdText').text(rehydrated.referral_id);
                 $('#activeReferralPatientText').text(rehydratedName);
-                fetchRecommendationsForReferral(rehydrated.referral_id, currentHospital.api_key || '');
+                fetchRecommendationsForReferral(rehydrated.referral_id, state.currentHospital.api_key || '');
             },
             error: function () {
                 $('#acceptedHospitalsCard').hide();
@@ -2494,8 +2009,8 @@ $(document).ready(function () {
 
     $(document).on('change', '#selectActiveReferralId', function() {
         const selectedId = $(this).val();
-        if (!selectedId || !currentHospital) return;
-        const apiKey = currentHospital.api_key || '';
+        if (!selectedId || !state.currentHospital) return;
+        const apiKey = state.currentHospital.api_key || '';
 
         const selectedRef = initiatedReferralsCache.find(r => r.referral_id === selectedId);
         if (selectedRef) {
@@ -2699,9 +2214,9 @@ $(document).ready(function () {
             customClass: { popup: 'rounded-4 shadow-lg' }
         }).then((result) => {
             if (!result.isConfirmed) return;
-            if (!currentHospital) return;
+            if (!state.currentHospital) return;
 
-            const apiKey = currentHospital.api_key || '';
+            const apiKey = state.currentHospital.api_key || '';
             const originalBtnHtml = $btn ? $btn.html() : null;
             if ($btn) $btn.html('<span class="spinner-border spinner-border-sm me-2"></span> Finalizing...').prop('disabled', true);
 
@@ -2727,7 +2242,7 @@ $(document).ready(function () {
                         .text(`Finalized`);
 
                     // Close out this referral's session client-side so polling stops surfacing it
-                    window.activeInitiatedReferralId = null;
+                    state.activeInitiatedReferralId = null;
                     try { localStorage.removeItem('active_initiated_referral'); } catch (e) {}
 
                     // Hide the card immediately -- it's finalized, there's nothing left to
@@ -2806,128 +2321,6 @@ $(document).ready(function () {
         }
     });
 
-    /**
-     * Generic Alert Popup
-     */
-    function showAlert(type, title, message) {
-        const swalIcon = type === 'success' ? 'success' : (type === 'warning' ? 'warning' : 'error');
-
-        Swal.fire({
-            icon: swalIcon,
-            title: title,
-            text: message,
-            confirmButtonText: '<i class="bi bi-check-lg me-1"></i> OK',
-            confirmButtonColor: '#0d6efd',
-            customClass: { popup: 'rounded-4 shadow-lg' }
-        });
-    }
-
-    /**
-     * Clean and format error messages (hides internal DB traces on 500 errors)
-     */
-    function cleanErrorMessage(msg, statusCode) {
-        if (statusCode >= 500 || (typeof msg === 'string' && (msg.includes('SQL') || msg.includes('violates') || msg.includes('constraint') || msg.includes('psycopg2') || msg.includes('NotNullViolation')))) {
-            return 'An internal server error occurred while processing the request.';
-        }
-        if (!msg || typeof msg !== 'string') return 'An unexpected error occurred.';
-        let clean = msg;
-        if (clean.includes('[SQL:')) {
-            clean = clean.split('[SQL:')[0];
-        }
-        if (clean.includes('DETAIL:')) {
-            clean = clean.split('DETAIL:')[0];
-        }
-        clean = clean.replace(/\s*\([^)]*psycopg2[^)]*\)/gi, '').trim();
-        if (clean.length > 400) {
-            clean = clean.substring(0, 397) + '...';
-        }
-        return clean;
-    }
-
-    /**
-     * Build the colored note box for an error dialog: a "contact developer" notice for
-     * genuine 5xx server failures, or the actual business-rule detail message otherwise.
-     */
-    function buildErrorNoteHtml(errorMsg, statusCode) {
-        if (statusCode >= 500) {
-            return `
-                <div class="p-4 rounded-2xl text-start shadow-sm border" style="background-color: #fef2f2; color: #991b1b; border-color: #fecaca;">
-                    <div class="flex items-start gap-2.5">
-                        <i class="bi bi-exclamation-triangle-fill text-red-600 text-lg leading-none mt-0.5 flex-shrink-0"></i>
-                        <span class="text-xs font-semibold leading-relaxed">It seems like there is a problem with the server, contact developer at irdss.dev@upmin.edu.ph</span>
-                    </div>
-                </div>
-            `;
-        }
-        return `
-            <div class="p-4 rounded-2xl text-start shadow-sm border" style="background-color: #fffbeb; color: #92400e; border-color: #fde68a;">
-                <div class="flex items-start gap-2.5">
-                    <i class="bi bi-info-circle-fill text-amber-600 text-lg leading-none mt-0.5 flex-shrink-0"></i>
-                    <span class="text-xs font-semibold leading-relaxed">${errorMsg}</span>
-                </div>
-            </div>
-        `;
-    }
-
-    /**
-     * Escape HTML special characters
-     */
-    function formatPatientName(patient) {
-        return [patient.first_name, patient.middle_name, patient.last_name].filter(Boolean).join(' ');
-    }
-
-    // MySQL DATETIME strings ("2026-09-01 14:22:10") aren't reliably parsed by `new Date()`
-    // across browsers unless the space is swapped for a "T" -- falls back to the raw string
-    // if parsing fails rather than showing "Invalid Date".
-    function formatDateTime12h(dtString) {
-        if (!dtString) return '';
-        const d = new Date(String(dtString).replace(' ', 'T'));
-        if (isNaN(d.getTime())) return dtString;
-        return d.toLocaleString('en-US', {
-            year: 'numeric', month: 'short', day: 'numeric',
-            hour: 'numeric', minute: '2-digit', hour12: true
-        });
-    }
-
-    function escapeHtml(text) {
-        if (text === null || text === undefined) return '';
-        return String(text)
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-    }
-
-    /**
-     * Three-tier age display: years, falling back to whole months under a year,
-     * falling back to whole days under a month -- so a newborn a few weeks old
-     * doesn't show as "0 months old" (indistinguishable from missing/broken data)
-     * the same way "0 years old" would've been indistinguishable from an infant.
-     *
-     * @param {number|null|undefined} age - years
-     * @param {number|null|undefined} ageMonths - completed months since birth
-     * @param {number|null|undefined} ageDays - completed days since birth
-     * @param {boolean} [withSuffix=false] - append " old" (years/months) for prose use
-     * @returns {string}
-     */
-    function formatAgeDisplay(age, ageMonths, ageDays, withSuffix) {
-        const hasAge = typeof age === 'number';
-        const hasMonths = ageMonths !== null && ageMonths !== undefined;
-        const hasDays = ageDays !== null && ageDays !== undefined;
-
-        if (hasAge && age < 1 && hasMonths && ageMonths < 1 && hasDays) {
-            return `${ageDays} day${ageDays === 1 ? '' : 's'}${withSuffix ? ' old' : ''}`;
-        }
-        if (hasAge && age < 1 && hasMonths) {
-            return `${ageMonths} month${ageMonths === 1 ? '' : 's'}${withSuffix ? ' old' : ''}`;
-        }
-        if (hasAge) {
-            return withSuffix ? `${age} years old` : String(age);
-        }
-        return '—';
-    }
-
     // ============================================================
     // MY REFERRALS PAGE (list, filter, cancel)
     // ============================================================
@@ -2977,7 +2370,7 @@ $(document).ready(function () {
      * Load referrals initiated by this hospital via GET /api/v1/referral/mine
      */
     function loadMyReferrals() {
-        if (!currentHospital) return;
+        if (!state.currentHospital) return;
 
         const $tableBody = $('#referralsTableBody');
 
@@ -3143,7 +2536,7 @@ $(document).ready(function () {
     }
 
     $('#btnRefreshReferrals').on('click', function () {
-        if (currentHospital) loadMyReferrals();
+        if (state.currentHospital) loadMyReferrals();
     });
 
     $('#referralFilterStatus, #referralFilterFrom, #referralFilterTo').on('change', applyReferralFilters);
@@ -3343,8 +2736,8 @@ $(document).ready(function () {
      * Poll Incoming Referrals for active hospital session
      */
     function pollIncomingReferrals() {
-        const isClinicalUser = currentUser && (currentUser.role === 'doctor' || currentUser.role === 'nurse');
-        if (!currentHospital || !isClinicalUser || isPollingInProgress) return;
+        const isClinicalUser = state.currentUser && (state.currentUser.role === 'doctor' || state.currentUser.role === 'nurse');
+        if (!state.currentHospital || !isClinicalUser || isPollingInProgress) return;
 
         isPollingInProgress = true;
 
@@ -3686,7 +3079,7 @@ $(document).ready(function () {
      * PATCH /api/v1/referral/{referral_id}/seen — stamps when the facility opened the form
      */
     function markReferralSeen(referralId) {
-        if (!currentHospital || !referralId) return;
+        if (!state.currentHospital || !referralId) return;
 
         $.ajax({
             url: `${API_BASE}/mark_referral_seen.php`,
@@ -3706,7 +3099,7 @@ $(document).ready(function () {
      */
     function showIncomingReferralDetail(incomingAlert) {
         const referralId = incomingAlert.referral_id || incomingAlert.id || 'N/A';
-        window.currentActiveReferralId = referralId;
+        state.currentActiveReferralId = referralId;
 
         const referringFacility = incomingAlert.referring_facility || incomingAlert.referring_hospital || (incomingAlert.serviceProvider && incomingAlert.serviceProvider.display) || 'Unknown Hospital';
         const patientId = incomingAlert.patient_id || (incomingAlert.subject && incomingAlert.subject.reference) || 'N/A';
@@ -3738,8 +3131,8 @@ $(document).ready(function () {
         // Extract hospital coordinates (destination) — this is OUR OWN hospital's location,
         // used only for the transfer-distance calc below, never for display as "referring
         // facility" (that's a different hospital entirely — see referring facility coords).
-        const hospitalLat = incomingAlert.hospital_latitude !== undefined && incomingAlert.hospital_latitude !== null ? parseFloat(incomingAlert.hospital_latitude) : (incomingAlert.hospital_lat !== undefined && incomingAlert.hospital_lat !== null ? parseFloat(incomingAlert.hospital_lat) : (currentHospital && currentHospital.latitude !== undefined && currentHospital.latitude !== null ? parseFloat(currentHospital.latitude) : null));
-        const hospitalLng = incomingAlert.hospital_longitude !== undefined && incomingAlert.hospital_longitude !== null ? parseFloat(incomingAlert.hospital_longitude) : (incomingAlert.hospital_lng !== undefined && incomingAlert.hospital_lng !== null ? parseFloat(incomingAlert.hospital_lng) : (currentHospital && currentHospital.longitude !== undefined && currentHospital.longitude !== null ? parseFloat(currentHospital.longitude) : null));
+        const hospitalLat = incomingAlert.hospital_latitude !== undefined && incomingAlert.hospital_latitude !== null ? parseFloat(incomingAlert.hospital_latitude) : (incomingAlert.hospital_lat !== undefined && incomingAlert.hospital_lat !== null ? parseFloat(incomingAlert.hospital_lat) : (state.currentHospital && state.currentHospital.latitude !== undefined && state.currentHospital.latitude !== null ? parseFloat(state.currentHospital.latitude) : null));
+        const hospitalLng = incomingAlert.hospital_longitude !== undefined && incomingAlert.hospital_longitude !== null ? parseFloat(incomingAlert.hospital_longitude) : (incomingAlert.hospital_lng !== undefined && incomingAlert.hospital_lng !== null ? parseFloat(incomingAlert.hospital_lng) : (state.currentHospital && state.currentHospital.longitude !== undefined && state.currentHospital.longitude !== null ? parseFloat(state.currentHospital.longitude) : null));
 
         // Extract the actual referring (sending) hospital's own coordinates, for display.
         const referringLat = incomingAlert.referring_facility_latitude !== undefined && incomingAlert.referring_facility_latitude !== null ? parseFloat(incomingAlert.referring_facility_latitude) : null;
@@ -3855,7 +3248,7 @@ $(document).ready(function () {
                         if (confirmBtn) confirmBtn.disabled = true;
                         if (denyBtn) denyBtn.disabled = true;
                         if (cancelBtn) cancelBtn.disabled = true;
-                        const refId = window.currentActiveReferralId;
+                        const refId = state.currentActiveReferralId;
                         Swal.close();
                         submitReferralDecision(refId, 'ACCEPTED');
                     }, { capture: true });
@@ -3868,7 +3261,7 @@ $(document).ready(function () {
                         if (confirmBtn) confirmBtn.disabled = true;
                         if (denyBtn) denyBtn.disabled = true;
                         if (cancelBtn) cancelBtn.disabled = true;
-                        const refId = window.currentActiveReferralId;
+                        const refId = state.currentActiveReferralId;
                         Swal.close();
                         promptRedirectReason(refId);
                     }, { capture: true });
@@ -3937,7 +3330,7 @@ $(document).ready(function () {
      * Submit Accept / Redirect decision to PATCH /api/v1/referral/{referral_id}/respond
      */
     function submitReferralDecision(referralId, decision, redirectReason) {
-        if (!currentHospital || isSubmittingDecision) return;
+        if (!state.currentHospital || isSubmittingDecision) return;
         isSubmittingDecision = true;
 
         Swal.fire({
@@ -4171,7 +3564,7 @@ $(document).ready(function () {
             const statusBadge = user.is_active
                 ? '<span class="px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">Active</span>'
                 : '<span class="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-500 border border-slate-200">Inactive</span>';
-            const isSelf = currentUser && currentUser.id === user.id;
+            const isSelf = state.currentUser && state.currentUser.id === user.id;
 
             const row = `
                 <tr class="!bg-slate-200/40 hover:!bg-slate-300/40 transition-colors">
@@ -4911,7 +4304,7 @@ $(document).ready(function () {
      * restart) as long as the session is still active.
      */
     function connectReferralWebSocket() {
-        if (!currentHospital || referralSocket) return;
+        if (!state.currentHospital || referralSocket) return;
         wsManuallyClosed = false;
 
         $.ajax({
@@ -4944,7 +4337,7 @@ $(document).ready(function () {
 
                 referralSocket.onclose = function () {
                     referralSocket = null;
-                    if (!wsManuallyClosed && currentHospital) scheduleWsReconnect();
+                    if (!wsManuallyClosed && state.currentHospital) scheduleWsReconnect();
                 };
 
                 referralSocket.onerror = function () {
@@ -4981,12 +4374,35 @@ $(document).ready(function () {
     setInterval(checkAndPollRecommendations, 30000);
     setInterval(loadAcceptedPatients, 45000);
 
-    // Exposed so service_assessment.js (a separate script/closure) can navigate back
-    // to the facility admin's home tab after a successful DOH Assessment submission,
-    // and so any script can raise a toast in the shared design.
+    IRDSS.navigation.configure({
+        loadPatients,
+        loadMyReferrals,
+        checkRecommendations: checkAndPollRecommendations,
+        stopAlarm: stopAlarmSound,
+        pollIncomingReferrals,
+        loadAcceptedPatients,
+        loadUsers,
+        loadServiceAssessment,
+        loadFacilityAnalytics,
+        loadSystemLogs,
+        initializePatientLocation: function () { patientLocationCascade.init(); },
+        connectReferralWebSocket,
+        disconnectReferralWebSocket
+    });
+    IRDSS.navigation.init();
+
+    IRDSS.auth.session.configure({
+        clearReferralNotifications: function () {
+            stopAlarmSound();
+            notifiedReferralIds.clear();
+            incomingNotifications.clear();
+            renderNotificationBell();
+        }
+    });
+
+    // Compatibility bridge for standalone scripts that still call these globals.
     window.switchTab = switchTab;
     window.showToast = showToast;
 
-    // Initialize session check
-    checkSession();
+    IRDSS.auth.session.init();
 });
