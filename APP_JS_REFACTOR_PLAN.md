@@ -4,7 +4,7 @@
 
 Split the current `frontend/js/app.js` into focused feature files while preserving existing behavior, jQuery event handling, shared session state, consent modules, and WebSocket updates.
 
-The original file was approximately 4,992 lines. After Phases 1–3, `app.js` is approximately 3,750 lines and the extracted responsibilities now live in focused modules.
+The original file was approximately 4,992 lines. After Phases 1–4, `app.js` is approximately 2,990 lines and the extracted responsibilities now live in focused modules.
 
 ## Progress
 
@@ -13,8 +13,9 @@ The original file was approximately 4,992 lines. After Phases 1–3, `app.js` is
 | Phase 1: Core infrastructure | Completed | Added configuration, shared state, formatter, and UI modules; `app.js` now consumes them. |
 | Phase 2: Navigation and authentication | Completed | Extracted session, login/logout, sidebar, role-based navigation, dashboard entry, and tab routing. |
 | Phase 3: Patient features | Completed | Extracted patient listing, registration and duplicate handling, PhilHealth fields, and transferred-patient arrival/departure workflows. |
-| Phase 4: Referral form and submission | Not started | Next planned implementation phase. |
-| Phases 5–9 | Not started | Proceed in the documented order after each phase is verified. |
+| Phase 4: Referral form and submission | Completed | Extracted form preparation and validation, reasons and allergy fields, payload submission and uploads, and printable consent generation. |
+| Phase 5: Referral views and workflow | Not started | Next planned implementation phase. |
+| Phases 6–9 | Not started | Proceed in the documented order after each phase is verified. |
 
 ## Current Responsibilities
 
@@ -25,9 +26,9 @@ The existing `app.js` currently handles:
 - Sidebar and tab navigation
 - Role-based access and dashboard initialization
 - Patient listing and registration (extracted in Phase 3)
-- Referral form preparation and validation
-- Referral submission
-- Paper consent generation and printing
+- Referral form preparation and validation (extracted in Phase 4)
+- Referral submission (extracted in Phase 4)
+- Paper consent generation and printing (extracted in Phase 4)
 - Recommendations and facility selection
 - Incoming and accepted patient workflows (transferred-patient actions extracted in Phase 3)
 - Referral timelines and cancellation
