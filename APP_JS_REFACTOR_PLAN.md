@@ -4,7 +4,7 @@
 
 Split the current `frontend/js/app.js` into focused feature files while preserving existing behavior, jQuery event handling, shared session state, consent modules, and WebSocket updates.
 
-The original file was approximately 4,992 lines. After Phases 1–4, `app.js` is approximately 2,990 lines and the extracted responsibilities now live in focused modules.
+The original file was approximately 4,992 lines. After Phases 1–5, `app.js` is approximately 1,353 lines and the extracted responsibilities now live in focused modules.
 
 ## Progress
 
@@ -14,8 +14,9 @@ The original file was approximately 4,992 lines. After Phases 1–4, `app.js` is
 | Phase 2: Navigation and authentication | Completed | Extracted session, login/logout, sidebar, role-based navigation, dashboard entry, and tab routing. |
 | Phase 3: Patient features | Completed | Extracted patient listing, registration and duplicate handling, PhilHealth fields, and transferred-patient arrival/departure workflows. |
 | Phase 4: Referral form and submission | Completed | Extracted form preparation and validation, reasons and allergy fields, payload submission and uploads, and printable consent generation. |
-| Phase 5: Referral views and workflow | Not started | Next planned implementation phase. |
-| Phases 6–9 | Not started | Proceed in the documented order after each phase is verified. |
+| Phase 5: Referral views and workflow | Completed | Extracted referral lists and timelines, recommendations and finalization, incoming polling, referral details, and referral decisions. |
+| Phase 6: Notifications and WebSockets | Not started | Next planned implementation phase. |
+| Phases 7–9 | Not started | Proceed in the documented order after each phase is verified. |
 
 ## Current Responsibilities
 
@@ -29,11 +30,11 @@ The existing `app.js` currently handles:
 - Referral form preparation and validation (extracted in Phase 4)
 - Referral submission (extracted in Phase 4)
 - Paper consent generation and printing (extracted in Phase 4)
-- Recommendations and facility selection
-- Incoming and accepted patient workflows (transferred-patient actions extracted in Phase 3)
-- Referral timelines and cancellation
-- Incoming referral polling and notifications
-- Referral decisions and redirect reasons
+- Recommendations and facility selection (extracted in Phase 5)
+- Incoming and accepted patient workflows (extracted in Phases 3 and 5)
+- Referral timelines and cancellation (extracted in Phase 5)
+- Incoming referral polling and decisions (extracted in Phase 5)
+- Notification state, sounds, and WebSocket routing (scheduled for Phase 6)
 - Facility analytics and CSV export
 - Audit logs
 - User administration
@@ -246,6 +247,10 @@ Acceptance criteria:
 - The submitted payload remains unchanged before the separate FHIR migration begins.
 
 ### Phase 5: Extract Referral Views and Workflow
+
+Status: Completed.
+
+Implemented in `referrals/referral-list.js`, `referrals/recommendations.js`, and `referrals/incoming-referrals.js`. Accepted-patient detail handling was moved into `patients/transferred-patients.js`. Notification state and sound handling remain temporarily colocated with incoming referrals and will move during Phase 6.
 
 Separate:
 

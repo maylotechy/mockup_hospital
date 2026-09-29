@@ -6,7 +6,7 @@
 
     const state = IRDSS.state;
     const { API_BASE } = IRDSS.config;
-    const { escapeHtml, formatDateTime12h } = IRDSS.formatters;
+    const { escapeHtml, formatDateTime12h, formatAgeDisplay, consentRecordedText } = IRDSS.formatters;
     const { showToast } = IRDSS.ui;
     const OUTCOME_LABELS = Object.freeze({
         DISCHARGED: 'Discharged',
@@ -283,6 +283,166 @@
             });
         });
     }
+
+    $(document).on('click.transferredPatients', '.btn-view-patient-details', function () {
+        const referralId = $(this).data('referral-id');
+
+        $.ajax({
+            url: `${API_BASE}/get_transferred_patient_details.php?referral_id=${encodeURIComponent(referralId)}`,
+            type: 'GET',
+            dataType: 'json',
+            success: function (d) {
+                const ageDisplay = formatAgeDisplay(d.age, d.age_months, d.age_days);
+
+                const vitalTile = function (label, value, unit) {
+                    const displayValue = (value != null && value !== '') ? `${escapeHtml(String(value))}${unit ? ' ' + unit : ''}` : '—';
+                    return `
+                        <div class="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-center">
+                            <p class="text-[10px] uppercase tracking-wide text-slate-500">${label}</p>
+                            <p class="font-semibold text-slate-900 text-sm">${displayValue}</p>
+                        </div>
+                    `;
+                };
+
+                const severityNum = parseInt(d.disease_severity, 10) || 0;
+                const severityLabelMap = { 1: 'Low', 2: 'Moderate', 3: 'High', 4: 'Critical', 5: 'Extreme' };
+                const severityColorMap = {
+                    1: 'bg-emerald-100 text-emerald-800',
+                    2: 'bg-amber-100 text-amber-800',
+                    3: 'bg-orange-100 text-orange-800',
+                    4: 'bg-red-100 text-red-800',
+                    5: 'bg-red-600 text-white'
+                };
+                const severityText = `Level ${severityNum} (${severityLabelMap[severityNum] || 'Unknown'})`;
+                const severityClass = severityColorMap[severityNum] || 'bg-slate-100 text-slate-700';
+
+                const statusTags = [];
+                if (d.is_pwd) statusTags.push('PWD');
+                if (d.is_pregnant) statusTags.push('Pregnant');
+                if (d.is_senior_citizen) statusTags.push('Senior Citizen');
+                const tagsRow = statusTags.length > 0
+                    ? `<p class="text-sm mt-3 pt-3 border-t border-slate-100"><span class="text-slate-500">Patient Status:</span> <span class="font-semibold text-slate-800">${escapeHtml(statusTags.join(', '))}</span></p>`
+                    : '';
+
+                const allergyBanner = d.has_allergy
+                    ? `
+                        <div class="mb-4 px-3.5 py-3 rounded-lg bg-red-50 border border-red-200">
+                            <p class="text-sm text-red-800"><strong>Allergy Alert:</strong> ${escapeHtml(d.allergy_details || 'Known allergy (unspecified)')}</p>
+                        </div>
+                    `
+                    : '';
+
+                const allAttachments = Array.isArray(d.attachments) ? d.attachments : [];
+                const consentAttachments = allAttachments.filter(file => file.attachment_type === 'CONSENT_FORM');
+                const clinicalAttachments = allAttachments.filter(file => file.attachment_type !== 'CONSENT_FORM');
+                const signerTypeLabels = {
+                    PATIENT: 'Patient',
+                    PARENT_GUARDIAN: 'Parent or guardian',
+                    AUTHORIZED_REPRESENTATIVE: 'Authorized representative'
+                };
+                const electronicConsentAudit = d.consent_method === 'ELECTRONIC' ? `
+                    <div class="mb-3 rounded-lg bg-blue-50 px-3 py-2 text-xs text-slate-700">
+                        <p><span class="text-slate-500">Signed by:</span> <strong>${escapeHtml(d.consent_signer_name || '—')}</strong> (${escapeHtml(signerTypeLabels[d.consent_signer_type] || d.consent_signer_type || '—')})</p>
+                        ${d.consent_representative_relationship ? `<p class="mt-1"><span class="text-slate-500">Relationship:</span> ${escapeHtml(d.consent_representative_relationship)}</p>` : ''}
+                        <p class="mt-1"><span class="text-slate-500">Witness:</span> ${escapeHtml(d.consent_witnessed_by || '—')}</p>
+                        <p class="mt-1"><span class="text-slate-500">Signed:</span> ${escapeHtml(d.consent_recorded_at ? formatDateTime12h(d.consent_recorded_at) : '—')}</p>
+                        <p class="mt-1 break-all"><span class="text-slate-500">Document SHA-256:</span> <span class="font-mono">${escapeHtml(d.consent_document_sha256 || '—')}</span></p>
+                    </div>
+                ` : '';
+
+                Swal.fire({
+                    title: 'Patient Details',
+                    width: '48rem',
+                    html: `
+                        <div class="text-start text-sm">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                                <div class="border border-slate-200 rounded-xl p-4">
+                                    <p class="text-xs text-slate-500 mb-0.5">Full Name</p>
+                                    <p class="text-lg font-bold text-slate-900 mb-3">${escapeHtml(d.full_name || '—')}</p>
+                                    <div class="grid grid-cols-2 gap-y-2 gap-x-3">
+                                        <p><span class="text-slate-500">DOB:</span> <span class="font-semibold text-slate-800">${escapeHtml(d.date_of_birth || '—')}</span></p>
+                                        <p><span class="text-slate-500">Gender:</span> <span class="font-semibold text-slate-800">${escapeHtml(d.gender || '—')}</span></p>
+                                        <p><span class="text-slate-500">Age:</span> <span class="font-semibold text-slate-800">${escapeHtml(String(ageDisplay))}</span></p>
+                                        <p><span class="text-slate-500">Civil Status:</span> <span class="font-semibold text-slate-800">${escapeHtml(d.civil_status || '—')}</span></p>
+                                        <p class="col-span-2"><span class="text-slate-500">Phone:</span> <span class="font-semibold text-slate-800">${escapeHtml(d.phone || '—')}</span></p>
+                                        <p class="col-span-2"><span class="text-slate-500">PhilHealth ID:</span> <span class="font-semibold text-slate-800">${escapeHtml(d.philhealth_status || '—')}${d.philhealth_number ? ' (' + escapeHtml(d.philhealth_number) + ')' : ''}</span></p>
+                                    </div>
+                                </div>
+
+                                <div class="border border-slate-200 rounded-xl p-4">
+                                    <p class="text-xs text-slate-500 mb-0.5">Diagnosis</p>
+                                    <p class="text-base font-bold text-slate-900 mb-3">${escapeHtml(d.diagnosis || '—')}</p>
+                                    <p class="mb-2"><span class="text-slate-500">Chief Complaint:</span> <span class="font-semibold text-slate-800">${escapeHtml(d.chief_complaint || '—')}</span></p>
+                                    <p class="mb-2"><span class="text-slate-500">Referral Reasons:</span> <span class="font-semibold text-slate-800">${escapeHtml(runAction('referralReasonsText', d))}</span></p>
+                                    <p class="mb-2"><span class="text-slate-500">Consent:</span> <span class="font-semibold ${String(d.consent_status || '').toUpperCase() === 'GRANTED' ? 'text-emerald-700' : 'text-red-700'}">${consentRecordedText(d.consent_status, d.consent_method)}</span></p>
+                                    <p class="mb-3"><span class="text-slate-500">Severity:</span> <span class="${severityClass} px-2.5 py-1 rounded-full text-xs font-bold ml-1">${severityText}</span></p>
+                                    <p><span class="text-slate-500">Referring Facility:</span> <span class="font-semibold text-slate-800">${escapeHtml(d.referring_facility || '—')}</span></p>
+                                    ${tagsRow}
+                                </div>
+                            </div>
+
+                            ${allergyBanner}
+
+                            <div class="mb-4 border border-slate-200 rounded-xl p-4">
+                                <p class="font-semibold text-slate-800 mb-1">Patient Consent</p>
+                                ${electronicConsentAudit}
+                                ${consentAttachments.length
+                                    ? runAction('attachmentLinksHtml', referralId, consentAttachments)
+                                    : '<p class="text-xs text-slate-400">No signed patient consent copy uploaded.</p>'}
+                            </div>
+
+                            ${clinicalAttachments.length ? `
+                                <div class="mb-4 border border-slate-200 rounded-xl p-4">
+                                    <p class="font-semibold text-slate-800 mb-1">Clinical Attachments</p>
+                                    ${runAction('attachmentLinksHtml', referralId, clinicalAttachments)}
+                                </div>
+                            ` : ''}
+
+                            <p class="mb-4"><strong class="text-slate-800">Address:</strong> <span class="text-slate-700">${escapeHtml(d.address || '—')}</span></p>
+
+                            <div>
+                                <p class="font-semibold text-slate-800 mb-2">Vitals at Time of Referral</p>
+                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                    ${vitalTile('BP', d.vital_bp)}
+                                    ${vitalTile('HR', d.vital_hr, 'bpm')}
+                                    ${vitalTile('RR', d.vital_rr, 'rpm')}
+                                    ${vitalTile('Temp', d.vital_temp_c, '°C')}
+                                    ${vitalTile('O2 Sat', d.vital_o2sat, '%')}
+                                    ${vitalTile('Height', d.vital_height_cm, 'cm')}
+                                    ${vitalTile('Weight', d.vital_weight_kg, 'kg')}
+                                </div>
+                            </div>
+
+                            ${(d.arrival_vital_bp || d.arrival_vital_hr || d.arrival_vital_rr || d.arrival_vital_temp_c || d.arrival_vital_o2sat) ? `
+                                <div class="mt-4">
+                                    <p class="font-semibold text-slate-800 mb-2">Vitals at Arrival${d.arrived_at ? ' &middot; ' + formatReferralTimestamp(d.arrived_at) : ''}</p>
+                                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                        ${vitalTile('BP', d.arrival_vital_bp)}
+                                        ${vitalTile('HR', d.arrival_vital_hr, 'bpm')}
+                                        ${vitalTile('RR', d.arrival_vital_rr, 'rpm')}
+                                        ${vitalTile('Temp', d.arrival_vital_temp_c, '°C')}
+                                        ${vitalTile('O2 Sat', d.arrival_vital_o2sat, '%')}
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `,
+                    confirmButtonColor: '#16a34a',
+                    customClass: { popup: 'rounded-4 shadow-lg' }
+                });
+            },
+            error: function (xhr) {
+                const errData = xhr.responseJSON || {};
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Could Not Load Patient Details',
+                    text: errData.detail || 'This referral may not be finalized to your facility.',
+                    confirmButtonColor: '#dc3545'
+                });
+            }
+        });
+    });
+
 
     function init() {
         if (initialized) return;
