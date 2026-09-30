@@ -12,352 +12,38 @@
     const resolveLocationAddressHtml = (...args) => IRDSS.referrals.recommendations.resolveLocationAddressHtml(...args);
     let initialized = false;
 
-    const notifiedReferralIds = new Set();
-    const incomingNotifications = new Map(); // referral_id -> alert payload, backs the bell dropdown
     let isPollingInProgress = false;
 
+    function normalizeIncomingResponse(response) {
+        if (Array.isArray(response)) return response;
+        if (response && Array.isArray(response.referrals)) return response.referrals;
+        if (response && Array.isArray(response.data)) return response.data;
+        if (response && Array.isArray(response.incoming)) return response.incoming;
+        if (response && (response.referral_id || response.id)) return [response];
+        return [];
+    }
+
     /**
-     * Poll Incoming Referrals for active hospital session
+     * Poll incoming referrals for the active clinical user. Notification state and
+     * rendering are owned by referrals/notifications.js.
      */
     function pollIncomingReferrals() {
         const isClinicalUser = state.currentUser && (state.currentUser.role === 'doctor' || state.currentUser.role === 'nurse');
         if (!state.currentHospital || !isClinicalUser || isPollingInProgress) return;
 
         isPollingInProgress = true;
-
         $.ajax({
             url: `${API_BASE}/get_incoming_referrals.php`,
             type: 'GET',
             dataType: 'json',
-            success: function (res) {
-                isPollingInProgress = false;
-                let items = [];
-                if (Array.isArray(res)) {
-                    items = res;
-                } else if (res && Array.isArray(res.referrals)) {
-                    items = res.referrals;
-                } else if (res && Array.isArray(res.data)) {
-                    items = res.data;
-                } else if (res && Array.isArray(res.incoming)) {
-                    items = res.incoming;
-                } else if (res && (res.referral_id || res.id)) {
-                    items = [res];
-                }
-
-                let hasNewNotification = false;
-                const stillPendingIds = new Set();
-
-                items.forEach(item => {
-                    const id = item.referral_id || item.id;
-                    const respStatus = (item.response_status || item.status || '').toUpperCase();
-                    if (!id || respStatus === 'ACCEPTED' || respStatus === 'REDIRECTED') return;
-
-                    stillPendingIds.add(id);
-                    // Always refresh with the latest server data (not just on first sight) so a
-                    // stale/deleted-then-recreated referral never shows outdated info
-                    incomingNotifications.set(id, item);
-
-                    if (!notifiedReferralIds.has(id)) {
-                        notifiedReferralIds.add(id);
-                        hasNewNotification = true;
-                    }
-                });
-
-                // Drop anything that's no longer PENDING server-side (accepted/redirected/
-                // cancelled/deleted) so the bell and Pending Referrals page never show a
-                // referral that's already been resolved out from under the doctor
-                Array.from(incomingNotifications.keys()).forEach(id => {
-                    if (!stillPendingIds.has(id)) {
-                        incomingNotifications.delete(id);
-                        notifiedReferralIds.delete(id);
-                    }
-                });
-
-                renderNotificationBell();
-                if (typeof renderPendingReferralsList === 'function') renderPendingReferralsList();
-
-                if (hasNewNotification) {
-                    showNewReferralToast();
-                    playAlarmSound();
-                }
+            success: function (response) {
+                IRDSS.referrals.notifications.sync(normalizeIncomingResponse(response));
             },
-            error: function () {
+            complete: function () {
                 isPollingInProgress = false;
             }
         });
     }
-
-    /**
-     * Render the bell badge count and the dropdown list of pending referral notifications (sorted newest first)
-     */
-    function renderNotificationBell() {
-        const $badge = $('#notificationBadge');
-        const $list = $('#notificationList');
-        const count = incomingNotifications.size;
-
-        if (count > 0) {
-            $badge.text(count > 9 ? '9+' : count).removeClass('hidden');
-        } else {
-            $badge.addClass('hidden');
-        }
-
-        if (count === 0) {
-            $list.html('<div class="px-4 py-6 text-center text-xs text-slate-400">No new referrals</div>');
-            return;
-        }
-
-        // Sort notifications by created_at (newest first)
-        const sorted = Array.from(incomingNotifications.entries()).sort((a, b) => {
-            const dateA = new Date(a[1].created_at || 0);
-            const dateB = new Date(b[1].created_at || 0);
-            return dateB - dateA;
-        });
-
-        let html = '';
-        sorted.forEach(([referralId, alert]) => {
-            const referringFacility = alert.referring_facility || alert.referring_hospital || (alert.serviceProvider && alert.serviceProvider.display) || 'Unknown Hospital';
-            html += `
-                <div class="px-4 py-3 flex items-start gap-3 hover:bg-slate-50 transition-colors">
-                    <div class="w-9 h-9 rounded-full bg-red-50 text-red-600 flex items-center justify-center shrink-0">
-                        <i class="bi bi-hospital"></i>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="text-xs font-semibold text-slate-800">New referral from <span class="text-red-700">${escapeHtml(referringFacility)}</span></p>
-                        <p class="text-[10px] text-slate-400 font-mono mt-0.5">${escapeHtml(String(referralId))}</p>
-                        <button type="button" class="btn-view-referral-form mt-2 px-3 py-1 bg-yellow-600 hover:bg-red-700 text-white text-[11px] font-bold rounded-lg transition-all" data-ref-id="${escapeHtml(String(referralId))}">
-                            <i class="bi bi-file-earmark-text-fill me-1"></i> View Form
-                        </button>
-                    </div>
-                </div>
-            `;
-        });
-        $list.html(html);
-    }
-
-    const PENDING_SEVERITY_LABEL = { 1: 'Mild', 2: 'Moderate', 3: 'Severe', 4: 'Critical', 5: 'Extreme' };
-
-    /**
-     * Waiting time, color-escalated to match the 15-30 minute ER turnaround window this
-     * system already tracks elsewhere -- green while fresh, amber approaching it, red
-     * once it's actually overdue. Plain text color, not a badge -- just a signal, not decor.
-     */
-    function formatWaitLabel(createdAt) {
-        if (!createdAt) return { text: 'Unknown', cls: 'text-slate-500' };
-        const mins = Math.max(0, Math.round((Date.now() - new Date(createdAt).getTime()) / 60000));
-        const text = mins < 1 ? 'Just now' : mins < 60 ? `${mins}m` : `${Math.floor(mins / 60)}h ${mins % 60}m`;
-        const cls = mins < 5 ? 'text-emerald-700' : mins < 15 ? 'text-amber-700' : 'text-red-700 font-bold';
-        return { text, cls };
-    }
-
-    /**
-     * Renders the full-page Pending Referrals queue (triage view) from the same
-     * `incomingNotifications` map the bell uses, sorted most-severe-first so a doctor
-     * can see everything stacked up at once instead of only the last one that popped in.
-     */
-    function renderPendingReferralsList() {
-        const $list = $('#pendingReferralsList');
-        if ($list.length === 0) return;
-
-        const items = Array.from(incomingNotifications.values());
-        const count = items.length;
-        const criticalCount = items.filter(i => (parseInt(i.disease_severity, 10) || 0) >= 4).length;
-
-        $('#statPendingCount').text(count);
-        $('#statCriticalPendingCount').text(criticalCount);
-        $('#navPendingBadge').text(count > 9 ? '9+' : count).toggleClass('hidden', count === 0);
-
-        if (count === 0) {
-            $list.html('<div class="px-6 py-10 text-center text-xs text-slate-400"><i class="bi bi-check2-circle text-2xl text-slate-300 block mb-2"></i>No pending referrals right now.</div>');
-            return;
-        }
-
-        const sorted = items.slice().sort(function (a, b) {
-            const sevDiff = (parseInt(b.disease_severity, 10) || 0) - (parseInt(a.disease_severity, 10) || 0);
-            if (sevDiff !== 0) return sevDiff;
-            return new Date(b.created_at || 0) - new Date(a.created_at || 0); // newest first within same severity
-        });
-
-        $list.html(sorted.map(function (item) {
-            const referralId = item.referral_id || item.id;
-            const severity = parseInt(item.disease_severity, 10) || 0;
-            const severityLabel = PENDING_SEVERITY_LABEL[severity] || String(item.disease_severity);
-            const wait = formatWaitLabel(item.created_at);
-
-            return `
-                <div class="bg-white rounded-xl border border-slate-200/70 p-4">
-                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div class="min-w-0 flex-1">
-                            <p class="text-sm text-slate-800"><span class="font-semibold">Referral from:</span> ${escapeHtml(item.referring_facility || 'Unknown Facility')}</p>
-                            <p class="text-sm text-slate-800"><span class="font-semibold">Severity:</span> ${severity} &middot; ${escapeHtml(severityLabel)}</p>
-                            <p class="text-sm"><span class="font-semibold text-slate-800">Waiting time:</span> <span class="${wait.cls}">${escapeHtml(wait.text)}</span></p>
-                        </div>
-                        <button type="button" data-ref-id="${escapeHtml(String(referralId))}"
-                            class="btn-review-pending-referral flex-shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition-all">
-                            <i class="bi bi-file-earmark-text-fill"></i> Review &amp; Decide
-                        </button>
-                    </div>
-                </div>
-            `;
-        }).join(''));
-    }
-
-    $(document).on('click.incomingReferrals', '.btn-review-pending-referral', function () {
-        const referralId = $(this).data('ref-id');
-        const incomingAlert = incomingNotifications.get(referralId);
-        if (!incomingAlert) return;
-
-        // Don't delete from the map just for opening it -- it should only disappear once
-        // it's actually resolved (accepted/redirected), which the next poll picks up
-        // naturally. Deleting here made it vanish for up to 12s if the doctor closed the
-        // popup without deciding, which looked like a bug (and was reported as one).
-        stopAlarmSound();
-        markReferralSeen(referralId);
-        showIncomingReferralDetail(incomingAlert);
-    });
-
-    let newReferralToastTimeout = null;
-
-    /**
-     * Briefly show a "New Referral" callout beside the bell and give it a shake
-     */
-    function showNewReferralToast() {
-        const $toast = $('#newReferralToast');
-        const $bell = $('#btnNotificationBell');
-
-        $toast.removeClass('hidden');
-        clearTimeout(newReferralToastTimeout);
-        newReferralToastTimeout = setTimeout(() => {
-            $toast.addClass('hidden');
-        }, 4000);
-
-        $bell.removeClass('animate-bell-shake');
-        // Force reflow so the animation can restart if it's already mid-run
-        void $bell[0].offsetWidth;
-        $bell.addClass('animate-bell-shake');
-    }
-
-    /**
-     * Play a short two-tone notification ring via the Web Audio API (no audio file needed)
-     */
-    function playNotificationSound() {
-        try {
-            const AudioCtx = window.AudioContext || window.webkitAudioContext;
-            if (!AudioCtx) return;
-
-            if (!window._notificationAudioCtx) {
-                window._notificationAudioCtx = new AudioCtx();
-            }
-            const ctx = window._notificationAudioCtx;
-            if (ctx.state === 'suspended') ctx.resume();
-
-            const now = ctx.currentTime;
-            [880, 1108].forEach((freq, i) => {
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.type = 'sine';
-                osc.frequency.value = freq;
-
-                const start = now + i * 0.15;
-                gain.gain.setValueAtTime(0, start);
-                gain.gain.linearRampToValueAtTime(0.3, start + 0.02);
-                gain.gain.exponentialRampToValueAtTime(0.001, start + 0.35);
-
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.start(start);
-                osc.stop(start + 0.4);
-            });
-        } catch (e) {
-            // Autoplay restrictions or unsupported browser — fail silently
-        }
-    }
-
-    let alarmIntervalId = null;
-    let alarmStopTimeoutId = null;
-
-    function playAlarmBeep() {
-        try {
-            const AudioCtx = window.AudioContext || window.webkitAudioContext;
-            if (!AudioCtx) return;
-
-            if (!window._notificationAudioCtx) {
-                window._notificationAudioCtx = new AudioCtx();
-            }
-            const ctx = window._notificationAudioCtx;
-            if (ctx.state === 'suspended') ctx.resume();
-
-            const now = ctx.currentTime;
-            [1046, 784].forEach((freq, i) => {
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.type = 'square';
-                osc.frequency.value = freq;
-
-                const start = now + i * 0.18;
-                gain.gain.setValueAtTime(0, start);
-                gain.gain.linearRampToValueAtTime(0.22, start + 0.02);
-                gain.gain.exponentialRampToValueAtTime(0.001, start + 0.3);
-
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.start(start);
-                osc.stop(start + 0.35);
-            });
-        } catch (e) {
-            // Autoplay restrictions or unsupported browser — fail silently
-        }
-    }
-
-    /**
-     * Urgent, repeating alarm for a brand-new incoming referral -- a single short chime
-     * is too easy to miss in a busy ER. Repeats every ~0.9s for up to 20s as a safety cap,
-     * but stops immediately the moment the doctor acknowledges it (opens the bell, opens
-     * the referral from the Pending Referrals page, or switches to that page).
-     */
-    function playAlarmSound() {
-        stopAlarmSound();
-        playAlarmBeep();
-        alarmIntervalId = setInterval(playAlarmBeep, 900);
-        alarmStopTimeoutId = setTimeout(stopAlarmSound, 20000);
-    }
-
-    function stopAlarmSound() {
-        if (alarmIntervalId) {
-            clearInterval(alarmIntervalId);
-            alarmIntervalId = null;
-        }
-        if (alarmStopTimeoutId) {
-            clearTimeout(alarmStopTimeoutId);
-            alarmStopTimeoutId = null;
-        }
-    }
-
-    // Toggle the notification dropdown open/closed
-    $(document).on('click.incomingReferrals', '#btnNotificationBell', function (e) {
-        e.stopPropagation();
-        $('#notificationDropdown').toggleClass('hidden');
-        stopAlarmSound();
-    });
-    $(document).on('click.incomingReferrals', '#notificationDropdown', function (e) {
-        e.stopPropagation();
-    });
-    $(document).on('click.incomingReferrals', function () {
-        $('#notificationDropdown').addClass('hidden');
-    });
-
-    // "View Form" click inside the notification dropdown: mark seen, open the full detail modal
-    $(document).on('click.incomingReferrals', '.btn-view-referral-form', function () {
-        const referralId = $(this).data('ref-id');
-        const incomingAlert = incomingNotifications.get(referralId);
-        if (!incomingAlert) return;
-
-        // Same fix as the Pending Referrals page: don't delete on open, only once resolved
-        $('#notificationDropdown').addClass('hidden');
-        stopAlarmSound();
-
-        markReferralSeen(referralId);
-        showIncomingReferralDetail(incomingAlert);
-    });
 
     /**
      * PATCH /api/v1/referral/{referral_id}/seen — stamps when the facility opened the form
@@ -562,8 +248,7 @@
 
                         // Keep this referral available in the notification bell so the
                         // hospital can reopen the form and decide later instead of losing it.
-                        incomingNotifications.set(referralId, incomingAlert);
-                        renderNotificationBell();
+                        IRDSS.referrals.notifications.upsert(incomingAlert);
                     }, { capture: true });
                 }
 
@@ -657,31 +342,17 @@
             }
         });
     }
-
-
-    function clearNotifications() {
-        stopAlarmSound();
-        notifiedReferralIds.clear();
-        incomingNotifications.clear();
-        renderNotificationBell();
-    }
-
     function init() {
         if (initialized) return;
         initialized = true;
         $(document).on('click.incomingReferrals', '#btnRefreshPending', pollIncomingReferrals);
-        $(document).on('click.incomingReferrals', '#btnTestAlarm', playAlarmSound);
     }
 
     IRDSS.referrals.incoming = Object.freeze({
         init,
         poll: pollIncomingReferrals,
+        markSeen: markReferralSeen,
         showDetail: showIncomingReferralDetail,
-        submitDecision: submitReferralDecision,
-        renderNotificationBell,
-        playNotificationSound,
-        playAlarm: playAlarmSound,
-        stopAlarm: stopAlarmSound,
-        clearNotifications
+        submitDecision: submitReferralDecision
     });
 })(window, window.jQuery);

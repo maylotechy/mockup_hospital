@@ -4,7 +4,7 @@
 
 Split the current `frontend/js/app.js` into focused feature files while preserving existing behavior, jQuery event handling, shared session state, consent modules, and WebSocket updates.
 
-The original file was approximately 4,992 lines. After Phases 1–5, `app.js` is approximately 1,353 lines and the extracted responsibilities now live in focused modules.
+The original file was approximately 4,992 lines. After Phases 1–6, `app.js` is approximately 1,234 lines and the extracted responsibilities now live in focused modules.
 
 ## Progress
 
@@ -15,8 +15,9 @@ The original file was approximately 4,992 lines. After Phases 1–5, `app.js` is
 | Phase 3: Patient features | Completed | Extracted patient listing, registration and duplicate handling, PhilHealth fields, and transferred-patient arrival/departure workflows. |
 | Phase 4: Referral form and submission | Completed | Extracted form preparation and validation, reasons and allergy fields, payload submission and uploads, and printable consent generation. |
 | Phase 5: Referral views and workflow | Completed | Extracted referral lists and timelines, recommendations and finalization, incoming polling, referral details, and referral decisions. |
-| Phase 6: Notifications and WebSockets | Not started | Next planned implementation phase. |
-| Phases 7–9 | Not started | Proceed in the documented order after each phase is verified. |
+| Phase 6: Notifications and WebSockets | Completed | Extracted notification state and rendering, alarm sounds, WebSocket routing, reconnect handling, and fallback polling. |
+| Phase 7: Admin and reporting | Not started | Next planned implementation phase. |
+| Phases 8–9 | Not started | Proceed in the documented order after each phase is verified. |
 
 ## Current Responsibilities
 
@@ -34,12 +35,12 @@ The existing `app.js` currently handles:
 - Incoming and accepted patient workflows (extracted in Phases 3 and 5)
 - Referral timelines and cancellation (extracted in Phase 5)
 - Incoming referral polling and decisions (extracted in Phase 5)
-- Notification state, sounds, and WebSocket routing (scheduled for Phase 6)
+- Notification state, sounds, and WebSocket routing (extracted in Phase 6)
 - Facility analytics and CSV export
 - Audit logs
 - User administration
 - PSGC location selectors and geocoding
-- WebSocket lifecycle and message routing
+- WebSocket lifecycle and message routing (extracted in Phase 6)
 - Shared formatting, escaping, alerts, and toast notifications
 
 There is also a duplicate `loadServiceAssessment()` function that should be consolidated during the refactor.
@@ -250,7 +251,7 @@ Acceptance criteria:
 
 Status: Completed.
 
-Implemented in `referrals/referral-list.js`, `referrals/recommendations.js`, and `referrals/incoming-referrals.js`. Accepted-patient detail handling was moved into `patients/transferred-patients.js`. Notification state and sound handling remain temporarily colocated with incoming referrals and will move during Phase 6.
+Implemented in `referrals/referral-list.js`, `referrals/recommendations.js`, and `referrals/incoming-referrals.js`. Accepted-patient detail handling was moved into `patients/transferred-patients.js`.
 
 Separate:
 
@@ -268,6 +269,10 @@ Acceptance criteria:
 - Accept, redirect, finalize, arrive, refer onward, and discharge continue working.
 
 ### Phase 6: Extract Notifications and WebSockets
+
+Status: Completed.
+
+Implemented in `referrals/notifications.js` and `referrals/websocket.js`. Notification state, badge and pending-queue rendering, toast and alarm sounds now have one owner. WebSocket startup, guarded reconnects, event routing, and fallback polling are started and stopped with the authenticated clinical session.
 
 Move polling state, notification-bell rendering, alarm handling, and WebSocket lifecycle into dedicated modules.
 

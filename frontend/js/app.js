@@ -1163,138 +1163,6 @@ $(document).ready(function () {
         region: '#patRegion', province: '#patProvince', city: '#patCity', barangay: '#patBarangay'
     });
 
-    // ============================================================
-    // REAL-TIME REFERRAL UPDATES (WebSocket)
-    // ============================================================
-    // Pushes referral lifecycle events (new/seen/accepted/redirected/finalized/
-    // not-selected/cancelled/arrived) instantly instead of waiting on a poll
-    // timer. Browser WebSockets can't carry the RSA signature headers used by
-    // every REST call, so a short-lived one-time ticket is fetched from the
-    // PHP backend (which signs the ticket request) and passed as a query param.
-    let referralSocket = null;
-    let wsReconnectTimeout = null;
-    let wsReconnectAttempts = 0;
-    let wsManuallyClosed = false;
-
-    /**
-     * Routes a pushed WebSocket event to the existing REST refresh function that
-     * already knows how to fetch and render the affected data -- the WS payload
-     * itself only ever carries enough info to know *what* to refresh, not the
-     * full record, keeping a single source of truth for rendering logic.
-     */
-    function handleWsMessage(msg) {
-        if (!msg || !msg.type) return;
-
-        switch (msg.type) {
-            case 'NEW_REFERRAL':
-            case 'REFERRAL_CANCELLED':
-                IRDSS.referrals.incoming.poll();
-                break;
-
-            case 'REFERRAL_SEEN':
-            case 'REFERRAL_ACCEPTED':
-            case 'REFERRAL_REDIRECTED':
-            case 'REFERRAL_FINALIZED_CONFIRMED':
-                IRDSS.referrals.recommendations.check();
-                if ($('#tabReferralsContent').is(':visible')) IRDSS.referrals.list.load();
-                break;
-
-            case 'REFERRAL_FINALIZED_TO_YOU':
-                showToast('success', 'A referral has been finalized to your facility!', 4000);
-                IRDSS.referrals.incoming.playNotificationSound();
-                if ($('#tabIncomingContent').is(':visible')) IRDSS.patients.transferred.load();
-                break;
-
-            case 'REFERRAL_NOT_SELECTED':
-                if ($('#tabIncomingContent').is(':visible')) IRDSS.patients.transferred.load();
-                break;
-
-            case 'PATIENT_ARRIVED':
-            case 'PATIENT_DEPARTED':
-                if ($('#tabReferralsContent').is(':visible')) IRDSS.referrals.list.load();
-                break;
-
-            default:
-                break;
-        }
-    }
-
-    /**
-     * Fetches a fresh one-time ticket and opens the real-time referral socket;
-     * reconnects with capped exponential backoff on drop (network blip, IOL
-     * restart) as long as the session is still active.
-     */
-    function connectReferralWebSocket() {
-        if (!state.currentHospital || referralSocket) return;
-        wsManuallyClosed = false;
-
-        $.ajax({
-            url: `${API_BASE}/get_ws_ticket.php`,
-            type: 'GET',
-            dataType: 'json',
-            success: function (response) {
-                if (!response.success || !response.ws_url) {
-                    scheduleWsReconnect();
-                    return;
-                }
-
-                try {
-                    referralSocket = new WebSocket(response.ws_url);
-                } catch (e) {
-                    referralSocket = null;
-                    scheduleWsReconnect();
-                    return;
-                }
-
-                referralSocket.onopen = function () {
-                    wsReconnectAttempts = 0;
-                };
-
-                referralSocket.onmessage = function (event) {
-                    try {
-                        handleWsMessage(JSON.parse(event.data));
-                    } catch (e) { /* ignore malformed frame */ }
-                };
-
-                referralSocket.onclose = function () {
-                    referralSocket = null;
-                    if (!wsManuallyClosed && state.currentHospital) scheduleWsReconnect();
-                };
-
-                referralSocket.onerror = function () {
-                    if (referralSocket) referralSocket.close();
-                };
-            },
-            error: function () {
-                scheduleWsReconnect();
-            }
-        });
-    }
-
-    function scheduleWsReconnect() {
-        clearTimeout(wsReconnectTimeout);
-        wsReconnectAttempts++;
-        const delay = Math.min(30000, 2000 * wsReconnectAttempts);
-        wsReconnectTimeout = setTimeout(connectReferralWebSocket, delay);
-    }
-
-    function disconnectReferralWebSocket() {
-        wsManuallyClosed = true;
-        clearTimeout(wsReconnectTimeout);
-        wsReconnectAttempts = 0;
-        if (referralSocket) {
-            referralSocket.onclose = null;
-            referralSocket.close();
-            referralSocket = null;
-        }
-    }
-
-    // Slow fallback polling only -- WebSocket delivers real-time updates above,
-    // this just guards against a missed push (e.g. reconnect race, backgrounded tab)
-    setInterval(IRDSS.referrals.incoming.poll, 45000);
-    setInterval(IRDSS.referrals.recommendations.check, 30000);
-    setInterval(IRDSS.patients.transferred.load, 45000);
-
     IRDSS.referrals.form.configure({
         initializeReferralLocation: function (location) { referralLocationCascade.init(location); },
         formatReferralTimestamp
@@ -1303,7 +1171,18 @@ $(document).ready(function () {
         checkRecommendations: IRDSS.referrals.recommendations.check
     });
     IRDSS.referrals.recommendations.configure({
-        playNotificationSound: IRDSS.referrals.incoming.playNotificationSound
+        playNotificationSound: IRDSS.referrals.notifications.playSound
+    });
+    IRDSS.referrals.notifications.configure({
+        markSeen: IRDSS.referrals.incoming.markSeen,
+        showDetail: IRDSS.referrals.incoming.showDetail
+    });
+    IRDSS.referrals.websocket.configure({
+        pollIncomingReferrals: IRDSS.referrals.incoming.poll,
+        checkRecommendations: IRDSS.referrals.recommendations.check,
+        loadMyReferrals: IRDSS.referrals.list.load,
+        loadAcceptedPatients: IRDSS.patients.transferred.load,
+        playNotificationSound: IRDSS.referrals.notifications.playSound
     });
     IRDSS.patients.list.configure({
         openReferralForm: IRDSS.referrals.form.openForPatient
@@ -1320,6 +1199,8 @@ $(document).ready(function () {
     IRDSS.referrals.list.init();
     IRDSS.referrals.recommendations.init();
     IRDSS.referrals.incoming.init();
+    IRDSS.referrals.notifications.init();
+    IRDSS.referrals.websocket.init();
     IRDSS.patients.list.init();
     IRDSS.patients.form.init();
     IRDSS.patients.transferred.init();
@@ -1328,7 +1209,7 @@ $(document).ready(function () {
         loadPatients: IRDSS.patients.list.load,
         loadMyReferrals: IRDSS.referrals.list.load,
         checkRecommendations: IRDSS.referrals.recommendations.check,
-        stopAlarm: IRDSS.referrals.incoming.stopAlarm,
+        stopAlarm: IRDSS.referrals.notifications.stopAlarm,
         pollIncomingReferrals: IRDSS.referrals.incoming.poll,
         loadAcceptedPatients: IRDSS.patients.transferred.load,
         loadUsers,
@@ -1336,13 +1217,13 @@ $(document).ready(function () {
         loadFacilityAnalytics,
         loadSystemLogs,
         initializePatientLocation: function () { patientLocationCascade.init(); },
-        connectReferralWebSocket,
-        disconnectReferralWebSocket
+        connectReferralWebSocket: IRDSS.referrals.websocket.start,
+        disconnectReferralWebSocket: IRDSS.referrals.websocket.stop
     });
     IRDSS.navigation.init();
 
     IRDSS.auth.session.configure({
-        clearReferralNotifications: IRDSS.referrals.incoming.clearNotifications
+        clearReferralNotifications: IRDSS.referrals.notifications.clear
     });
 
     // Compatibility bridge for standalone scripts that still call these globals.
