@@ -4,7 +4,7 @@
 
 Split the current `frontend/js/app.js` into focused feature files while preserving existing behavior, jQuery event handling, shared session state, consent modules, and WebSocket updates.
 
-The original file was approximately 4,992 lines. After Phases 1–6, `app.js` is approximately 1,234 lines and the extracted responsibilities now live in focused modules.
+The original file was approximately 4,992 lines. After Phases 1–7, `app.js` is approximately 540 lines and the extracted responsibilities now live in focused modules.
 
 ## Progress
 
@@ -16,8 +16,9 @@ The original file was approximately 4,992 lines. After Phases 1–6, `app.js` is
 | Phase 4: Referral form and submission | Completed | Extracted form preparation and validation, reasons and allergy fields, payload submission and uploads, and printable consent generation. |
 | Phase 5: Referral views and workflow | Completed | Extracted referral lists and timelines, recommendations and finalization, incoming polling, referral details, and referral decisions. |
 | Phase 6: Notifications and WebSockets | Completed | Extracted notification state and rendering, alarm sounds, WebSocket routing, reconnect handling, and fallback polling. |
-| Phase 7: Admin and reporting | Not started | Next planned implementation phase. |
-| Phases 8–9 | Not started | Proceed in the documented order after each phase is verified. |
+| Phase 7: Admin and reporting | Completed | Extracted user administration, analytics and CSV export, audit logs, and the Service Assessment loader. |
+| Phase 8: PSGC and geocoding | Not started | Next planned implementation phase. |
+| Phase 9 | Not started | Proceed after Phase 8 is verified. |
 
 ## Current Responsibilities
 
@@ -36,14 +37,14 @@ The existing `app.js` currently handles:
 - Referral timelines and cancellation (extracted in Phase 5)
 - Incoming referral polling and decisions (extracted in Phase 5)
 - Notification state, sounds, and WebSocket routing (extracted in Phase 6)
-- Facility analytics and CSV export
-- Audit logs
-- User administration
+- Facility analytics and CSV export (extracted in Phase 7)
+- Audit logs (extracted in Phase 7)
+- User administration (extracted in Phase 7)
 - PSGC location selectors and geocoding
 - WebSocket lifecycle and message routing (extracted in Phase 6)
 - Shared formatting, escaping, alerts, and toast notifications
 
-There is also a duplicate `loadServiceAssessment()` function that should be consolidated during the refactor.
+The Service Assessment bridge was consolidated into one loader during Phase 7.
 
 ## Recommended Module Structure
 
@@ -286,6 +287,10 @@ Acceptance criteria:
 - Notification sounds and bell entries do not duplicate.
 
 ### Phase 7: Extract Admin and Reporting Features
+
+Status: Completed.
+
+Implemented in `analytics/facility-analytics.js`, `admin/audit-logs.js`, `admin/users.js`, and `admin/service-assessment-loader.js`. Admin navigation now calls these modules through their public `load()` methods, and the Service Assessment bridge has one owner.
 
 Move:
 
