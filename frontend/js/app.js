@@ -12,42 +12,7 @@ $(document).ready(function () {
     });
 
     const IRDSS = window.IRDSS;
-    const { showToast } = IRDSS.ui;
-
-    const { switchTab } = IRDSS.navigation;
     const formatReferralTimestamp = IRDSS.referrals.list.formatTimestamp;
-
-    /**
-     * Live System Clock Ticker — renders into the header, left of the notification bell.
-     */
-    function updateSystemClock() {
-        const now = new Date();
-        const timeText = now.toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true
-        });
-        const dateText = now.toLocaleDateString('en-US', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-        });
-        $('#headerTimeText').text(timeText);
-        $('#headerDateText').text(dateText);
-    }
-    setInterval(updateSystemClock, 30000);
-    updateSystemClock();
-
-    /**
-     * Copy API Key to Clipboard
-     */
-    $('#btnCopyApiKey').on('click', function () {
-        const apiKeyText = $('#displayApiKey').text();
-        navigator.clipboard.writeText(apiKeyText).then(function () {
-            showToast('success', 'API Key copied to clipboard!', 2000);
-        });
-    });
 
     IRDSS.referrals.form.configure({
         initializeReferralLocation: IRDSS.location.psgc.initializeReferral,
@@ -79,6 +44,7 @@ $(document).ready(function () {
         referralReasonsText: IRDSS.referrals.form.reasonsText,
         attachmentLinksHtml: IRDSS.referrals.form.attachmentLinksHtml
     });
+    IRDSS.header.init();
     IRDSS.referrals.form.init();
     IRDSS.consent.print.init();
     IRDSS.referrals.submit.init();
@@ -118,8 +84,8 @@ $(document).ready(function () {
     });
 
     // Compatibility bridge for standalone scripts that still call these globals.
-    window.switchTab = switchTab;
-    window.showToast = showToast;
+    window.switchTab = IRDSS.navigation.switchTab;
+    window.showToast = IRDSS.ui.showToast;
 
     IRDSS.auth.session.init();
 });

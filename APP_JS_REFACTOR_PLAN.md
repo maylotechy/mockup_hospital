@@ -4,7 +4,7 @@
 
 Split the current `frontend/js/app.js` into focused feature files while preserving existing behavior, jQuery event handling, shared session state, consent modules, and WebSocket updates.
 
-The original file was approximately 4,992 lines. After Phases 1–8, `app.js` is approximately 125 lines and the extracted responsibilities now live in focused modules.
+The original file was approximately 4,992 lines. After all nine phases, `app.js` is approximately 91 lines and now serves only as the application bootstrap.
 
 ## Progress
 
@@ -18,16 +18,16 @@ The original file was approximately 4,992 lines. After Phases 1–8, `app.js` is
 | Phase 6: Notifications and WebSockets | Completed | Extracted notification state and rendering, alarm sounds, WebSocket routing, reconnect handling, and fallback polling. |
 | Phase 7: Admin and reporting | Completed | Extracted user administration, analytics and CSV export, audit logs, and the Service Assessment loader. |
 | Phase 8: PSGC and geocoding | Completed | Extracted the shared PSGC cache, cascading selectors, referral geocoding, and coordinate fallbacks. |
-| Phase 9: Bootstrap cleanup | Not started | Next planned implementation phase. |
+| Phase 9: Bootstrap cleanup | Completed | Moved the header clock into a core module, removed obsolete clipboard code, and reduced `app.js` to module wiring and startup. |
 
-## Current Responsibilities
+## Extracted Responsibilities
 
-The existing `app.js` currently handles:
+The modular frontend now separates:
 
-- API base URL configuration
-- Session and authentication state
-- Sidebar and tab navigation
-- Role-based access and dashboard initialization
+- API base URL configuration (extracted in Phase 1)
+- Session and authentication state (extracted in Phase 2)
+- Sidebar and tab navigation (extracted in Phase 2)
+- Role-based access and dashboard initialization (extracted in Phase 2)
 - Patient listing and registration (extracted in Phase 3)
 - Referral form preparation and validation (extracted in Phase 4)
 - Referral submission (extracted in Phase 4)
@@ -42,7 +42,7 @@ The existing `app.js` currently handles:
 - User administration (extracted in Phase 7)
 - PSGC location selectors and geocoding (extracted in Phase 8)
 - WebSocket lifecycle and message routing (extracted in Phase 6)
-- Shared formatting, escaping, alerts, and toast notifications
+- Shared formatting, escaping, alerts, and toast notifications (extracted in Phase 1)
 
 The Service Assessment bridge was consolidated into one loader during Phase 7.
 
@@ -54,10 +54,10 @@ frontend/js/
 ├── core/
 │   ├── config.js                  # API URLs and static application configuration
 │   ├── state.js                   # Logged-in user, facility, and active referral state
-│   ├── api.js                     # Shared AJAX request helpers
 │   ├── ui.js                      # Toasts, alerts, loading states, and error messages
 │   ├── formatters.js              # Dates, ages, names, escaping, and printable values
-│   └── navigation.js              # Sidebar, tabs, role-based navigation
+│   ├── navigation.js              # Sidebar, tabs, role-based navigation
+│   └── header.js                  # Live dashboard clock
 ├── auth/
 │   └── session.js                 # Login, logout, session check, and dashboard entry
 ├── patients/
@@ -95,10 +95,11 @@ Use one controlled global namespace during the transition instead of creating ma
 window.IRDSS = window.IRDSS || {
     config: {},
     state: {},
-    api: {},
     ui: {},
     formatters: {},
+    header: {},
     navigation: {},
+    auth: {},
     patients: {},
     referrals: {},
     consent: {},
@@ -146,27 +147,28 @@ Until ES modules are introduced, load scripts in dependency order:
 ```html
 <script src="js/core/config.js"></script>
 <script src="js/core/state.js"></script>
-<script src="js/core/api.js"></script>
 <script src="js/core/formatters.js"></script>
 <script src="js/core/ui.js"></script>
+<script src="js/core/navigation.js"></script>
+<script src="js/core/header.js"></script>
+<script src="js/auth/session.js"></script>
 <script src="js/location/psgc-location.js"></script>
 <script src="js/patients/patient-list.js"></script>
 <script src="js/patients/patient-form.js"></script>
 <script src="js/patients/transferred-patients.js"></script>
-<script src="js/consent/consent-print.js"></script>
 <script src="js/referrals/referral-form.js"></script>
+<script src="js/consent/consent-print.js"></script>
 <script src="js/referrals/referral-submit.js"></script>
 <script src="js/referrals/referral-list.js"></script>
 <script src="js/referrals/recommendations.js"></script>
 <script src="js/referrals/notifications.js"></script>
 <script src="js/referrals/incoming-referrals.js"></script>
 <script src="js/referrals/websocket.js"></script>
+<script src="js/service_assessment.js"></script>
 <script src="js/analytics/facility-analytics.js"></script>
-<script src="js/admin/users.js"></script>
 <script src="js/admin/audit-logs.js"></script>
+<script src="js/admin/users.js"></script>
 <script src="js/admin/service-assessment-loader.js"></script>
-<script src="js/core/navigation.js"></script>
-<script src="js/auth/session.js"></script>
 <script src="js/app.js"></script>
 ```
 
@@ -326,6 +328,10 @@ Acceptance criteria:
 - Coordinates still resolve with safe fallbacks.
 
 ### Phase 9: Reduce `app.js` to Bootstrap Code
+
+Status: Completed.
+
+The live header clock now lives in `core/header.js`, and an obsolete API-key clipboard handler with no matching UI was removed. `app.js` now performs AJAX setup, module configuration, dependency-ordered initialization, compatibility bridging for standalone scripts, and the initial session check.
 
 The final `app.js` should only:
 
