@@ -4,7 +4,7 @@
 
 Split the current `frontend/js/app.js` into focused feature files while preserving existing behavior, jQuery event handling, shared session state, consent modules, and WebSocket updates.
 
-The original file was approximately 4,992 lines. After Phases 1–7, `app.js` is approximately 540 lines and the extracted responsibilities now live in focused modules.
+The original file was approximately 4,992 lines. After Phases 1–8, `app.js` is approximately 125 lines and the extracted responsibilities now live in focused modules.
 
 ## Progress
 
@@ -17,8 +17,8 @@ The original file was approximately 4,992 lines. After Phases 1–7, `app.js` is
 | Phase 5: Referral views and workflow | Completed | Extracted referral lists and timelines, recommendations and finalization, incoming polling, referral details, and referral decisions. |
 | Phase 6: Notifications and WebSockets | Completed | Extracted notification state and rendering, alarm sounds, WebSocket routing, reconnect handling, and fallback polling. |
 | Phase 7: Admin and reporting | Completed | Extracted user administration, analytics and CSV export, audit logs, and the Service Assessment loader. |
-| Phase 8: PSGC and geocoding | Not started | Next planned implementation phase. |
-| Phase 9 | Not started | Proceed after Phase 8 is verified. |
+| Phase 8: PSGC and geocoding | Completed | Extracted the shared PSGC cache, cascading selectors, referral geocoding, and coordinate fallbacks. |
+| Phase 9: Bootstrap cleanup | Not started | Next planned implementation phase. |
 
 ## Current Responsibilities
 
@@ -40,7 +40,7 @@ The existing `app.js` currently handles:
 - Facility analytics and CSV export (extracted in Phase 7)
 - Audit logs (extracted in Phase 7)
 - User administration (extracted in Phase 7)
-- PSGC location selectors and geocoding
+- PSGC location selectors and geocoding (extracted in Phase 8)
 - WebSocket lifecycle and message routing (extracted in Phase 6)
 - Shared formatting, escaping, alerts, and toast notifications
 
@@ -310,6 +310,10 @@ Acceptance criteria:
 - Service Assessment loads exactly once.
 
 ### Phase 8: Extract PSGC and Geocoding
+
+Status: Completed.
+
+Implemented in `location/psgc-location.js`. It owns one shared PSGC cache and exposes separate referral and patient cascade instances. Referral locations retain patient-address prepopulation, asynchronous geocoding, and city-based coordinate fallbacks.
 
 Move the reusable location cascade and geocoding cache into `location/psgc-location.js`.
 
