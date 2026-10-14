@@ -168,6 +168,16 @@
                     return;
                 }
                 runAction('openReferralForm', details.local_patient_id, null, {
+                    diagnosis: details.diagnosis,
+                    diagnosis_system: details.diagnosis_system,
+                    diagnosis_code: details.diagnosis_code,
+                    diagnosis_display: details.diagnosis_display,
+                    diagnosis_text: details.diagnosis_text,
+                    chief_complaint: details.chief_complaint,
+                    chief_complaint_text: details.chief_complaint_text,
+                    chief_complaint_system: details.chief_complaint_system,
+                    chief_complaint_code: details.chief_complaint_code,
+                    chief_complaint_display: details.chief_complaint_display,
                     vital_bp: details.arrival_vital_bp || details.vital_bp || '',
                     vital_hr: details.arrival_vital_hr || details.vital_hr || '',
                     vital_rr: details.arrival_vital_rr || details.vital_rr || '',
@@ -181,7 +191,11 @@
                     has_allergy: !!details.has_allergy,
                     allergy_details: details.allergy_details || '',
                     disease_severity: details.disease_severity || '',
-                    vitalsAsOf: details.arrived_at || null
+                    triage_code: details.triage_code,
+                    referral_priority: details.referral_priority,
+                    condition_severity_code: details.condition_severity_code,
+                    vitalsAsOf: details.arrived_at || null,
+                    ...IRDSS.vitals.latest(details)
                 });
             },
             error() {
@@ -230,15 +244,27 @@
             window.Swal.fire({
                 icon: 'question',
                 title: 'Mark Patient as Arrived',
-                html: `<p class="text-sm text-slate-600 mb-4 text-start">Confirms the patient has physically arrived at your facility. Optionally record vitals taken on arrival.</p><div class="grid grid-cols-2 gap-3 text-start"><div><label class="block text-xs font-semibold text-slate-500 mb-1">BP (mmHg)</label><input type="text" id="arrivalVitalBp" placeholder="120/80" class="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm"></div><div><label class="block text-xs font-semibold text-slate-500 mb-1">HR (bpm)</label><input type="number" min="0" id="arrivalVitalHr" class="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm"></div><div><label class="block text-xs font-semibold text-slate-500 mb-1">RR (br/min)</label><input type="number" min="0" id="arrivalVitalRr" class="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm"></div><div><label class="block text-xs font-semibold text-slate-500 mb-1">Temp (°C)</label><input type="text" id="arrivalVitalTemp" class="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm"></div><div class="col-span-2"><label class="block text-xs font-semibold text-slate-500 mb-1">O2 Sat (%)</label><input type="number" min="0" max="100" id="arrivalVitalO2sat" class="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm"></div></div>`,
+                html: `<p class="text-sm text-slate-600 mb-4 text-start">Confirms the patient has physically arrived at your facility. Optionally record vitals taken on arrival.</p><div class="grid grid-cols-2 gap-3 text-start"><div><label class="block text-xs font-semibold text-slate-500 mb-1">BP (mmHg)</label><input type="text" id="arrivalVitalBp" placeholder="120/80" class="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm"></div><div><label class="block text-xs font-semibold text-slate-500 mb-1">HR (bpm)</label><input type="number" min="0" id="arrivalVitalHr" class="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm"></div><div><label class="block text-xs font-semibold text-slate-500 mb-1">RR (br/min)</label><input type="number" min="0" id="arrivalVitalRr" class="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm"></div><div><label class="block text-xs font-semibold text-slate-500 mb-1">Temp (°C)</label><input type="text" id="arrivalVitalTemp" class="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm"></div><div class="col-span-2"><label class="block text-xs font-semibold text-slate-500 mb-1">O2 Sat (%)</label><input type="number" min="0" max="100" id="arrivalVitalO2sat" class="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm"></div><div><label class="ref-label" for="arrivalVitalHeight">Height (cm)</label><input type="number" step="0.1" min="0" id="arrivalVitalHeight" class="ref-input"></div><div><label class="ref-label" for="arrivalVitalWeight">Weight (kg)</label><input type="number" step="0.1" min="0" id="arrivalVitalWeight" class="ref-input"></div><div class="col-span-2"><label class="ref-label" for="arrivalObservedAt">Measured at</label><input type="datetime-local" step="1" id="arrivalObservedAt" class="ref-input"></div><div class="col-span-2"><label class="ref-label" for="arrivalOxygenMethod">Oxygen measurement method</label><select id="arrivalOxygenMethod" class="ref-input"><option value="unknown">Not specified</option><option value="pulse-oximetry">Pulse oximetry</option></select></div></div>`,
                 showCancelButton: true,
                 confirmButtonText: 'Mark as Arrived',
                 cancelButtonText: 'Cancel',
                 confirmButtonColor: '#f59e0b',
                 reverseButtons: true,
                 focusConfirm: false,
+                didOpen() {
+                    const date=new Date();
+                    $('#arrivalObservedAt').val(new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,19));
+                },
                 preConfirm() {
-                    return { arrival_vital_bp: $('#arrivalVitalBp').val() || '', arrival_vital_hr: $('#arrivalVitalHr').val() || '', arrival_vital_rr: $('#arrivalVitalRr').val() || '', arrival_vital_temp_c: $('#arrivalVitalTemp').val() || '', arrival_vital_o2sat: $('#arrivalVitalO2sat').val() || '' };
+                    const values={ arrival_vital_bp: $('#arrivalVitalBp').val() || '', arrival_vital_hr: $('#arrivalVitalHr').val() || '', arrival_vital_rr: $('#arrivalVitalRr').val() || '', arrival_vital_temp_c: $('#arrivalVitalTemp').val() || '', arrival_vital_o2sat: $('#arrivalVitalO2sat').val() || '',
+                        arrival_vital_height_cm:$('#arrivalVitalHeight').val() || '',arrival_vital_weight_kg:$('#arrivalVitalWeight').val() || ''};
+                    if (Object.values(values).some(value=>value!=='')) {
+                        const time=new Date($('#arrivalObservedAt').val());
+                        if (!Number.isFinite(time.getTime())) {window.Swal.showValidationMessage('Enter the actual measurement time.');return false;}
+                        values.arrival_observed_at=time.toISOString();
+                    }
+                    values.arrival_oxygen_method=$('#arrivalOxygenMethod').val() || 'unknown';
+                    return values;
                 }
             }).then(function (result) {
                 if (result.isConfirmed) submitArrival($button, referralId, originalHtml, result.value);
@@ -360,6 +386,7 @@
                                     <p class="text-xs text-slate-500 mb-0.5">Full Name</p>
                                     <p class="text-lg font-bold text-slate-900 mb-3">${escapeHtml(d.full_name || '—')}</p>
                                     <div class="grid grid-cols-2 gap-y-2 gap-x-3">
+                                        ${d.local_patient_id ? `<p class="col-span-2"><span class="text-slate-500">Patient ID:</span> <span class="font-semibold text-slate-800">${escapeHtml(IRDSS.formatters.displayPatientId(d))}</span></p>` : ''}
                                         <p><span class="text-slate-500">DOB:</span> <span class="font-semibold text-slate-800">${escapeHtml(d.date_of_birth || '—')}</span></p>
                                         <p><span class="text-slate-500">Gender:</span> <span class="font-semibold text-slate-800">${escapeHtml(d.gender || '—')}</span></p>
                                         <p><span class="text-slate-500">Age:</span> <span class="font-semibold text-slate-800">${escapeHtml(String(ageDisplay))}</span></p>
@@ -372,10 +399,15 @@
                                 <div class="border border-slate-200 rounded-xl p-4">
                                     <p class="text-xs text-slate-500 mb-0.5">Diagnosis</p>
                                     <p class="text-base font-bold text-slate-900 mb-3">${escapeHtml(d.diagnosis || '—')}</p>
-                                    <p class="mb-2"><span class="text-slate-500">Chief Complaint:</span> <span class="font-semibold text-slate-800">${escapeHtml(d.chief_complaint || '—')}</span></p>
+                                    ${d.diagnosis_code ? `<p class="text-sm text-slate-600 mb-3">${escapeHtml(d.diagnosis_display)} · SNOMED CT ${escapeHtml(d.diagnosis_code)}</p>` : ''}
+                                    <p class="mb-2"><span class="text-slate-500">Chief Complaint:</span> <span class="font-semibold text-slate-800">${escapeHtml(d.chief_complaint_text || d.chief_complaint || '—')}</span></p>
+                                    ${d.chief_complaint_code ? `<p class="text-sm text-slate-600 mb-3">${escapeHtml(d.chief_complaint_display)} — SNOMED CT ${escapeHtml(d.chief_complaint_code)}</p>` : ''}
                                     <p class="mb-2"><span class="text-slate-500">Referral Reasons:</span> <span class="font-semibold text-slate-800">${escapeHtml(runAction('referralReasonsText', d))}</span></p>
                                     <p class="mb-2"><span class="text-slate-500">Consent:</span> <span class="font-semibold ${String(d.consent_status || '').toUpperCase() === 'GRANTED' ? 'text-emerald-700' : 'text-red-700'}">${consentRecordedText(d.consent_status, d.consent_method)}</span></p>
-                                    <p class="mb-3"><span class="text-slate-500">Severity:</span> <span class="${severityClass} px-2.5 py-1 rounded-full text-xs font-bold ml-1">${severityText}</span></p>
+                                    <p class="mb-3"><span class="text-slate-500">Triage Acuity:</span> <span class="${severityClass} px-2.5 py-1 rounded-full text-xs font-bold ml-1">${severityText}</span></p>
+                                    <p class="mb-2 text-sm">Referral Priority: <strong>${escapeHtml((d.referral_priority || 'Legacy / not recorded').toUpperCase())}</strong></p>
+                                    <p class="mb-2 text-sm">Condition Severity: <strong>${escapeHtml(d.condition_severity_display || 'Not specified')}</strong></p>
+                                    ${state.currentUser?.role === 'doctor' && !d.departed_at ? `<button type="button" class="btn-reassess-urgency ref-btn-secondary my-2" data-ref-id="${escapeHtml(referralId)}">Reassess clinical urgency</button>` : ''}
                                     <p><span class="text-slate-500">Referring Facility:</span> <span class="font-semibold text-slate-800">${escapeHtml(d.referring_facility || '—')}</span></p>
                                     ${tagsRow}
                                 </div>
@@ -413,7 +445,7 @@
                                 </div>
                             </div>
 
-                            ${(d.arrival_vital_bp || d.arrival_vital_hr || d.arrival_vital_rr || d.arrival_vital_temp_c || d.arrival_vital_o2sat) ? `
+                            ${(d.arrival_vital_bp || d.arrival_vital_hr || d.arrival_vital_rr || d.arrival_vital_temp_c || d.arrival_vital_o2sat || d.arrival_vital_height_cm || d.arrival_vital_weight_kg) ? `
                                 <div class="mt-4">
                                     <p class="font-semibold text-slate-800 mb-2">Vitals at Arrival${d.arrived_at ? ' &middot; ' + formatReferralTimestamp(d.arrived_at) : ''}</p>
                                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -422,9 +454,12 @@
                                         ${vitalTile('RR', d.arrival_vital_rr, 'rpm')}
                                         ${vitalTile('Temp', d.arrival_vital_temp_c, '°C')}
                                         ${vitalTile('O2 Sat', d.arrival_vital_o2sat, '%')}
+                                        ${vitalTile('Height', d.arrival_vital_height_cm, 'cm')}
+                                        ${vitalTile('Weight', d.arrival_vital_weight_kg, 'kg')}
                                     </div>
                                 </div>
                             ` : ''}
+                            ${(d.observations || []).length ? `<details class="mt-4 border-t border-slate-200 pt-3"><summary class="font-semibold cursor-pointer">Measurement history · FHIR Observations</summary><div class="overflow-x-auto mt-3"><table class="w-full text-xs text-left"><thead><tr><th class="p-2">Measurement</th><th class="p-2">Value / UCUM unit</th><th class="p-2">Recorded context / time</th><th class="p-2">Observation ID</th></tr></thead><tbody>${d.observations.map(obs=>`<tr class="border-t border-slate-100"><td class="p-2">${escapeHtml(obs.display)}<br>LOINC ${escapeHtml(obs.loinc_code)}</td><td class="p-2">${escapeHtml(String(obs.value ?? 'Not recorded'))} ${escapeHtml(obs.unit)}</td><td class="p-2">${escapeHtml(obs.measurement_context)}<br>${escapeHtml(formatReferralTimestamp(obs.observed_at))}</td><td class="p-2 font-mono break-all">${escapeHtml(obs.fhir_observation_id)}</td></tr>`).join('')}</tbody></table></div></details>` : ''}
                         </div>
                     `,
                     confirmButtonColor: '#16a34a',

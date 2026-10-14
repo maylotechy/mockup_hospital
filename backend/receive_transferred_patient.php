@@ -8,6 +8,7 @@
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/crypto_helper.php';
+require_once __DIR__ . '/patient_transfer.php';
 
 $user = getLoggedInUser();
 if (!$user) {
@@ -38,6 +39,10 @@ $arrivalVitals = [
     'vital_temp_c'  => isset($input['arrival_vital_temp_c']) ? trim((string)$input['arrival_vital_temp_c']) : '',
     'vital_o2sat'   => isset($input['arrival_vital_o2sat']) ? trim((string)$input['arrival_vital_o2sat']) : ''
 ];
+$arrivalVitals['vital_height_cm']=trim((string)($input['arrival_vital_height_cm'] ?? ''));
+$arrivalVitals['vital_weight_kg']=trim((string)($input['arrival_vital_weight_kg'] ?? ''));
+if (!empty($input['arrival_observed_at'])) $arrivalVitals['observed_at']=(string)$input['arrival_observed_at'];
+$arrivalVitals['oxygen_method']=(string)($input['arrival_oxygen_method'] ?? 'unknown');
 $arrivalVitals = array_filter($arrivalVitals, fn($v) => $v !== '');
 
 $duplicateChoice = isset($input['duplicate_choice']) ? trim((string)$input['duplicate_choice']) : null;
@@ -95,14 +100,6 @@ try {
         }
     }
 
-    // Step 2: pull the decrypted patient identity -- gated the same way centrally
-    $detailsRes = callCentralReferralApi('GET', "/api/v1/referral/{$referralId}/patient-details", null, $user, $iolHost, $portsToTry);
-    if ($detailsRes['code'] < 200 || $detailsRes['code'] >= 300) {
-        $detail = $detailsRes['data']['detail'] ?? "Can't reach the central server to retrieve patient details.";
-        sendJsonResponse(['success' => false, 'message' => $detail], $detailsRes['code'] ?: 502);
-    }
-    $details = $detailsRes['data'];
-
     $pdo = getDbConnection();
     $facilityId = (int)($user['facility']['id'] ?? 0);
 
@@ -118,10 +115,18 @@ try {
         ], 200);
     }
 
+    // IoL authorizes access; the sender returns identity encrypted to this hospital.
+    $detailsRes = callCentralReferralApi('GET', "/api/v1/referral/{$referralId}/patient-details", null, $user, $iolHost, $portsToTry);
+    if ($detailsRes['code'] < 200 || $detailsRes['code'] >= 300) {
+        $detail = $detailsRes['data']['detail'] ?? "Can't reach the central server to retrieve patient details.";
+        sendJsonResponse(['success' => false, 'message' => $detail], $detailsRes['code'] ?: 502);
+    }
+    $details = decryptDirectPatientDetails($detailsRes['data'], $user);
+
     $fullName = trim((string)($details['full_name'] ?? ''));
     $nameParts = $fullName !== '' ? preg_split('/\s+/', $fullName, 2) : ['Unknown', 'Patient'];
-    $firstName = $nameParts[0] ?? 'Unknown';
-    $lastName = $nameParts[1] ?? 'Patient';
+    $firstName = $details['first_name'] ?? ($nameParts[0] ?? 'Unknown');
+    $lastName = $details['last_name'] ?? ($nameParts[1] ?? 'Patient');
 
     $genderMap = ['male' => 'Male', 'female' => 'Female'];
     $gender = $genderMap[strtolower((string)($details['gender'] ?? ''))] ?? 'Other';
@@ -134,6 +139,27 @@ try {
     $philhealthStatus = !empty($details['philhealth_status']) ? $details['philhealth_status'] : null;
     $philhealthMember = ($philhealthNumber || $philhealthStatus) ? 'Yes' : 'No';
     $address = !empty($details['address']) ? $details['address'] : null;
+    $identity = [
+        'first_name' => $firstName,
+        'middle_name' => $details['middle_name'] ?? null,
+        'last_name' => $lastName,
+        'suffix' => $details['suffix'] ?? null,
+        'dob' => $dob,
+        'gender' => $gender,
+        'civil_status' => $civilStatus,
+        'phone' => $phone,
+        'region' => $details['region'] ?? null,
+        'province' => $details['province'] ?? null,
+        'city_municipality' => $details['city_municipality'] ?? null,
+        'barangay' => $details['barangay'] ?? null,
+        'zip_code' => $details['zip_code'] ?? null,
+        'philhealth_member' => $philhealthMember,
+        'philhealth_number' => $philhealthNumber,
+        'philhealth_status_type' => $philhealthStatus,
+        'is_4ps_member' => $details['is_4ps_member'] ?? 'No',
+        'transferred_address' => $address,
+    ];
+    $snapshotCiphertext = encryptLocalTransferSnapshot($details);
 
     // Only prompt on the first pass, and only when central actually supplied a real DOB --
     // a fabricated "today" DOB (see $dobSuppliedByCentral above) would false-positive-match
@@ -160,16 +186,16 @@ try {
             UPDATE patients SET
                 source_referral_id = :source_referral_id,
                 source_facility = :source_facility,
-                transferred_address = :transferred_address,
-                transferred_details_snapshot = :transferred_details_snapshot,
+                transferred_address = NULL,
+                transferred_details_snapshot = NULL,
+                transferred_snapshot_ciphertext = :transferred_snapshot_ciphertext,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = :pid AND facility_id = :fid
         ');
         $linkStmt->execute([
             ':source_referral_id' => $referralId,
             ':source_facility' => $details['referring_facility'] ?? null,
-            ':transferred_address' => $address,
-            ':transferred_details_snapshot' => json_encode($details),
+            ':transferred_snapshot_ciphertext' => $snapshotCiphertext,
             ':pid' => $linkPatientId,
             ':fid' => $facilityId
         ]);
@@ -182,29 +208,20 @@ try {
         // Details" clicks can be served local-to-local instead of re-hitting central every time.
         $insertStmt = $pdo->prepare('
             INSERT INTO patients
-                (facility_id, first_name, last_name, dob, gender, civil_status, phone,
-                 philhealth_member, philhealth_number, philhealth_status_type,
-                 source_referral_id, source_facility, transferred_address, transferred_details_snapshot, created_by_user_id)
+                (facility_id, identity_ciphertext, identity_blind_index, identity_key_version,
+                 source_referral_id, source_facility, transferred_snapshot_ciphertext, created_by_user_id)
             VALUES
-                (:facility_id, :first_name, :last_name, :dob, :gender, :civil_status, :phone,
-                 :philhealth_member, :philhealth_number, :philhealth_status_type,
-                 :source_referral_id, :source_facility, :transferred_address, :transferred_details_snapshot, :created_by_user_id)
+                (:facility_id, :identity_ciphertext, :identity_blind_index, :identity_key_version,
+                 :source_referral_id, :source_facility, :transferred_snapshot_ciphertext, :created_by_user_id)
         ');
         $insertStmt->execute([
             ':facility_id' => $facilityId,
-            ':first_name' => $firstName,
-            ':last_name' => $lastName,
-            ':dob' => $dob,
-            ':gender' => $gender,
-            ':civil_status' => $civilStatus,
-            ':phone' => $phone,
-            ':philhealth_member' => $philhealthMember,
-            ':philhealth_number' => $philhealthNumber,
-            ':philhealth_status_type' => $philhealthStatus,
+            ':identity_ciphertext' => encryptLocalPatientIdentity($identity),
+            ':identity_blind_index' => localPatientIdentityBlindIndex($firstName, $lastName, $dob),
+            ':identity_key_version' => LOCAL_DATA_ENVELOPE_VERSION,
             ':source_referral_id' => $referralId,
             ':source_facility' => $details['referring_facility'] ?? null,
-            ':transferred_address' => $address,
-            ':transferred_details_snapshot' => json_encode($details),
+            ':transferred_snapshot_ciphertext' => $snapshotCiphertext,
             ':created_by_user_id' => (int)($user['id'] ?? 0)
         ]);
 
@@ -212,13 +229,25 @@ try {
         logAuditEvent($user, 'PATIENT_ARRIVED', $referralId, $fullName);
     }
 
+    // The complete identity is now encrypted in this hospital's local database.
+    // Acknowledge delivery so Central IRDSS can delete its temporary encrypted copy.
+    $ackRes = callCentralReferralApi(
+        'POST',
+        "/api/v1/referral/{$referralId}/patient-details/acknowledge",
+        [],
+        $user,
+        $iolHost,
+        $portsToTry
+    );
+
     sendJsonResponse([
         'success' => true,
         'message' => 'Patient marked as arrived and added to your local patient records.',
         'patient_id' => $newPatientId,
-        'arrived_at' => $arriveRes['data']['arrived_at'] ?? null
+        'arrived_at' => $arriveRes['data']['arrived_at'] ?? null,
+        'central_identity_acknowledged' => $ackRes['code'] >= 200 && $ackRes['code'] < 300
     ], 200);
 
 } catch (Exception $e) {
-    sendJsonResponse(['success' => false, 'message' => 'An error occurred: ' . $e->getMessage()], 500);
+    sendJsonResponse(['success' => false, 'message' => 'The patient record could not be transferred securely. Check that the sending hospital is online and try again.'], 503);
 }

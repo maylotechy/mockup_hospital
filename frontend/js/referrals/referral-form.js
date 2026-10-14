@@ -6,7 +6,7 @@
 
     const state = IRDSS.state;
     const { API_BASE } = IRDSS.config;
-    const { escapeHtml, formatPatientName, calculatePrintableAge } = IRDSS.formatters;
+    const { escapeHtml, formatPatientName, calculatePrintableAge, calculateAgeYears } = IRDSS.formatters;
     const { switchTab, getHospitalLogoPath } = IRDSS.navigation;
     let actions = {};
     let initialized = false;
@@ -54,26 +54,25 @@
                     // abandoned re-referral (with prefilled vitals) could leak into the
                     // next patient's form if the doctor opens a normal "Refer" afterward.
                     $('#referralForm')[0].reset();
+                    IRDSS.diagnosis.set();
+                    IRDSS.symptom.set();
+                    IRDSS.urgency.set(clinicalData || {});
+                    IRDSS.vitals.set(clinicalData || {});
                     resetAdditionalReferralReasons();
 
                     $('#modalPatientId').val(patient.id);
                     $('#modalPatientName').text(formatPatientName(patient));
                     $('#modalPatientDob').text(patient.dob);
+                    const patientAgeYears = calculateAgeYears(patient.dob);
+                    $('#modalPatientAge').text(calculatePrintableAge(patient.dob));
                     $('#modalPatientGender').text(patient.gender);
                     $('#modalPatientPhone').text(patient.phone || 'N/A');
+                    $('#modalPatientPhoneField').toggleClass('hidden', !patient.phone);
 
-                    // Pregnancy is not applicable to male patients
+                    // Pregnancy is not applicable to male patients, so the option is hidden
                     const isMale = String(patient.gender || '').trim().toLowerCase() === 'male';
-
-                    $('#modalIsPregnant')
-                        .prop('disabled', isMale)
-                        .prop('checked', isMale ? false : $('#modalIsPregnant').prop('checked'));
-
-                    $('#modalIsPregnantLabel').toggleClass('text-slate-400', isMale);
-
-                    if (isMale) {
-                        $('#modalIsPregnant').prop('checked', false);
-                    }
+                    $('#modalIsPregnant').prop('disabled', isMale).prop('checked', false);
+                    $('#modalIsPregnantOption').toggleClass('hidden', isMale);
 
                     switchTab('referPatient');
                     // Pre-fill the location selector from the patient's own registered
@@ -86,6 +85,9 @@
                     });
 
                     if (clinicalData) {
+                        IRDSS.diagnosis.set(clinicalData);
+                        IRDSS.symptom.set(clinicalData);
+                        $('#modalChiefComplaint').val(clinicalData.chief_complaint_text || clinicalData.chief_complaint || '');
                         if (clinicalData.vital_bp) {
                             const bpParts = String(clinicalData.vital_bp).split('/');
                             $('#modalVitalBpSystolic').val(bpParts[0] || '');
@@ -99,8 +101,7 @@
                         if (clinicalData.vital_weight_kg) $('#modalVitalWeight').val(clinicalData.vital_weight_kg);
 
                         $('#modalIsPwd').prop('checked', !!clinicalData.is_pwd);
-                        $('#modalIsPregnant').prop('checked', !!clinicalData.is_pregnant);
-                        $('#modalIsSeniorCitizen').prop('checked', !!clinicalData.is_senior_citizen);
+                        $('#modalIsPregnant').prop('checked', !isMale && !!clinicalData.is_pregnant);
                         $('#modalHasAllergy').prop('checked', !!clinicalData.has_allergy);
                         if (clinicalData.has_allergy && clinicalData.allergy_details) {
                             $('#modalAllergyDetails').val(clinicalData.allergy_details);
@@ -118,6 +119,14 @@
                     } else {
                         $('#modalVitalsPrefillNotice').addClass('hidden');
                     }
+
+                    const isSeniorCitizen = patientAgeYears !== null && patientAgeYears >= 60;
+                    // Senior status comes from the date of birth; only shown when it applies
+                    $('#modalIsSeniorCitizen')
+                        .prop('checked', isSeniorCitizen)
+                        .prop('disabled', true);
+                    $('#modalIsSeniorCitizenOption').toggleClass('hidden', !isSeniorCitizen);
+                    $('#modalSeniorCitizenNote').text(isSeniorCitizen ? `(${patientAgeYears} years old)` : '');
 
                     updateReasonDropdown();
                     toggleAllergyDetails();
@@ -269,7 +278,7 @@
         const count = $('.additional-reason-row').length;
         if (count >= 3) return;
         const $row = $('<div class="additional-reason-row flex items-center gap-2 min-w-0"></div>');
-        const $select = $('<select class="additional-reason-select flex-1 min-w-0 h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-600/10 outline-none"></select>');
+        const $select = $('<select class="additional-reason-select ref-input flex-1 min-w-0"></select>');
         populateAdditionalReferralReasonSelect($select);
         $row.append($select).append('<button type="button" class="btn-remove-additional-reason w-10 h-10 rounded-lg text-red-600 hover:bg-red-50" aria-label="Remove additional reason"><i class="bi bi-trash"></i></button>');
         $(this).before($row);
@@ -335,6 +344,11 @@
      * novalidate attribute disables) and returns whether the form is valid overall.
      */
     function validateReferralForm(requireConsent = true) {
+        if (!IRDSS.urgency.validate()) return false;
+        if (!IRDSS.vitals.validate()) return false;
+        if ($('#modalConditionSeverity').val() && !String($('#modalDiagnosis').val() || '').trim()) {
+            IRDSS.ui.showToast('error','Enter a working diagnosis before assigning condition severity.',4000); return false;
+        }
         let isValid = true;
         let $firstInvalid = null;
 
@@ -446,6 +460,8 @@
             chiefComplaint: String($('#modalChiefComplaint').val() || '').trim(),
             diagnosis: String($('#modalDiagnosis').val() || 'Not specified').trim(),
             severity: String($('#modalSeverity option:selected').text() || '').trim(),
+            referralPriority: String($('#modalReferralPriority').val() || '').toUpperCase(),
+            conditionSeverity: String($('#modalConditionSeverity option:selected').text() || 'Not specified'),
             reasons: [primaryReason, ...getAdditionalReferralReasons()].filter(Boolean).map(value => String(value).trim()),
             vitals: {
                 bloodPressure: `${$('#modalVitalBpSystolic').val() || '--'}/${$('#modalVitalBpDiastolic').val() || '--'} mmHg`,
@@ -478,6 +494,8 @@
     // Returns to Patient Records without saving
     function cancelReferPatient() {
         $('#referralForm')[0].reset();
+        IRDSS.diagnosis.set();
+        IRDSS.symptom.set();
         $('#modalReasonSelect').empty().append('<option value="" selected disabled hidden>select a reason...</option>').prop('disabled', true);
         resetAdditionalReferralReasons();
         toggleAllergyDetails();
@@ -504,4 +522,3 @@
         toggleAllergyDetails
     });
 })(window, window.jQuery);
-

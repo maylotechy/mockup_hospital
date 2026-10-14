@@ -1,0 +1,29 @@
+{
+  "resourceType": "ValueSet",
+  "id": "pheref-referral-category-snapshot",
+  "url": "https://www.fhir.doh.gov.ph/pheref/ValueSet/referral-category",
+  "version": "0.1.0",
+  "name": "VS_Referral_Category",
+  "title": "Referral Category VS",
+  "status": "active",
+  "description": "Source-controlled snapshot of the PeRef referral-category ValueSet expansion retrieved from the FHIRLab terminology server on 2026-10-06. The canonical resource remains owned by its publisher.",
+  "compose": {
+    "include": [
+      {
+        "system": "http://snomed.info/sct",
+        "concept": [
+          { "code": "73770003", "display": "Emergency" },
+          { "code": "440655000", "display": "Outpatient" }
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "timestamp": "2026-10-06T04:53:22+00:00",
+    "total": 2,
+    "contains": [
+      { "system": "http://snomed.info/sct", "code": "73770003", "display": "Emergency" },
+      { "system": "http://snomed.info/sct", "code": "440655000", "display": "Outpatient" }
+    ]
+  }
+}

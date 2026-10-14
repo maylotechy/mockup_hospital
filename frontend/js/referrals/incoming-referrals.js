@@ -6,7 +6,7 @@
 
     const state = IRDSS.state;
     const { API_BASE } = IRDSS.config;
-    const { escapeHtml, formatAgeDisplay, consentRecordedText } = IRDSS.formatters;
+    const { escapeHtml, formatAgeDisplay, consentRecordedText, displayReferralNumber } = IRDSS.formatters;
     const { showToast, cleanErrorMessage } = IRDSS.ui;
     const referralReasonsText = IRDSS.referrals.form.reasonsText;
     const resolveLocationAddressHtml = (...args) => IRDSS.referrals.recommendations.resolveLocationAddressHtml(...args);
@@ -72,7 +72,6 @@
         state.currentActiveReferralId = referralId;
 
         const referringFacility = incomingAlert.referring_facility || incomingAlert.referring_hospital || (incomingAlert.serviceProvider && incomingAlert.serviceProvider.display) || 'Unknown Hospital';
-        const patientId = incomingAlert.patient_id || (incomingAlert.subject && incomingAlert.subject.reference) || 'N/A';
         const age = incomingAlert.patient_age !== undefined ? incomingAlert.patient_age : incomingAlert.age;
         const ageMonths = incomingAlert.patient_age_months !== undefined ? incomingAlert.patient_age_months : null;
         const ageDays = incomingAlert.patient_age_days !== undefined ? incomingAlert.patient_age_days : null;
@@ -81,8 +80,12 @@
         const patientInfo = `${ageDisplay} (${gender})`;
         const severity = incomingAlert.disease_severity !== undefined ? incomingAlert.disease_severity : (incomingAlert.severity !== undefined ? incomingAlert.severity : '3');
         const clinicalReason = referralReasonsText(incomingAlert);
-        const diagnosis = incomingAlert.diagnosis || 'Not specified';
-        const chiefComplaint = incomingAlert.chief_complaint || 'Not specified';
+        const diagnosisText = incomingAlert.diagnosis_text || incomingAlert.diagnosis || incomingAlert.diagnosis_display || 'Not specified';
+        const diagnosis = incomingAlert.diagnosis_code
+            ? `${diagnosisText} (${incomingAlert.diagnosis_display || diagnosisText} — SNOMED CT ${incomingAlert.diagnosis_code})`
+            : diagnosisText;
+        const complaintText = incomingAlert.chief_complaint_text || incomingAlert.chief_complaint || 'Not specified';
+        const chiefComplaint = incomingAlert.chief_complaint_code ? `${complaintText} (${incomingAlert.chief_complaint_display} — SNOMED CT ${incomingAlert.chief_complaint_code})` : complaintText;
 
         // Patient status flags -- only ever shown if at least one applies, to avoid clutter
         const statusTags = [];
@@ -135,64 +138,59 @@
 
         // Update placeholder elements if present in DOM
         $('#modal-referring-hospital').text(referringFacility);
-        $('#modal-patient-id').text(patientId);
         $('#modal-patient-age').text(ageDisplay);
         $('#modal-severity').text("Triage Category: " + severity);
         $('#modal-diagnosis').text(diagnosis);
         $('#modal-chief-complaint').text(chiefComplaint);
         $('#modal-reason').text(clinicalReason);
 
-        // Builds one label/value row inside a grouped info card; `last` drops the divider.
-        const infoRow = (label, valueHtml, opts = {}) => `
-            <div class="flex flex-col sm:flex-row sm:justify-between ${opts.last ? '' : 'border-b border-slate-200/60'} pb-1.5 gap-0.5 sm:gap-2">
-                <span class="text-slate-700 font-bold shrink-0">${label}:</span>
-                <span class="${opts.valueClass || 'font-bold text-slate-800'} sm:text-right${opts.leading ? ' leading-relaxed' : ''}" ${opts.id ? `id="${opts.id}"` : ''}>${valueHtml}</span>
+        // Label is bold, value is plain; `opts.full` spans the whole row, `opts.valueClass`
+        // is reserved for the few values that need to stand out (e.g. allergies).
+        const detail = (label, valueHtml, opts = {}) => `
+            <div class="min-w-0 ${opts.full ? 'col-span-2 sm:col-span-3' : ''}">
+                <dt class="text-xs font-semibold text-slate-800">${label}</dt>
+                <dd class="mt-0.5 text-sm ${opts.valueClass || 'font-normal text-slate-600'} break-words" ${opts.id ? `id="${opts.id}"` : ''}>${valueHtml}</dd>
             </div>`;
-        const infoCard = (title, rowsHtml, extraClass = '') => `
-            <div class="${extraClass}">
-                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-2">${title}</p>
-                <div class="bg-slate-50 rounded-xl border border-slate-200/70 p-3.5 space-y-1.5 text-xs">${rowsHtml}</div>
-            </div>`;
+        const section = (title, itemsHtml) => `
+            <section class="border-t border-slate-200 py-4">
+                <h4 class="mb-3 text-sm font-bold text-slate-900">${title.toUpperCase()}</h4>
+                <dl class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3">${itemsHtml}</dl>
+            </section>`;
+        const consentGranted = String(incomingAlert.consent_status || '').toUpperCase() === 'GRANTED';
 
         Swal.fire({
-            title: '<div class="flex items-center justify-center gap-2 text-red-600"><i class="bi bi-hospital text-2xl"></i> <span>Incoming Patient Referral</span></div>',
-            width: '60rem',
+            title: '<span class="text-lg font-bold text-slate-900">INCOMING PATIENT REFERRAL</span>',
+            width: '48rem',
             html: `
-                <div class="text-start space-y-3 p-2 text-sm text-slate-700">
-                    <p class="text-xs text-slate-500 uppercase font-semibold tracking-wider mb-2">Hospital Referral Notification</p>
-
-                    <div class="p-3 bg-red-50 rounded-xl border border-red-100 space-y-1">
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs font-bold text-red-900 font-mono">Referral ID: ${escapeHtml(referralId)}</span>
-                            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">Pending Decision</span>
-                        </div>
+                <div class="incoming-referral-view text-start">
+                    <div class="flex flex-wrap items-center justify-between gap-2 pb-4">
+                        <span class="font-mono text-xs text-slate-500">${escapeHtml(displayReferralNumber(incomingAlert) || 'N/A')}</span>
+                        <span class="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">Pending decision</span>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
-                        ${infoCard('Referring Hospital', `
-                            ${infoRow('Referring Facility', escapeHtml(referringFacility), { id: 'modal-referring-hospital' })}
-                            ${infoRow('Location', hospLocationHtml, { valueClass: 'font-normal text-slate-800', leading: true })}
-                            ${infoRow('Transfer Distance & ETA', escapeHtml(etaText), { valueClass: 'font-bold text-red-700', id: 'modal-transfer-eta', last: true })}
-                        `)}
-                        ${infoCard('Patient Info', `
-                            ${infoRow('Patient ID', escapeHtml(String(patientId)), { valueClass: 'font-bold text-slate-800 font-mono', id: 'modal-patient-id' })}
-                            ${infoRow('Age', escapeHtml(ageDisplay), { valueClass: 'font-normal text-slate-800', id: 'modal-patient-age' })}
-                            ${infoRow('Gender', escapeHtml(String(gender)), { valueClass: 'font-normal text-slate-800', id: 'modal-patient-gender' })}
-                            ${infoRow('Location', patientLocationHtml, { valueClass: 'font-normal text-slate-800', leading: true, last: true })}
-                        `)}
-                    </div>
+                    ${section('Referring Hospital', `
+                        ${detail('Facility', escapeHtml(referringFacility), { id: 'modal-referring-hospital' })}
+                        ${detail('Distance &amp; ETA', escapeHtml(etaText), { id: 'modal-transfer-eta' })}
+                        ${detail('Location', hospLocationHtml, { full: true })}
+                    `)}
 
-                    ${infoCard('Clinical Info', `
-                        ${infoRow('Severity', 'Triage Category: ' + escapeHtml(String(severity)), { valueClass: 'font-bold text-amber-700', id: 'modal-severity' })}
-                        ${infoRow('Diagnosis', escapeHtml(diagnosis), { id: 'modal-diagnosis' })}
-                        ${infoRow('Chief Complaint', escapeHtml(chiefComplaint), { id: 'modal-chief-complaint' })}
-                        ${patientStatusText ? infoRow('Patient Status', escapeHtml(patientStatusText)) : ''}
-                        ${allergyText ? infoRow('Allergy', escapeHtml(allergyText), { valueClass: 'font-bold text-red-700' }) : ''}
-                        ${infoRow('Consent', consentRecordedText(incomingAlert.consent_status, incomingAlert.consent_method), { valueClass: String(incomingAlert.consent_status || '').toUpperCase() === 'GRANTED' ? 'font-bold text-emerald-700' : 'font-bold text-red-700' })}
-                        ${infoRow('Reason for Referral', escapeHtml(clinicalReason), { id: 'modal-reason', last: true })}
-                    `, 'mt-3')}
+                    ${section('Patient', `
+                        ${detail('Age', escapeHtml(ageDisplay), { id: 'modal-patient-age' })}
+                        ${detail('Gender', escapeHtml(String(gender)), { id: 'modal-patient-gender' })}
+                        ${detail('Address', patientLocationHtml)}
+                    `)}
 
-                    <p class="text-xs text-slate-500 text-center mt-3">Please choose your decision for this incoming referral:</p>
+                    ${section('Clinical Information', `
+                        ${detail('Triage Acuity', escapeHtml(incomingAlert.triage_display || 'Triage level ' + String(severity)), { id: 'modal-severity' })}
+                        ${detail('Diagnosis', escapeHtml(diagnosis), { id: 'modal-diagnosis' })}
+                        ${detail('Chief Complaint', escapeHtml(chiefComplaint), { id: 'modal-chief-complaint' })}
+                        ${detail('Referral Priority', escapeHtml((incomingAlert.referral_priority || 'Legacy / not recorded').toUpperCase()))}
+                        ${detail('Condition Severity', escapeHtml(incomingAlert.condition_severity_display || 'Not specified'))}
+                        ${patientStatusText ? detail('Priority Group', escapeHtml(patientStatusText)) : ''}
+                        ${allergyText ? detail('Allergy', escapeHtml(allergyText), { valueClass: 'font-medium text-red-700' }) : ''}
+                        ${detail('Consent', consentRecordedText(incomingAlert.consent_status, incomingAlert.consent_method), { valueClass: consentGranted ? 'font-normal text-slate-600' : 'font-medium text-red-700' })}
+                        ${detail('Reason for Referral', escapeHtml(clinicalReason), { id: 'modal-reason', full: true })}
+                    `)}
                 </div>
             `,
             showCancelButton: true,
@@ -205,7 +203,7 @@
             cancelButtonColor: '#64748b',
             allowOutsideClick: false,
             allowEscapeKey: false,
-            customClass: { popup: 'rounded-3xl shadow-2xl border' },
+            customClass: { popup: 'rounded-2xl shadow-xl' },
             didOpen: (popup) => {
                 const confirmBtn = Swal.getConfirmButton();
                 const denyBtn = Swal.getDenyButton();
@@ -334,11 +332,12 @@
 
                 Swal.fire({
                     icon: 'error',
-                    title: 'Decision Submission Failed',
+                    title: xhr.status === 409 && decision === 'ACCEPTED' ? 'Unable to Accept Referral' : 'Decision Submission Failed',
                     text: cleanErrorMessage(rawMsg, xhr.status),
                     confirmButtonColor: '#0d6efd',
                     customClass: { popup: 'rounded-4 shadow-lg' }
                 });
+                if (xhr.status === 409 || xhr.status === 404) pollIncomingReferrals();
             }
         });
     }

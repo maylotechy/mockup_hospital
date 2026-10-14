@@ -8,6 +8,7 @@
         currentUser: null,
         currentReferralPatient: null,
         activeInitiatedReferralId: null,
+        activeInitiatedReferralNumber: null,
         currentActiveReferralId: null
     };
 })(window);

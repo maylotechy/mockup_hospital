@@ -22,6 +22,7 @@
         state.currentUser = null;
         state.currentReferralPatient = null;
         state.activeInitiatedReferralId = null;
+        state.activeInitiatedReferralNumber = null;
         state.currentActiveReferralId = null;
     }
 

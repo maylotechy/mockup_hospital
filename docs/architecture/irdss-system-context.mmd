@@ -1,0 +1,33 @@
+flowchart LR
+    subgraph PARTICIPANTS[Participating Healthcare Facilities]
+        direction TB
+        STANDALONE[IRDSS Standalone Hospital System]
+        HIS[External Hospital HIS or EMR]
+        ADAPTER[FHIR Integration Adapter]
+        HIS --> ADAPTER
+    end
+
+    subgraph CENTRAL[Central IRDSS Platform]
+        IOL[IRDSS Interoperability Layer]
+        MATCH[Intelligent Referral Matching]
+        WORKFLOW[Referral Workflow Management]
+        NOTIFY[Notification Service]
+        ADMIN[IRDSS Admin Console]
+        IOL --> MATCH
+        IOL --> WORKFLOW
+        IOL --> NOTIFY
+        ADMIN --> IOL
+    end
+
+    STANDALONE -->|POST FHIR transaction Bundle| IOL
+    ADAPTER -->|POST FHIR transaction Bundle| IOL
+    IOL -->|FHIR response and referral status| STANDALONE
+    IOL -->|FHIR response, webhook or polling| ADAPTER
+
+    ONTO[(Ontoserver Terminology Service)]
+    NIDAS[NIDAS or Approved Identity Service]
+    IOL -->|ValueSet expand, code lookup and validation| ONTO
+    IOL -->|User identity verification when enabled| NIDAS
+
+    NOTIFY -->|WebSocket notifications| STANDALONE
+    NOTIFY -->|Webhook or API notification| ADAPTER

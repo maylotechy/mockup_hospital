@@ -71,7 +71,7 @@
                     </div>
                     <div class="flex-1 min-w-0">
                         <p class="text-xs font-semibold text-slate-800">New referral from <span class="text-red-700">${escapeHtml(referringFacility)}</span></p>
-                        <p class="text-[10px] text-slate-400 font-mono mt-0.5">${escapeHtml(String(referralId))}</p>
+                        <p class="text-[10px] text-slate-400 font-mono mt-0.5">${escapeHtml(alert.referral_number || String(referralId))}</p>
                         <button type="button" class="btn-view-referral-form mt-2 px-3 py-1 bg-yellow-600 hover:bg-red-700 text-white text-[11px] font-bold rounded-lg transition-all" data-ref-id="${escapeHtml(String(referralId))}">
                             <i class="bi bi-file-earmark-text-fill me-1"></i> View Form
                         </button>
@@ -113,7 +113,7 @@
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                         <div class="min-w-0 flex-1">
                             <p class="text-sm text-slate-800"><span class="font-semibold">Referral from:</span> ${escapeHtml(item.referring_facility || 'Unknown Facility')}</p>
-                            <p class="text-sm text-slate-800"><span class="font-semibold">Severity:</span> ${severity} &middot; ${escapeHtml(severityLabel)}</p>
+                            <p class="text-sm text-slate-800"><span class="font-semibold">Triage:</span> ${severity} &middot; ${escapeHtml(severityLabel)}</p>
                             <p class="text-sm"><span class="font-semibold text-slate-800">Waiting time:</span> <span class="${wait.cls}">${escapeHtml(wait.text)}</span></p>
                         </div>
                         <button type="button" data-ref-id="${escapeHtml(String(referralId))}"

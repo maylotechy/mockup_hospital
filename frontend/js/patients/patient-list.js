@@ -110,7 +110,7 @@
                     <td class="py-3.5 px-6 text-right border-b border-slate-300/60 whitespace-nowrap">
                         <div class="flex items-center justify-end gap-1.5">
                             ${markOutButton}
-                            <button class="whitespace-nowrap px-3.5 py-1.5 bg-white/50 hover:bg-white text-slate-600 border border-slate-600/50 text-xs font-medium rounded-lg shadow-sm hover:shadow-lg hover:border-slate-700/60 hover:text-slate-700 active:scale-[0.98] transition-all btn-refer-patient inline-flex items-center gap-1.5" data-id="${patient.id}">
+                            <button class="patient-refer-button whitespace-nowrap px-3.5 py-1.5 text-xs rounded-lg shadow-sm active:scale-[0.98] transition-all btn-refer-patient inline-flex items-center gap-1.5" data-id="${patient.id}">
                                 <i class="bi bi-send-plus"></i> Refer
                             </button>
                         </div>

@@ -1,0 +1,14 @@
+stateDiagram-v2
+    [*] --> Draft
+    Draft --> Submitted: Doctor sends referral
+    Submitted --> Requested: IOL validates and creates Task
+    Requested --> Received: Receiving facility opens or acknowledges
+    Received --> Accepted: Facility accepts
+    Received --> Rejected: Facility rejects
+    Rejected --> Requested: IOL notifies or selects another facility
+    Accepted --> Arrived: Patient reaches receiving facility
+    Accepted --> ReferredOnward: Facility transfers referral onward
+    Arrived --> Completed: Treatment or referral episode completed
+    Arrived --> ReferredOnward: Further transfer is required
+    ReferredOnward --> Requested: New linked referral begins
+    Completed --> [*]

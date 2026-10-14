@@ -52,8 +52,8 @@
             status.textContent = 'Electronic consent has not been signed.';
         }
         byId('consentMethod').value = method;
-        byId('consentMethodPaperCard').className = `flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${isElectronic ? 'border-slate-200' : 'border-red-300 bg-red-50'}`;
-        byId('consentMethodElectronicCard').className = `flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${isElectronic ? 'border-red-300 bg-red-50' : 'border-slate-200'}`;
+        byId('consentMethodPaperCard').className = `flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 ${isElectronic ? 'border-slate-200' : 'border-red-300 bg-red-50/60'}`;
+        byId('consentMethodElectronicCard').className = `flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 ${isElectronic ? 'border-red-300 bg-red-50/60' : 'border-slate-200'}`;
         byId('consentMethodPaper').checked = !isElectronic;
         byId('consentMethodElectronic').checked = isElectronic;
         if (isElectronic) {
@@ -286,7 +286,7 @@
         drawLabelValue(context, 'Receiving Hospital', details.receivingHospital, 650, 545);
         drawLabelValue(context, 'Chief Complaint', details.chiefComplaint, 80, 600);
         drawLabelValue(context, 'Diagnosis', details.diagnosis, 650, 600);
-        drawLabelValue(context, 'Severity', details.severity, 80, 655);
+        drawLabelValue(context, 'Triage acuity', details.severity, 80, 655);
         const reasons = details.reasons?.length
             ? details.reasons.map((reason, index) => `${index === 0 ? 'Primary: ' : ''}${reason}`).join('; ')
             : 'Not specified';

@@ -1,0 +1,47 @@
+---
+title: Receiving Hospital Referral Workflow
+---
+flowchart TD
+    START([Incoming referral received])
+    REVIEW[Review patient and referral information]
+    DECIDE{Referral decision}
+    REDIRECT[Redirect referral<br/>and provide reason]
+    ACCEPT[Accept referral]
+    ARRIVE[Mark patient as arrived]
+    VITALS[Record or recheck vital signs<br/>Blood pressure / Heart rate / Respiratory rate<br/>Temperature / Oxygen saturation / Weight]
+    ASSESS[Receiving clinician assesses the patient<br/>and confirms triage level]
+    CAPABLE{Can the hospital provide<br/>the required care?}
+    CARE[Provide assessment and treatment]
+    OUTCOME{Patient disposition}
+    ADMIT[Admit or continue care]
+    DISCHARGE[Discharge patient]
+
+    FORWARD[Prepare onward referral<br/>with updated clinical information]
+    AI[Run hospital matching again<br/>Capability / Availability / Distance / Acuity]
+    CONFIRM[Clinician reviews recommendation<br/>and confirms receiving hospital]
+    SEND[Send referral to the selected hospital]
+
+    UPDATE[Update referral status in Central IRDSS]
+    CLOSE([Referral completed / closed])
+
+    START --> REVIEW --> DECIDE
+    DECIDE -->|Redirect| REDIRECT --> AI
+    DECIDE -->|Accept| ACCEPT --> ARRIVE --> VITALS --> ASSESS --> CAPABLE
+    CAPABLE -->|Yes| CARE --> OUTCOME
+    OUTCOME -->|Admitted / care continued| ADMIT --> UPDATE
+    OUTCOME -->|Discharged| DISCHARGE --> UPDATE
+    CAPABLE -->|No - refer onward| FORWARD --> AI
+    AI --> CONFIRM --> SEND --> UPDATE
+    UPDATE --> CLOSE
+
+    classDef startEnd fill:#ec4899,color:#ffffff,stroke:#db2777,stroke-width:2px;
+    classDef action fill:#eef2ff,color:#172033,stroke:#6366f1,stroke-width:1.5px;
+    classDef clinical fill:#ecfeff,color:#172033,stroke:#06b6d4,stroke-width:1.5px;
+    classDef decision fill:#fff7ed,color:#172033,stroke:#f59e0b,stroke-width:1.5px;
+    classDef onward fill:#fdf2f8,color:#172033,stroke:#ec4899,stroke-width:1.5px;
+
+    class START,CLOSE startEnd;
+    class REVIEW,ACCEPT,ARRIVE,CARE,ADMIT,DISCHARGE,UPDATE action;
+    class VITALS,ASSESS clinical;
+    class DECIDE,CAPABLE,OUTCOME decision;
+    class REDIRECT,FORWARD,AI,CONFIRM,SEND onward;

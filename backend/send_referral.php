@@ -5,6 +5,10 @@
 // ========================================================
 
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/patient_transfer.php';
+require_once __DIR__ . '/terminology_service.php';
+require_once __DIR__ . '/clinical_urgency.php';
+require_once __DIR__ . '/fhir_clinical.php';
 
 // Only accept POST requests
 if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -33,15 +37,33 @@ if (empty($input) && !empty($rawInput)) {
     }
 }
 
-// Extract inputs with robust defaults
-$patientId     = isset($input['patient_id']) && $input['patient_id'] !== '' ? (int)$input['patient_id'] : 1;
-$latitude      = isset($input['latitude']) && $input['latitude'] !== '' ? (float)$input['latitude'] : 7.1907;
-$longitude     = isset($input['longitude']) && $input['longitude'] !== '' ? (float)$input['longitude'] : 125.4553;
+// Extract inputs. Clinical and routing fields are never substituted with
+// placeholder values -- missing or invalid input is rejected below instead.
+$patientId     = filter_var($input['patient_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+$latitude      = filter_var($input['latitude'] ?? null, FILTER_VALIDATE_FLOAT);
+$longitude     = filter_var($input['longitude'] ?? null, FILTER_VALIDATE_FLOAT);
 $salary        = isset($input['salary']) && $input['salary'] !== '' ? (float)$input['salary'] : (isset($input['monthly_salary']) ? (float)$input['monthly_salary'] : 12000.0);
-$severity      = isset($input['severity']) && $input['severity'] !== '' ? (float)$input['severity'] : 3.0;
-$reasonText    = !empty($input['reason_text']) ? trim((string)$input['reason_text']) : 'Severe Pneumonia';
-$reasonCode    = !empty($input['reason_code']) ? trim((string)$input['reason_code']) : '233604007';
-$diagnosis     = !empty($input['diagnosis']) ? trim((string)$input['diagnosis']) : 'Pneumonia';
+$severity      = filter_var($input['triage_code'] ?? $input['severity'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 5]]);
+if ($user['role'] !== 'doctor' && array_intersect(['triage_code', 'referral_priority', 'condition_severity_code'], array_keys($input))) {
+    sendJsonResponse(['success' => false, 'message' => 'A doctor must assign triage acuity before sending this referral.'], 403);
+}
+try { $urgencyFields = resolveClinicalUrgency($input); }
+catch (InvalidArgumentException $error) { sendJsonResponse(['success' => false, 'message' => $error->getMessage()], 422); }
+catch (Throwable $error) { sendJsonResponse(['success' => false, 'message' => 'Clinical urgency options are unavailable.'], 503); }
+$reasonText    = trim((string)($input['reason_text'] ?? ''));
+$reasonCode    = trim((string)($input['reason_code'] ?? ''));
+if ($reasonCode === '' && $reasonText !== '') {
+    // Same label-derived code used for additional reasons below
+    $reasonCode = strtoupper(trim(preg_replace('/[^A-Za-z0-9]+/', '_', $reasonText), '_'));
+}
+try {
+    $diagnosisFields = resolveClinicalDiagnosis($input);
+} catch (InvalidArgumentException $error) {
+    sendJsonResponse(['success' => false, 'message' => $error->getMessage()], 422);
+} catch (RuntimeException $error) {
+    sendJsonResponse(['success' => false, 'message' => 'Diagnosis validation is unavailable. Retry or use text only.'], 503);
+}
+$diagnosis = $diagnosisFields['diagnosis'] ?? '';
 $reasonDisplay = $reasonText;
 $consentStatus = strtoupper(trim((string)($input['consent_status'] ?? '')));
 $consentMethod = strtoupper(trim((string)($input['consent_method'] ?? '')));
@@ -124,6 +146,13 @@ foreach ($referralReasons as $reason) {
 
 // Clinical info entered by the referring doctor/nurse -- all optional
 $chiefComplaint = isset($input['chief_complaint']) ? trim((string)$input['chief_complaint']) : '';
+try {
+    $complaintFields = resolveChiefComplaint($input);
+} catch (InvalidArgumentException $error) {
+    sendJsonResponse(['success' => false, 'message' => $error->getMessage()], 422);
+} catch (RuntimeException $error) {
+    sendJsonResponse(['success' => false, 'message' => 'Symptom validation is unavailable. Retry or keep text only.'], 503);
+}
 $vitalBp        = isset($input['vital_bp']) ? trim((string)$input['vital_bp']) : '';
 $vitalHr        = isset($input['vital_hr']) && $input['vital_hr'] !== '' ? (int)$input['vital_hr'] : null;
 $vitalRr        = isset($input['vital_rr']) && $input['vital_rr'] !== '' ? (int)$input['vital_rr'] : null;
@@ -135,16 +164,29 @@ $vitalWeightKg  = isset($input['vital_weight_kg']) && $input['vital_weight_kg'] 
 // Patient status flags entered by the referring doctor/nurse -- all optional
 $isPwd          = !empty($input['is_pwd']);
 $isPregnant     = !empty($input['is_pregnant']);
-$isSeniorCitizen = !empty($input['is_senior_citizen']);
+$isSeniorCitizen = false; // Calculated from the stored DOB after the patient is loaded.
 $hasAllergy     = !empty($input['has_allergy']);
 $allergyDetails = $hasAllergy && isset($input['allergy_details']) ? trim((string)$input['allergy_details']) : '';
 
 // Basic validation
-if ($patientId <= 0) {
+if ($patientId === false) {
     sendJsonResponse([
         'success' => false,
         'message' => 'Missing or invalid required field: patient_id.'
     ], 400);
+}
+if ($latitude === false || $longitude === false
+    || $latitude < -90 || $latitude > 90 || $longitude < -180 || $longitude > 180) {
+    sendJsonResponse([
+        'success' => false,
+        'message' => 'The referral location could not be resolved. Re-select the location and try again.'
+    ], 422);
+}
+if ($severity === false) {
+    sendJsonResponse([
+        'success' => false,
+        'message' => 'Severity level must be between 1 and 5.'
+    ], 422);
 }
 
 if (isset($_FILES['referral_attachments'])) {
@@ -184,7 +226,8 @@ try {
     
     // Fetch patient demographics along with facility details
     $stmt = $pdo->prepare('
-        SELECT p.id, p.first_name, p.last_name, p.dob, p.gender, p.phone,
+        SELECT p.id, p.identity_ciphertext, p.identity_blind_index, p.identity_key_version,
+               p.first_name, p.middle_name, p.last_name, p.suffix, p.dob, p.gender, p.phone,
                p.region, p.province, p.city_municipality, p.barangay, p.zip_code,
                p.civil_status, p.philhealth_member, p.philhealth_number, p.philhealth_status_type,
                f.id as facility_id, f.code as facility_code, f.name as facility_name, f.api_key
@@ -201,6 +244,13 @@ try {
             'message' => "Patient with ID {$patientId} not found in database."
         ], 404);
     }
+    $patient = hydrateLocalPatientRow($patient);
+
+    try {
+        $isSeniorCitizen = isLocalPatientSeniorCitizen((string)($patient['dob'] ?? ''));
+    } catch (InvalidArgumentException $error) {
+        sendJsonResponse(['success' => false, 'message' => $error->getMessage()], 422);
+    }
 
     // Prevent referring a patient registered under a different facility
     if ((int)$patient['facility_id'] !== (int)($user['facility']['id'] ?? 0)) {
@@ -212,12 +262,13 @@ try {
 
     // Patient reference formatting for FHIR Encounter resource
     $patientRefId = 'P-' . sprintf('%06d', (int)$patient['id']);
-    $fullName = trim($patient['first_name'] . ' ' . $patient['last_name']);
+    $fullName = localPatientFullName($patient);
     if ($consentMethod === 'ELECTRONIC' && $consentSignerType === 'PATIENT'
-        && mb_strtolower($consentSignerName) !== mb_strtolower($fullName)) {
+        && normalizeLocalPersonName($consentSignerName) !== normalizeLocalPersonName($fullName)) {
         sendJsonResponse(['success' => false, 'message' => 'A patient signature must use the selected patient’s full name.'], 422);
     }
     $genderLower = strtolower(trim($patient['gender']));
+    if (!in_array($genderLower,['male','female','other','unknown'],true)) $genderLower='unknown';
 
     // Construct FHIR JSON Payload matching exact IOL schema specification
     $extensions = [
@@ -242,7 +293,9 @@ try {
     if ($chiefComplaint !== '') {
         $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/chiefComplaint", "valueString" => $chiefComplaint];
     }
-    $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/diagnosis", "valueString" => $diagnosis];
+    if ($diagnosis !== '') {
+        $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/diagnosis", "valueString" => $diagnosis];
+    }
     $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/consentStatus", "valueString" => $consentStatus];
     $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/consentMethod", "valueString" => $consentMethod];
     $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/consentTextVersion", "valueString" => $consentTextVersion];
@@ -257,8 +310,8 @@ try {
         $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/consentDocumentSha256", "valueString" => $consentDocumentSha256];
     }
 
-    // Patient identity fields -- only ever decrypted centrally by the facility this
-    // referral is finalized to (GET /api/v1/referral/{id}/patient-details)
+    // These identity fields are removed from the routing payload below and kept
+    // in the sender's encrypted outbox for direct recipient-only transfer.
     if (!empty($patient['phone'])) {
         $extensions[] = ["url" => "http://irdss.gov.ph/fhir/StructureDefinition/phone", "valueString" => $patient['phone']];
     }
@@ -312,20 +365,24 @@ try {
         }
     }
 
+    $fhirPatientName = [
+        "family" => $patient['last_name'],
+        "given" => array_values(array_filter([
+            $patient['first_name'],
+            $patient['middle_name'] ?? null
+        ], static fn($value) => trim((string)$value) !== '')),
+    ];
+    if (!empty($patient['suffix'])) {
+        $fhirPatientName['suffix'] = [$patient['suffix']];
+    }
+
     $payload = [
         "patient_record" => [
             "birthDate" => $patient['dob'],
             "extension" => $extensions,
             "gender" => $genderLower,
             "id" => $patientRefId,
-            "name" => [
-                [
-                    "family" => $patient['last_name'],
-                    "given" => [
-                        $patient['first_name']
-                    ]
-                ]
-            ],
+            "name" => [$fhirPatientName],
             "resourceType" => "Patient"
         ],
         "reasonCode" => array_map(function ($reason) {
@@ -352,6 +409,39 @@ try {
         ]
     ];
 
+    $payload['diagnosis_concept'] = [
+        'text' => $diagnosisFields['diagnosis_text'],
+        'coding' => $diagnosisFields['diagnosis_code'] ? [[
+            'system' => $diagnosisFields['diagnosis_system'],
+            'code' => $diagnosisFields['diagnosis_code'],
+            'display' => $diagnosisFields['diagnosis_display'],
+        ]] : [],
+    ];
+    $payload['chief_complaint_concept'] = ['text' => $chiefComplaint,
+        'coding' => $complaintFields['chief_complaint_code'] ? [[
+            'system' => $complaintFields['chief_complaint_system'],
+            'code' => $complaintFields['chief_complaint_code'],
+            'display' => $complaintFields['chief_complaint_display'],
+        ]] : []];
+    // Legacy clients remain compatible; only doctor-assigned coded triage carries an actor assertion.
+    if (isset($input['triage_code']) || $user['role'] === 'doctor') $payload = array_merge($payload, urgencyRoutingFields($urgencyFields, $user));
+    $payload['referral_priority']=$urgencyFields['referral_priority'];
+    $payload['condition_severity']=$urgencyFields['condition_severity_code'] ? ['system'=>$urgencyFields['condition_severity_system'],
+        'code'=>$urgencyFields['condition_severity_code'],'display'=>$urgencyFields['condition_severity_display']] : null;
+    try {
+        $vitalTimes=json_decode((string)($input['vital_timestamps'] ?? '{}'),true,16,JSON_THROW_ON_ERROR);
+        if (!is_array($vitalTimes)) throw new InvalidArgumentException('Invalid vital-sign timestamps.');
+        $clinicalUser=$user;
+        $clinicalUser['facility']['name']=$patient['facility_name'];
+        $clinicalUser['facility']['code']=$patient['facility_code'];
+        $payload['clinical_bundle']=buildReferralClinicalBundle($payload,$clinicalUser,$input,
+            (string)($input['vitals_observed_at'] ?? ''),$vitalTimes,(string)($input['oxygen_method'] ?? 'unknown'));
+    } catch (InvalidArgumentException $error) {
+        sendJsonResponse(['success'=>false,'message'=>$error->getMessage()],422);
+    } catch (Throwable $error) {
+        sendJsonResponse(['success'=>false,'message'=>'Unable to build the clinical referral resources. Check the clinical fields and measurement time.'],422);
+    }
+    [$payload, $transferId] = prepareDirectPatientTransfer($pdo, $patient, $payload, $fullName);
     $payloadJson = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
 
     [$httpCode, $iolResponseData, $curlErrno, $curlError] = sendSignedIolRequest(
@@ -368,6 +458,7 @@ try {
     }
 
     $referralId = null;
+    $referralNumber = null;
 
     // Handle cURL connection / signing failure gracefully
     if ($curlErrno) {
@@ -382,6 +473,12 @@ try {
         $referralId = null;
         if (is_array($decodedRes)) {
             $referralId = $decodedRes['referral_id'] ?? $decodedRes['referral_tracking_id'] ?? $decodedRes['id'] ?? $decodedRes['referralId'] ?? ($decodedRes['data']['referral_id'] ?? ($decodedRes['data']['id'] ?? null));
+        }
+
+        // Staff-facing number issued by IRDSS (REF-YYYYMM-NNNNN); referral_id stays the system key
+        $candidateNumber = is_array($decodedRes) ? trim((string)($decodedRes['referral_number'] ?? '')) : '';
+        if (preg_match('/^REF-\d{6}-\d{5,}$/', $candidateNumber)) {
+            $referralNumber = $candidateNumber;
         }
 
         if (empty($referralId)) {
@@ -422,24 +519,49 @@ try {
     // record of what was sent even if the central server was unreachable.
     $localReferralId = null;
     try {
+        $pdo->beginTransaction();
         $localStmt = $pdo->prepare('
             INSERT INTO initiated_referrals
-                (hospital_id, referral_id, patient_id, patient_name, reason, chief_complaint,
-                 diagnosis, vital_bp, vital_hr, vital_rr, vital_temp_c, vital_o2sat,
+                (hospital_id, referral_id, referral_number, patient_id, patient_name, patient_name_ciphertext, reason, chief_complaint,
+                 diagnosis, diagnosis_system, diagnosis_code, diagnosis_display, diagnosis_text,
+                 chief_complaint_system, chief_complaint_code, chief_complaint_display, chief_complaint_text,
+                 triage_system, triage_code, triage_display, referral_priority,
+                 condition_severity_system, condition_severity_code, condition_severity_display,
+                 vital_bp, vital_hr, vital_rr, vital_temp_c, vital_o2sat,
                  status, sync_status, http_status)
             VALUES
-                (:hospital_id, :referral_id, :patient_id, :patient_name, :reason, :chief_complaint,
-                 :diagnosis, :vital_bp, :vital_hr, :vital_rr, :vital_temp_c, :vital_o2sat,
+                (:hospital_id, :referral_id, :referral_number, :patient_id, NULL, :patient_name_ciphertext, :reason, :chief_complaint,
+                 :diagnosis, :diagnosis_system, :diagnosis_code, :diagnosis_display, :diagnosis_text,
+                 :chief_complaint_system, :chief_complaint_code, :chief_complaint_display, :chief_complaint_text,
+                 :triage_system, :triage_code, :triage_display, :referral_priority,
+                 :condition_severity_system, :condition_severity_code, :condition_severity_display,
+                 :vital_bp, :vital_hr, :vital_rr, :vital_temp_c, :vital_o2sat,
                  :status, :sync_status, :http_status)
         ');
         $localStmt->execute([
             ':hospital_id'     => (int)$patient['facility_id'],
             ':referral_id'     => $referralId,
+            ':referral_number' => $referralNumber,
             ':patient_id'      => (int)$patient['id'],
-            ':patient_name'    => $fullName,
+            ':patient_name_ciphertext' => encryptLocalSensitiveValue($fullName, 'initiated_referrals.patient_name'),
             ':reason'          => $reasonText,
-            ':chief_complaint' => $chiefComplaint !== '' ? $chiefComplaint : null,
-            ':diagnosis'       => $diagnosis,
+            ':chief_complaint' => mb_substr($chiefComplaint, 0, 255),
+            ':chief_complaint_system' => $complaintFields['chief_complaint_system'],
+            ':chief_complaint_code' => $complaintFields['chief_complaint_code'],
+            ':chief_complaint_display' => $complaintFields['chief_complaint_display'],
+            ':chief_complaint_text' => $complaintFields['chief_complaint_text'],
+            ':triage_system' => $urgencyFields['triage_system'],
+            ':triage_code' => $urgencyFields['triage_code'],
+            ':triage_display' => $urgencyFields['triage_display'],
+            ':referral_priority' => $urgencyFields['referral_priority'],
+            ':condition_severity_system' => $urgencyFields['condition_severity_system'],
+            ':condition_severity_code' => $urgencyFields['condition_severity_code'],
+            ':condition_severity_display' => $urgencyFields['condition_severity_display'],
+            ':diagnosis'       => $diagnosis !== '' ? mb_substr($diagnosis, 0, 255) : null,
+            ':diagnosis_system' => $diagnosisFields['diagnosis_system'],
+            ':diagnosis_code' => $diagnosisFields['diagnosis_code'],
+            ':diagnosis_display' => $diagnosisFields['diagnosis_display'],
+            ':diagnosis_text' => $diagnosisFields['diagnosis_text'],
             ':vital_bp'        => $vitalBp !== '' ? $vitalBp : null,
             ':vital_hr'        => $vitalHr,
             ':vital_rr'        => $vitalRr,
@@ -450,6 +572,7 @@ try {
             ':http_status'     => $httpCode
         ]);
         $localReferralId = (int)$pdo->lastInsertId();
+        persistLocalClinicalBundle($pdo,$localReferralId,$payload['clinical_bundle']);
         $reasonStmt = $pdo->prepare('
             INSERT INTO initiated_referral_reasons
                 (initiated_referral_id, reason_code, reason_label, is_primary, sort_order)
@@ -467,12 +590,13 @@ try {
         $consentStmt = $pdo->prepare('
             INSERT INTO referral_consents
                 (initiated_referral_id, central_referral_id, status, method, consent_text_version,
-                 witnessed_by, recorded_at, signer_type, signer_name,
-                 representative_relationship, document_sha256, signed_copy_uploaded)
+                 witnessed_by, recorded_at, signer_type, signer_name, signer_name_ciphertext,
+                 representative_relationship, representative_relationship_ciphertext,
+                 document_sha256, signed_copy_uploaded)
             VALUES
                 (:local_referral_id, :central_referral_id, :status, :method, :text_version,
-                 :witnessed_by, :recorded_at, :signer_type, :signer_name,
-                 :representative_relationship, :document_sha256, 0)
+                 :witnessed_by, :recorded_at, :signer_type, NULL, :signer_name_ciphertext,
+                 NULL, :representative_relationship_ciphertext, :document_sha256, 0)
         ');
         $consentStmt->execute([
             ':local_referral_id' => $localReferralId,
@@ -483,11 +607,19 @@ try {
             ':witnessed_by' => $consentWitnessedBy,
             ':recorded_at' => $consentRecordedAtMysql,
             ':signer_type' => $consentSignerType !== '' ? $consentSignerType : null,
-            ':signer_name' => $consentSignerName !== '' ? $consentSignerName : null,
-            ':representative_relationship' => $consentRepresentativeRelationship !== '' ? $consentRepresentativeRelationship : null,
+            ':signer_name_ciphertext' => $consentSignerName !== ''
+                ? encryptLocalSensitiveValue($consentSignerName, 'referral_consents.signer_name')
+                : null,
+            ':representative_relationship_ciphertext' => $consentRepresentativeRelationship !== ''
+                ? encryptLocalSensitiveValue($consentRepresentativeRelationship, 'referral_consents.representative_relationship')
+                : null,
             ':document_sha256' => $consentDocumentSha256 !== '' ? $consentDocumentSha256 : null,
         ]);
+        $pdo->commit();
     } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $localReferralId=null;
+        error_log('Local clinical referral persistence failed; central response remains authoritative.');
         // Local persistence is a best-effort record -- never block the referral
         // response on it, since the actual referral has already been (or failed to be)
         // transmitted to IOL by this point.
@@ -495,6 +627,7 @@ try {
 
     if ($isSuccess) {
         logAuditEvent($user, 'REFERRAL_SENT', $referralId, $fullName, $reasonText);
+        logAuditEvent($user, 'CLINICAL_URGENCY_ASSIGNED', $referralId, null, json_encode($urgencyFields));
     }
 
     $attachmentUploads = [];
@@ -602,6 +735,7 @@ try {
         'http_status'  => $httpCode,
         'message'      => $errorMessage,
         'referral_id'  => $referralId,
+        'referral_number' => $referralNumber,
         'referral_reasons' => $referralReasons,
         'attachment_uploads' => $attachmentUploads,
         'attachment_warning' => $failedAttachmentCount > 0 ? "{$failedAttachmentCount} attachment(s) could not be uploaded. The referral was still sent." : null,

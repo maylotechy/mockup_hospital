@@ -6,7 +6,7 @@
 
     const state = IRDSS.state;
     const { API_BASE } = IRDSS.config;
-    const { escapeHtml } = IRDSS.formatters;
+    const { escapeHtml, displayReferralNumber } = IRDSS.formatters;
     const { showToast, cleanErrorMessage, buildErrorNoteHtml } = IRDSS.ui;
     const attachmentLinksHtml = IRDSS.referrals.form.attachmentLinksHtml;
     let initialized = false;
@@ -130,7 +130,7 @@
             }
 
             if (search) {
-                const haystack = `${ref.referral_id} ${ref.patient_id} ${ref.clinical_reason}`.toLowerCase();
+                const haystack = `${ref.referral_number || ''} ${ref.referral_id} ${ref.patient_display_id || ref.patient_id} ${ref.clinical_reason}`.toLowerCase();
                 if (!haystack.includes(search)) return false;
             }
 
@@ -170,25 +170,24 @@
         }
 
         referrals.forEach(function (ref) {
-            const badgeClass = REFERRAL_STATUS_BADGE_CLASS[ref.status] || 'bg-slate-100 text-slate-700';
-            const responses = Array.isArray(ref.responses) ? ref.responses : [];
+            const actionClass = 'px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium inline-flex items-center gap-1 transition-colors';
 
             const cancelBtn = ref.cancellable
-                ? `<button class="px-3.5 py-1.5 bg-white/50 hover:bg-red-50 text-red-600 border border-red-300/70 text-xs font-medium rounded-lg shadow-sm hover:shadow-lg hover:border-red-500 hover:text-red-700 active:scale-[0.98] transition-all btn-cancel-referral flex items-center gap-1.5 ml-auto" data-ref-id="${escapeHtml(ref.referral_id)}">
-                    <i class="bi bi-x-circle"></i> Cancel
+                ? `<button type="button" class="${actionClass} btn-cancel-referral" data-ref-id="${escapeHtml(ref.referral_id)}">
+                    Cancel
                 </button>`
                 : '';
 
             const row = `
-                <tr class="!bg-slate-200/40 hover:!bg-slate-300/40 transition-colors">
-                    <td class="py-3.5 px-6 font-mono text-xs font-semibold text-slate-500 border-b border-slate-300/60">${escapeHtml(ref.referral_id)}</td>
-                    <td class="py-3.5 px-6 text-slate-700 text-xs font-mono border-b border-slate-300/60">${escapeHtml(ref.patient_id)}</td>
+                <tr class="!bg-white hover:!bg-slate-50 transition-colors">
+                    <td class="py-3.5 px-6 font-mono text-xs font-semibold text-slate-500 border-b border-slate-300/60">${escapeHtml(displayReferralNumber(ref))}</td>
+                    <td class="py-3.5 px-6 text-slate-700 text-xs font-mono border-b border-slate-300/60">${escapeHtml(ref.patient_display_id || (String(ref.patient_id || '').startsWith('tx_') ? 'Unavailable' : ref.patient_id))}</td>
                     <td class="py-3.5 px-6 text-slate-600 text-xs border-b border-slate-300/60">${escapeHtml(ref.disease_severity)}</td>
-                    <td class="py-3.5 px-6 border-b border-slate-300/60"><span class="px-2.5 py-1 rounded-full text-xs font-bold ${badgeClass}">${escapeHtml(REFERRAL_STATUS_LABEL[ref.status] || ref.status)}</span></td>
+                    <td class="py-3.5 px-6 border-b border-slate-300/60"><span class="text-xs font-semibold text-slate-700">${escapeHtml(String(REFERRAL_STATUS_LABEL[ref.status] || ref.status).toUpperCase())}</span></td>
                     <td class="py-3.5 px-6 text-slate-600 text-xs border-b border-slate-300/60">${formatReferralTimestamp(ref.created_at)}</td>
                     <td class="py-3.5 px-6 text-slate-600 text-xs border-b border-slate-300/60">${formatReferralTimestamp(ref.seen_at)}</td>
                     <td class="py-3.5 px-6 text-xs border-b border-slate-300/60">
-                        <button type="button" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium btn-view-referral-timeline" data-ref-id="${escapeHtml(ref.referral_id)}">
+                        <button type="button" class="${actionClass} btn-view-referral-timeline" data-ref-id="${escapeHtml(ref.referral_id)}">
                             <i class="bi bi-truck me-1"></i> Track
                         </button>
                     </td>
@@ -246,17 +245,17 @@
      */
     function trackerStep(label, timestamp, completed, isLast, iconClass, extraHtml) {
         const dotClasses = completed
-            ? 'bg-emerald-500 text-white'
+            ? 'bg-slate-700 text-white'
             : 'bg-white text-slate-300 border-2 border-slate-200';
         const labelClasses = completed ? 'text-slate-900' : 'text-slate-400';
         const icon = completed ? `<i class="bi ${iconClass || 'bi-check-lg'} text-xs"></i>` : '';
 
         return `
             <div class="relative ${isLast ? '' : 'pb-6'} pl-9">
-                ${isLast ? '' : `<div class="absolute left-[11px] top-6 bottom-0 w-0.5 ${completed ? 'bg-emerald-400' : 'bg-slate-200'}"></div>`}
+                ${isLast ? '' : `<div class="absolute left-[11px] top-6 bottom-0 w-0.5 bg-slate-200"></div>`}
                 <div class="absolute left-0 top-0 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${dotClasses}">${icon}</div>
                 <p class="text-sm font-semibold ${labelClasses}">${label}</p>
-                <p class="text-xs text-slate-500 mt-0.5">${timestamp ? formatReferralTimestamp(timestamp) : 'Pending'}</p>
+                <p class="text-xs text-slate-500 mt-0.5">${timestamp ? formatReferralTimestamp(timestamp) : (completed ? 'Recorded' : 'Pending')}</p>
                 ${extraHtml || ''}
             </div>
         `;
@@ -328,36 +327,52 @@
                 // still technically PENDING server-side -- show it as SEEN so the referring
                 // doctor can tell "no one's looked at this" apart from "someone's reviewing it".
                 const displayStatus = (r.response_status === 'PENDING' && r.seen_at) ? 'SEEN' : r.response_status;
-                const statusBadge = REFERRAL_STATUS_BADGE_CLASS[displayStatus] || 'bg-slate-100 text-slate-700';
                 const redirectReason = r.response_status === 'REDIRECTED'
                     ? (REDIRECT_REASONS[r.redirect_reason_code] || r.redirect_reason_code || 'Reason not recorded') + (r.redirect_reason_text ? `: ${r.redirect_reason_text}` : '')
                     : '';
                 return `
                     <div class="flex items-start justify-between gap-3 py-2 border-b border-slate-100 last:border-0">
-                        <div><p class="text-xs font-medium text-slate-700">${escapeHtml(r.hospital_name)}</p>${redirectReason ? `<p class="text-[10px] text-red-600 mt-0.5">${escapeHtml(redirectReason)}</p>` : ''}</div>
-                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold flex-shrink-0 ${statusBadge}">${escapeHtml(displayStatus)}</span>
+                        <div class="min-w-0"><p class="text-xs font-medium text-slate-700">${escapeHtml(r.hospital_name)}</p>${redirectReason ? `<p class="text-xs text-slate-500 mt-1">${escapeHtml(redirectReason)}</p>` : ''}</div>
+                        <span class="text-[10px] font-semibold text-slate-600 flex-shrink-0">${escapeHtml(displayStatus)}</span>
                     </div>
                 `;
             }).join('')
             : '<p class="text-xs text-slate-400 text-center py-3">No hospitals have been notified yet.</p>';
 
         Swal.fire({
-            title: 'Track Referral',
-            width: '56rem',
+            title: 'REFERRAL TRACKING',
+            width: '50rem',
             html: `
-                <div class="text-left flex gap-6">
-                    <div class="flex-1 pt-2 pb-2">${stepsHtml}</div>
-                    <div class="flex-1 pt-2 pb-2 border-l border-slate-200 pl-6">
-                        <p class="text-xs font-bold text-slate-700 mb-2">Notified Hospitals (${responses.length})</p>
-                        <div class="max-h-64 overflow-y-auto">${notifiedHtml}</div>
-                        <p class="text-xs font-bold text-slate-700 mt-4 mb-2">Clinical Attachments</p>
-                        <div id="trackerAttachments"><p class="text-xs text-slate-400">Loading attachments...</p></div>
+                <div class="referral-tracker text-left">
+                    <div class="tracker-summary">
+                        <span class="font-mono text-xs text-slate-600">${escapeHtml(displayReferralNumber(ref))}</span>
+                        <span class="text-xs font-semibold text-slate-700">${escapeHtml(String(REFERRAL_STATUS_LABEL[ref.status] || ref.status).toUpperCase())}</span>
+                    </div>
+                    <div class="tracker-meta">
+                        <div><span>Triage acuity</span><strong>${escapeHtml(ref.triage_display || 'Legacy level ' + ref.disease_severity)}</strong></div>
+                        <div><span>Referral priority</span><strong>${escapeHtml(ref.referral_priority || 'Not recorded')}</strong></div>
+                    </div>
+                    <div class="tracker-columns">
+                        <section><h3>PROGRESS</h3>${stepsHtml}</section>
+                        <section><h3>NOTIFIED HOSPITALS <span class="font-normal text-slate-500">(${responses.length})</span></h3>
+                            <div class="tracker-hospitals">${notifiedHtml}</div>
+                            <details class="tracker-disclosure"><summary>CLINICAL DETAILS</summary>
+                                <dl class="tracker-clinical">
+                                    <dt>Chief complaint</dt><dd>${escapeHtml(ref.chief_complaint_text || ref.chief_complaint || 'Not specified')}${ref.chief_complaint_code ? `<small>${escapeHtml(ref.chief_complaint_display || '')} · SNOMED CT ${escapeHtml(ref.chief_complaint_code)}</small>` : ''}</dd>
+                                    <dt>Diagnosis</dt><dd>${escapeHtml(ref.diagnosis_text || ref.diagnosis || ref.diagnosis_display || 'Not specified')}${ref.diagnosis_code ? `<small>${escapeHtml(ref.diagnosis_display || '')} · SNOMED CT ${escapeHtml(ref.diagnosis_code)}</small>` : ''}</dd>
+                                    <dt>Condition severity</dt><dd>${escapeHtml(ref.condition_severity_display || 'Not specified')}</dd>
+                                </dl>
+                            </details>
+                            <details class="tracker-disclosure"><summary>ATTACHMENTS</summary>
+                                <div id="trackerAttachments"><p class="text-xs text-slate-500">Loading attachments...</p></div>
+                            </details>
+                        </section>
                     </div>
                 </div>
             `,
-            confirmButtonText: '<i class="bi bi-check-lg me-1"></i> Close',
-            confirmButtonColor: '#0d6efd',
-            customClass: { popup: 'rounded-4 shadow-lg' },
+            confirmButtonText: 'Close',
+            confirmButtonColor: '#475569',
+            customClass: { popup: 'referral-tracker-popup' },
             didOpen: function () {
                 $.getJSON(`${API_BASE}/get_referral_attachments.php?referral_id=${encodeURIComponent(referralId)}`)
                     .done(items => $('#trackerAttachments').html(attachmentLinksHtml(referralId, items)))
@@ -393,6 +408,8 @@
                 dataType: 'json',
                 success: function () {
                     showToast('success', 'Referral cancelled', 2000);
+                    // Stop the Accepted Hospitals card from still showing it as awaiting
+                    IRDSS.referrals.recommendations.clearActive(referralId);
                     loadMyReferrals();
                 },
                 error: function (xhr) {

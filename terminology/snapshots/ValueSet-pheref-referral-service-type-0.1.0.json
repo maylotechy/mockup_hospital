@@ -1,0 +1,33 @@
+{
+  "resourceType": "ValueSet",
+  "id": "pheref-referral-service-type-snapshot",
+  "url": "https://www.fhir.doh.gov.ph/pheref/ValueSet/reason-for-referral-service-type",
+  "version": "0.1.0",
+  "name": "VS_Reason_for_Referral_Service_Type",
+  "title": "Reason for Referral (Service Type) VS",
+  "status": "active",
+  "description": "Source-controlled snapshot of the PeRef reason-for-referral service-type ValueSet expansion retrieved from the FHIRLab terminology server on 2026-10-06. The canonical resource remains owned by its publisher.",
+  "compose": {
+    "include": [
+      {
+        "system": "http://snomed.info/sct",
+        "concept": [
+          { "code": "11429006", "display": "Consultation" },
+          { "code": "165197003", "display": "Diagnostics" },
+          { "code": "71388002", "display": "Procedure" },
+          { "code": "3457005", "display": "Others" }
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "timestamp": "2026-10-06T04:53:22+00:00",
+    "total": 4,
+    "contains": [
+      { "system": "http://snomed.info/sct", "code": "11429006", "display": "Consultation" },
+      { "system": "http://snomed.info/sct", "code": "165197003", "display": "Diagnostics" },
+      { "system": "http://snomed.info/sct", "code": "71388002", "display": "Procedure" },
+      { "system": "http://snomed.info/sct", "code": "3457005", "display": "Others" }
+    ]
+  }
+}

@@ -5,3 +5,4 @@ vendor
 
 .env
 storage/keys/*.pem
+storage/patient_transfer/

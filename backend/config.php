@@ -9,7 +9,9 @@ require_once __DIR__ . '/../vendor/autoload.php';
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
 $dotenv->safeLoad(); 
 
-if (session_status() === PHP_SESSION_NONE) {
+require_once __DIR__ . '/local_data_encryption.php';
+
+if (PHP_SAPI !== 'cli' && session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
@@ -291,6 +293,20 @@ function hasPatientBeenReferredOnward($pdo, $facilityId, $localPatientId) {
  * @return array|null the matching row (id, first_name, last_name, dob, created_at), or null
  */
 function findPossibleDuplicatePatient($pdo, $facilityId, $firstName, $lastName, $dob) {
+    $blindIndex = localPatientIdentityBlindIndex($firstName, $lastName, $dob);
+    $encryptedStmt = $pdo->prepare('
+        SELECT id, identity_ciphertext, created_at
+        FROM patients
+        WHERE facility_id = :fid AND identity_blind_index = :identity_blind_index
+        LIMIT 1
+    ');
+    $encryptedStmt->execute([':fid' => $facilityId, ':identity_blind_index' => $blindIndex]);
+    $encryptedRow = $encryptedStmt->fetch();
+    if ($encryptedRow) {
+        return hydrateLocalPatientRow($encryptedRow);
+    }
+
+    // Compatibility lookup for rows created before local encryption was enabled.
     $stmt = $pdo->prepare('
         SELECT id, first_name, last_name, dob, created_at
         FROM patients
@@ -322,9 +338,9 @@ function logAuditEvent($user, $action, $referralId = null, $patientName = null, 
         $pdo = getDbConnection();
         $stmt = $pdo->prepare('
             INSERT INTO audit_logs
-                (facility_id, user_id, user_full_name, user_role, action, referral_id, patient_name, details)
+                (facility_id, user_id, user_full_name, user_role, action, referral_id, patient_name, patient_name_ciphertext, details)
             VALUES
-                (:facility_id, :user_id, :user_full_name, :user_role, :action, :referral_id, :patient_name, :details)
+                (:facility_id, :user_id, :user_full_name, :user_role, :action, :referral_id, NULL, :patient_name_ciphertext, :details)
         ');
         $stmt->execute([
             ':facility_id'     => (int)($user['facility']['id'] ?? 0),
@@ -333,7 +349,9 @@ function logAuditEvent($user, $action, $referralId = null, $patientName = null, 
             ':user_role'       => $user['role'] ?? 'unknown',
             ':action'          => $action,
             ':referral_id'     => $referralId,
-            ':patient_name'    => $patientName,
+            ':patient_name_ciphertext' => $patientName !== null
+                ? encryptLocalSensitiveValue($patientName, 'audit_logs.patient_name')
+                : null,
             ':details'         => $details
         ]);
     } catch (Exception $e) {

@@ -1,5 +1,7 @@
 # Frontend `app.js` Modularization Plan
 
+[All project plans](README.md)
+
 ## Objective
 
 Split the current `frontend/js/app.js` into focused feature files while preserving existing behavior, jQuery event handling, shared session state, consent modules, and WebSocket updates.
@@ -21,6 +23,8 @@ The original file was approximately 4,992 lines. After all nine phases, `app.js`
 | Phase 9: Bootstrap cleanup | Completed | Moved the header clock into a core module, removed obsolete clipboard code, and reduced `app.js` to module wiring and startup. |
 
 ## Extracted Responsibilities
+
+Next planned maintainability change: split `frontend/index.html` into PHP presentation templates while retaining these JavaScript modules. See [Frontend PHP Template Refactor Plan](FRONTEND_PHP_TEMPLATE_REFACTOR_PLAN.md). This is a separate planned change, not an additional completed JavaScript phase.
 
 The modular frontend now separates:
 

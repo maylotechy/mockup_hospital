@@ -59,6 +59,15 @@
                 if ($('#tabReferralsContent').is(':visible')) runAction('loadMyReferrals');
                 break;
 
+            case 'CLINICAL_URGENCY_UPDATED':
+                runAction('loadMyReferrals');
+                runAction('loadAcceptedPatients');
+                if (message.immediate_notification) {
+                    showToast('warning', 'A referral clinical urgency was reassessed. Review the updated triage.', 4000);
+                    runAction('playNotificationSound');
+                }
+                break;
+
             default:
                 break;
         }

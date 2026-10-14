@@ -6,7 +6,7 @@
 
     const state = IRDSS.state;
     const { API_BASE, API_V1_REFERRAL } = IRDSS.config;
-    const { escapeHtml } = IRDSS.formatters;
+    const { escapeHtml, displayReferralNumber } = IRDSS.formatters;
     const { cleanErrorMessage, buildErrorNoteHtml } = IRDSS.ui;
     const { switchTab } = IRDSS.navigation;
     let actions = {};
@@ -21,8 +21,64 @@
         return undefined;
     }
 
+    // Statuses in which the referring doctor still has a decision to make. Anything
+    // else (CANCELLED, all REDIRECTED, ARRIVED, departed, or finalized to a receiving
+    // facility) means the card has nothing left to show.
+    const OPEN_REFERRAL_STATUSES = ['PENDING', 'SEEN', 'ACCEPTED'];
+
+    function isOpenReferral(referral) {
+        return !!referral && !referral.receiving_facility && OPEN_REFERRAL_STATUSES.includes(referral.status);
+    }
+
+    function readStoredActiveReferral() {
+        let parsed = null;
+        try { parsed = JSON.parse(localStorage.getItem('active_initiated_referral') || 'null'); } catch (e) {}
+        if (state.activeInitiatedReferralId) {
+            const sameReferral = !!parsed && parsed.id === state.activeInitiatedReferralId;
+            return {
+                id: state.activeInitiatedReferralId,
+                number: state.activeInitiatedReferralNumber || (sameReferral ? parsed.number : null),
+                patientName: sameReferral ? parsed.patientName : null
+            };
+        }
+        return parsed && parsed.id ? parsed : null;
+    }
+
+    function storeActiveReferral(referralId, referralNumber, patientName) {
+        state.activeInitiatedReferralId = referralId;
+        state.activeInitiatedReferralNumber = referralNumber || null;
+        try {
+            localStorage.setItem('active_initiated_referral', JSON.stringify({ id: referralId, number: referralNumber || null, patientName: patientName || 'Patient' }));
+        } catch (e) {}
+    }
+
     /**
-     * Poll GET /api/v1/referral/{referral_id}/recommendations for accepting hospitals
+     * Forgets the active referral (state + localStorage) and hides the card. When a
+     * referralId is given, only clears if it is the one currently tracked, so
+     * cancelling an older referral never hides a different, still-open one.
+     */
+    function clearActiveReferral(referralId) {
+        const stored = readStoredActiveReferral();
+        if (referralId && stored && stored.id !== referralId) return;
+        state.activeInitiatedReferralId = null;
+        state.activeInitiatedReferralNumber = null;
+        try { localStorage.removeItem('active_initiated_referral'); } catch (e) {}
+        $('#acceptedHospitalsCard').hide();
+    }
+
+    function showActiveReferral(referralId, referralNumber, patientName) {
+        storeActiveReferral(referralId, referralNumber, patientName);
+        $('#acceptedHospitalsCard').fadeIn(200);
+        $('#activeReferralIdText').text(referralNumber || referralId);
+        $('#activeReferralPatientText').text(patientName || 'Patient');
+        fetchRecommendationsForReferral(referralId, state.currentHospital.api_key || '');
+    }
+
+    /**
+     * Shows the "Accepted Hospitals" card for the referral this facility is still
+     * deciding on. localStorage only remembers which referral that was; the server's
+     * /mine list decides whether it is still open, so a referral cancelled, finalized
+     * or closed elsewhere (another tab, device or user) stops showing on the next poll.
      */
     function checkAndPollRecommendations() {
         if (!state.currentHospital) {
@@ -30,39 +86,28 @@
             return;
         }
 
-        let referralId = state.activeInitiatedReferralId || null;
-        let patientName = 'Patient';
+        const stored = readStoredActiveReferral();
 
-        if (!referralId) {
-            const stored = localStorage.getItem('active_initiated_referral');
-            if (stored) {
-                try {
-                    const parsed = JSON.parse(stored);
-                    if (parsed && parsed.id) {
-                        referralId = parsed.id;
-                        patientName = parsed.patientName || 'Patient';
-                    }
-                } catch(e) {}
-            }
-        }
-
-        if (referralId) {
-            $('#acceptedHospitalsCard').fadeIn(200);
-            $('#activeReferralIdText').text(referralId);
-            $('#activeReferralPatientText').text(patientName);
-            fetchRecommendationsForReferral(referralId, state.currentHospital.api_key || '');
-            return;
-        }
-
-        // Nothing in this browser's local state (fresh login, different device, or
-        // logout wiped it) -- fall back to server truth: find the most recent referral
-        // this facility sent that has an acceptance still awaiting finalization.
         $.ajax({
             url: `${API_BASE}/get_my_referrals.php`,
             type: 'GET',
             dataType: 'json',
             success: function (data) {
-                const awaitingFinalization = (Array.isArray(data) ? data : [])
+                const referrals = Array.isArray(data) ? data : [];
+
+                if (stored) {
+                    const match = referrals.find(r => r.referral_id === stored.id);
+                    if (isOpenReferral(match)) {
+                        showActiveReferral(match.referral_id, match.referral_number || stored.number, stored.patientName);
+                        return;
+                    }
+                    clearActiveReferral();
+                }
+
+                // Nothing open remembered locally (fresh login, different device, or it
+                // just closed) -- surface the most recent referral with an acceptance
+                // still awaiting finalization, if any.
+                const awaitingFinalization = referrals
                     .filter(r => r.status === 'ACCEPTED' && !r.receiving_facility)
                     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
@@ -72,24 +117,24 @@
                 }
 
                 const rehydrated = awaitingFinalization[0];
-                state.activeInitiatedReferralId = rehydrated.referral_id;
-                const rehydratedName = 'Patient';
-                localStorage.setItem('active_initiated_referral', JSON.stringify({ id: rehydrated.referral_id, patientName: rehydratedName }));
-
-                $('#acceptedHospitalsCard').fadeIn(200);
-                $('#activeReferralIdText').text(rehydrated.referral_id);
-                $('#activeReferralPatientText').text(rehydratedName);
-                fetchRecommendationsForReferral(rehydrated.referral_id, state.currentHospital.api_key || '');
+                showActiveReferral(rehydrated.referral_id, rehydrated.referral_number, 'Patient');
             },
             error: function () {
-                $('#acceptedHospitalsCard').hide();
+                // Can't verify against the server right now; keep showing the remembered
+                // referral rather than hiding a possibly still-open one.
+                if (stored) {
+                    showActiveReferral(stored.id, stored.number, stored.patientName);
+                } else {
+                    $('#acceptedHospitalsCard').hide();
+                }
             }
         });
     }
 
     function fetchRecommendationsForReferral(referralId, apiKey) {
-        // Unauthenticated on IOL's side (no get_current_hospital dependency on this
-        // endpoint) -- called directly, no signing/API key needed or sent.
+        // Goes through the local api/v1/referral proxy (backend/referral_api.php),
+        // which RSA-signs the request; IRDSS only returns recommendations to the
+        // hospital that initiated the referral.
         $.ajax({
             url: `${API_V1_REFERRAL}/${encodeURIComponent(referralId)}/recommendations`,
             type: 'GET',
@@ -118,12 +163,14 @@
         const apiKey = state.currentHospital.api_key || '';
 
         const selectedRef = IRDSS.referrals.list.getCache().find(r => r.referral_id === selectedId);
+        state.activeInitiatedReferralNumber = selectedRef ? (selectedRef.referral_number || null) : null;
         if (selectedRef) {
             $('#activeReferralPatientText').text(selectedRef.patient_name || 'Patient');
+            $('#activeReferralIdText').text(displayReferralNumber(selectedRef));
         }
 
         try {
-            localStorage.setItem('active_initiated_referral', JSON.stringify({ id: selectedId, patientName: selectedRef ? selectedRef.patient_name : '' }));
+            localStorage.setItem('active_initiated_referral', JSON.stringify({ id: selectedId, number: state.activeInitiatedReferralNumber, patientName: selectedRef ? selectedRef.patient_name : '' }));
         } catch(e) {}
 
         fetchRecommendationsForReferral(selectedId, apiKey);
@@ -270,7 +317,7 @@
                                     <i class="bi bi-hospital text-xs"></i> ${beds} Beds Available
                                 </span>
                                 <span class="px-2.5 py-1 rounded-lg font-bold text-xs bg-indigo-100 text-indigo-800 border border-indigo-200">
-                                    ${matchDeg}% Match
+                                    ${hosp.ranking_method === 'DETERMINISTIC_EMERGENCY' ? 'Emergency routing · AI bypassed' : `${matchDeg}% Match`}
                                 </span>
                             </div>
                         </div>
@@ -348,6 +395,7 @@
 
                     // Close out this referral's session client-side so polling stops surfacing it
                     state.activeInitiatedReferralId = null;
+                    state.activeInitiatedReferralNumber = null;
                     try { localStorage.removeItem('active_initiated_referral'); } catch (e) {}
 
                     // Hide the card immediately -- it's finalized, there's nothing left to
@@ -436,6 +484,7 @@
         configure,
         init,
         check: checkAndPollRecommendations,
+        clearActive: clearActiveReferral,
         fetch: fetchRecommendationsForReferral,
         finalize: confirmAndFinalizeReferral,
         resolveLocationAddressHtml
