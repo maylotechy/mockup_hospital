@@ -1,0 +1,74 @@
+---
+title: IRDSS eReferral Interoperability Architecture
+---
+flowchart LR
+    subgraph MAIN[Main eReferral Workflow]
+        direction LR
+
+        subgraph SENDING[1. Participating / Sending Hospital]
+            direction TB
+            PEOPLE[Doctors and Hospital Staff]
+            STANDALONE[IRDSS Standalone<br/>Hospital System]
+            HIS[Existing Hospital<br/>HIS or EMR]
+            ADAPTER[FHIR Integration Adapter<br/>PLANNED / FUTURE]
+            PEOPLE --> STANDALONE
+            PEOPLE --> HIS
+            HIS --> ADAPTER
+        end
+
+        subgraph CENTRAL[2. Central IRDSS Interoperability Platform]
+            direction LR
+            API[1. FHIR API Gateway<br/>and Authentication<br/>Receive Bundle / Authenticate Facility]
+            VALIDATE[2. FHIR and Terminology<br/>Validation<br/>Profiles / References / Codes<br/>PLANNED / FUTURE]
+            PROCESS[3. Clinical Data and<br/>Audit Processing<br/>Referral / History / Audit]
+            MATCH[4. Facility Matching<br/>and Routing<br/>Capability / Availability<br/>Distance / Acuity]
+            WORKFLOW[5. Referral Workflow<br/>Management<br/>ServiceRequest + Task<br/>FHIR WORKFLOW: PLANNED]
+            NOTIFY[6. Notification and<br/>Status Service<br/>WebSocket / Polling<br/>WEBHOOK: PLANNED]
+
+            API --> VALIDATE --> PROCESS --> MATCH --> WORKFLOW --> NOTIFY
+        end
+
+        subgraph RECEIVING[3. Receiving Hospital]
+            direction TB
+            RECEIVER[Receiving IRDSS,<br/>HIS or EMR]
+            ACTIONS[Review Referral<br/>Accept / Reject / Forward]
+            RECEIVER --> ACTIONS
+        end
+
+        STANDALONE -->|FHIR R4 / PH Core / PH eReferral<br/>REST API / Transaction Bundle| API
+        ADAPTER -->|FHIR R4 / PH Core / PH eReferral<br/>REST API / Transaction Bundle| API
+        NOTIFY -->|New Referral| RECEIVER
+        ACTIONS -->|Accept / Reject / Forward| WORKFLOW
+        NOTIFY -->|Referral Status Updates| STANDALONE
+        NOTIFY -->|Webhook or API Polling| ADAPTER
+    end
+
+    subgraph SUPPORT[Supporting Services and Infrastructure]
+        direction LR
+        ONTO[(Ontoserver Terminology Service<br/>SNOMED CT / LOINC / UCUM<br/>CodeSystems / ValueSets<br/>$expand / $lookup / $validate-code<br/>INTEGRATION: PLANNED)]
+        PSGC[(PSGC Reference Service<br/>Region / Province<br/>City / Municipality / Barangay<br/>Central validation: PLANNED)]
+        POSTGRES[(Central PostgreSQL Database<br/>Referral Records<br/>Workflow Records / Audit History)]
+        STORAGE[(Protected Storage<br/>Clinical Attachments<br/>Consent Documents / Protected Files)]
+        ADMIN[IRDSS Admin Console<br/>Facilities / Capabilities<br/>Monitoring / Configuration]
+    end
+
+    VALIDATE -.->|Terminology operations| ONTO
+    VALIDATE -.->|Geographic code validation| PSGC
+    PROCESS -->|Store referral and audit data| POSTGRES
+    WORKFLOW -->|Store workflow state| POSTGRES
+    PROCESS -->|Store file metadata and content| STORAGE
+    ADMIN -->|Manage and monitor| CENTRAL
+
+    classDef main fill:#E8F0FE,stroke:#4567B7,color:#172033,stroke-width:1.5px;
+    classDef support fill:#E6F7F2,stroke:#2B7A78,color:#172033,stroke-width:1.5px;
+    classDef planned fill:#FFF4DC,stroke:#C88719,color:#5C3A00,stroke-width:1.5px,stroke-dasharray:5 3;
+
+    class PEOPLE,STANDALONE,HIS,API,PROCESS,MATCH,NOTIFY,RECEIVER,ACTIONS,POSTGRES,STORAGE,ADMIN main;
+    class ONTO,PSGC support;
+    class ADAPTER,VALIDATE,WORKFLOW planned;
+
+    style MAIN fill:#FFFFFF,stroke:#AAB4C5,stroke-width:1.5px
+    style SENDING fill:#F8FAFD,stroke:#7C8AA5,stroke-width:1px
+    style CENTRAL fill:#F8FAFD,stroke:#4567B7,stroke-width:2px
+    style RECEIVING fill:#F8FAFD,stroke:#7C8AA5,stroke-width:1px
+    style SUPPORT fill:#F4FAF8,stroke:#2B7A78,stroke-width:1.5px

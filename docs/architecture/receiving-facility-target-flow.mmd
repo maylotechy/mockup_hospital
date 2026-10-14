@@ -1,0 +1,30 @@
+---
+title: Receiving Facility Workflow
+---
+flowchart TD
+    RECEIVE([Receive referral from IoL])
+    REVIEW[Review clinical summary<br/>Patient identity hidden]
+    CAPACITY{Can receive and<br/>provide care?}
+    REDIRECT[Redirect with a reason<br/>Notify IoL]
+    CONFIRM[Confirm availability to IoL]
+    WAIT[Wait for sender selection]
+    SELECTED{Selected destination?}
+    CLOSED([Close notification])
+    PERMISSION[Get transfer permission<br/>from IoL]
+    FETCH[Request full Bundle directly<br/>from sending hospital]
+    DECRYPT[Verify signature and decrypt<br/>Receiver's private key]
+    IMPORT[On arrival, save locally<br/>Encrypted hospital database]
+    UPDATE([Update status in IoL])
+
+    RECEIVE --> REVIEW --> CAPACITY
+    CAPACITY -->|No| REDIRECT --> CLOSED
+    CAPACITY -->|Yes| CONFIRM --> WAIT --> SELECTED
+    SELECTED -->|No| CLOSED
+    SELECTED -->|Yes| PERMISSION --> FETCH --> DECRYPT --> IMPORT --> UPDATE
+
+    classDef endpoint fill:#ffffff,color:#172033,stroke:#334155,stroke-width:2px;
+    classDef hospital fill:#eff6ff,color:#172033,stroke:#2563eb;
+    classDef central fill:#f0fdfa,color:#172033,stroke:#0f766e;
+    class RECEIVE,CLOSED,UPDATE endpoint;
+    class REVIEW,CAPACITY,REDIRECT,CONFIRM,FETCH,DECRYPT,IMPORT hospital;
+    class WAIT,SELECTED,PERMISSION central;

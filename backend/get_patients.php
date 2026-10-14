@@ -18,11 +18,12 @@ $facilityId = (int)$loggedInUser['facility']['id'];
 
 $patientColumns = '
     p.id, p.facility_id, f.name as facility_name,
+    p.identity_ciphertext, p.identity_blind_index, p.identity_key_version,
     p.first_name, p.middle_name, p.last_name, p.suffix,
     p.dob, p.gender, p.civil_status, p.phone,
     p.region, p.province, p.city_municipality, p.barangay, p.zip_code,
     p.philhealth_member, p.philhealth_number, p.philhealth_status_type, p.is_4ps_member,
-    p.source_referral_id, p.transferred_details_snapshot,
+    p.source_referral_id, p.transferred_details_snapshot, p.transferred_snapshot_ciphertext,
     p.created_by_user_id, p.created_at, p.updated_at
 ';
 
@@ -35,23 +36,25 @@ $patientColumns = '
  * a discharge action that would contradict it.
  */
 function enrichPatientTransferFields($row, $referredOnwardIds = []) {
+    $row = hydrateLocalPatientRow($row);
     $row['is_transferred_in'] = !empty($row['source_referral_id']);
     $row['departed_at'] = null;
     $row['departure_outcome'] = null;
     $row['departure_remarks'] = null;
 
-    if (!empty($row['transferred_details_snapshot'])) {
-        $snapshot = json_decode($row['transferred_details_snapshot'], true);
-        if (is_array($snapshot)) {
-            $row['departed_at'] = $snapshot['departed_at'] ?? null;
-            $row['departure_outcome'] = $snapshot['departure_outcome'] ?? null;
-            $row['departure_remarks'] = $snapshot['departure_remarks'] ?? null;
-        }
+    $snapshot = decryptLocalTransferSnapshot(
+        $row['transferred_snapshot_ciphertext'] ?? null,
+        $row['transferred_details_snapshot'] ?? null
+    );
+    if ($snapshot) {
+        $row['departed_at'] = $snapshot['departed_at'] ?? null;
+        $row['departure_outcome'] = $snapshot['departure_outcome'] ?? null;
+        $row['departure_remarks'] = $snapshot['departure_remarks'] ?? null;
     }
 
     $row['already_referred_onward'] = in_array((int)$row['id'], $referredOnwardIds, true);
 
-    unset($row['transferred_details_snapshot']);
+    unset($row['transferred_details_snapshot'], $row['transferred_snapshot_ciphertext']);
     return $row;
 }
 

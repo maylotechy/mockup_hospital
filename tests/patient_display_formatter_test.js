@@ -1,0 +1,12 @@
+const fs = require('fs');
+const vm = require('vm');
+const assert = require('assert');
+const context = { window: { IRDSS: {} } };
+vm.runInNewContext(fs.readFileSync('frontend/js/core/formatters.js', 'utf8'), context);
+const format = context.window.IRDSS.formatters.displayPatientId;
+assert.strictEqual(format({ local_patient_id: 51, patient_id: 'tx_hidden' }), '#00051');
+assert.strictEqual(format({ patient_display_id: '#00072', patient_id: 'tx_hidden' }), '#00072');
+assert.strictEqual(format({ patient_id: 'tx_hidden' }), 'Not registered yet');
+assert.strictEqual(format({ subject: { reference: 'Patient/tx_hidden' } }), 'Not registered yet');
+assert.strictEqual(format({ patient_id: 'P00051' }), 'P00051');
+console.log('PATIENT_DISPLAY_FORMATTER_OK');

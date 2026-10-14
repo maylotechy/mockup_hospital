@@ -6,6 +6,7 @@
 CREATE DATABASE IF NOT EXISTS `hospital_db` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `hospital_db`;
 
+DROP TABLE IF EXISTS `initiated_referral_observations`;
 DROP TABLE IF EXISTS `initiated_referrals`;
 DROP TABLE IF EXISTS `service_assessments`;
 DROP TABLE IF EXISTS `patients`;
@@ -49,15 +50,21 @@ CREATE TABLE `patients` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `facility_id` INT NOT NULL,
 
+  -- AES-256-GCM encrypted identity document and deterministic keyed lookup.
+  -- Plaintext demographic columns remain nullable during compatibility migration.
+  `identity_ciphertext` LONGTEXT NULL,
+  `identity_blind_index` CHAR(64) NULL,
+  `identity_key_version` VARCHAR(20) NULL,
+
   -- Demographics
-  `first_name` VARCHAR(50) NOT NULL,
+  `first_name` VARCHAR(50) NULL,
   `middle_name` VARCHAR(50) NULL,
-  `last_name` VARCHAR(50) NOT NULL,
+  `last_name` VARCHAR(50) NULL,
   `suffix` VARCHAR(10) NULL,
-  `dob` DATE NOT NULL,
-  `gender` ENUM('Male', 'Female', 'Other') NOT NULL,
+  `dob` DATE NULL,
+  `gender` ENUM('Male', 'Female', 'Other') NULL,
   `civil_status` ENUM('Single', 'Married', 'Widow/er', 'Separated') NULL,
-  `phone` VARCHAR(20) NOT NULL,
+  `phone` VARCHAR(20) NULL,
 
   -- Residential Address
   `region` VARCHAR(100) NULL,
@@ -67,10 +74,10 @@ CREATE TABLE `patients` (
   `zip_code` VARCHAR(10) NULL,
 
   -- Socio-Economic & Health Insurance
-  `philhealth_member` ENUM('Yes', 'No') NOT NULL DEFAULT 'No',
+  `philhealth_member` ENUM('Yes', 'No') NULL,
   `philhealth_number` VARCHAR(20) NULL,
   `philhealth_status_type` ENUM('Member', 'Dependent') NULL,
-  `is_4ps_member` ENUM('Yes', 'No') NOT NULL DEFAULT 'No',
+  `is_4ps_member` ENUM('Yes', 'No') NULL,
 
   `created_by_user_id` INT NULL,
 
@@ -82,6 +89,7 @@ CREATE TABLE `patients` (
   `source_facility` VARCHAR(150) NULL,
   `transferred_address` VARCHAR(255) NULL,
   `transferred_details_snapshot` JSON NULL,
+  `transferred_snapshot_ciphertext` LONGTEXT NULL,
 
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -89,6 +97,7 @@ CREATE TABLE `patients` (
   -- Speeds up the identity lookup used to prompt "possible duplicate patient?" on
   -- registration/arrival -- not unique, since staff can still choose "create new anyway".
   KEY `idx_patients_identity` (`facility_id`, `last_name`, `first_name`, `dob`),
+  KEY `idx_patients_identity_blind` (`facility_id`, `identity_blind_index`),
 
   CONSTRAINT `fk_patients_facility` FOREIGN KEY (`facility_id`) REFERENCES `facilities` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_patients_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
@@ -137,11 +146,30 @@ CREATE TABLE `initiated_referrals` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `hospital_id` INT NOT NULL,
   `referral_id` VARCHAR(100) NULL,
+  `referral_number` VARCHAR(20) NULL,
   `patient_id` INT NOT NULL,
-  `patient_name` VARCHAR(255) NOT NULL,
+  `patient_name` VARCHAR(255) NULL,
+  `patient_name_ciphertext` TEXT NULL,
   `reason` VARCHAR(255) NULL,
   `chief_complaint` VARCHAR(255) NULL,
   `diagnosis` VARCHAR(255) NULL,
+  `diagnosis_system` VARCHAR(255) NULL,
+  `diagnosis_code` VARCHAR(100) NULL,
+  `diagnosis_display` VARCHAR(255) NULL,
+  `diagnosis_text` TEXT NULL,
+  `chief_complaint_text` TEXT NULL,
+  `chief_complaint_system` VARCHAR(255) NULL,
+  `chief_complaint_code` VARCHAR(100) NULL,
+  `chief_complaint_display` VARCHAR(255) NULL,
+  `triage_system` VARCHAR(255) NULL,
+  `triage_code` VARCHAR(50) NULL,
+  `triage_display` VARCHAR(100) NULL,
+  `referral_priority` VARCHAR(20) NULL,
+  `condition_severity_system` VARCHAR(255) NULL,
+  `condition_severity_code` VARCHAR(100) NULL,
+  `condition_severity_display` VARCHAR(255) NULL,
+  `fhir_condition_id` VARCHAR(100) NULL,
+  `fhir_service_request_id` VARCHAR(100) NULL,
   `vital_bp` VARCHAR(20) NULL,
   `vital_hr` SMALLINT NULL,
   `vital_rr` SMALLINT NULL,
@@ -150,7 +178,48 @@ CREATE TABLE `initiated_referrals` (
   `status` VARCHAR(50) DEFAULT 'AWAITING',
   `sync_status` VARCHAR(20) NOT NULL DEFAULT 'PENDING',
   `http_status` SMALLINT NULL,
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY `idx_initiated_referrals_referral_number` (`referral_number`),
+  KEY `idx_initiated_referrals_diagnosis_code` (`diagnosis_code`),
+  KEY `idx_initiated_referrals_triage_code` (`triage_code`),
+  KEY `idx_initiated_referrals_priority` (`referral_priority`),
+  KEY `idx_initiated_referrals_fhir_condition` (`fhir_condition_id`),
+  KEY `idx_initiated_referrals_fhir_service_request` (`fhir_service_request_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Sender-owned encrypted referral snapshot for direct hospital-to-hospital identity transfer.
+CREATE TABLE IF NOT EXISTS patient_transfer_outbox (
+  transfer_id VARCHAR(35) PRIMARY KEY,
+  facility_id INT NOT NULL,
+  patient_id INT NOT NULL,
+  snapshot_ciphertext MEDIUMTEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_transfer_facility (facility_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ========================================================
+-- Normalized referral-time and arrival-time FHIR observations.
+-- Legacy vital_* columns remain available during migration.
+-- ========================================================
+CREATE TABLE `initiated_referral_observations` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `initiated_referral_id` INT NOT NULL,
+  `fhir_observation_id` VARCHAR(100) NULL,
+  `loinc_code` VARCHAR(50) NOT NULL,
+  `display` VARCHAR(255) NULL,
+  `value_numeric` DECIMAL(12,4) NULL,
+  `unit_code` VARCHAR(50) NULL,
+  `unit_display` VARCHAR(100) NULL,
+  `measurement_context` VARCHAR(20) NOT NULL DEFAULT 'referral',
+  `observed_at` DATETIME(6) NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_initiated_observation_fhir_id` (`fhir_observation_id`),
+  KEY `idx_initiated_observation_ref_context` (`initiated_referral_id`, `measurement_context`),
+  KEY `idx_initiated_observation_ref_loinc` (`initiated_referral_id`, `loinc_code`),
+  CONSTRAINT `fk_initiated_observation_referral`
+    FOREIGN KEY (`initiated_referral_id`) REFERENCES `initiated_referrals` (`id`)
+    ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ========================================================
@@ -168,6 +237,7 @@ CREATE TABLE `audit_logs` (
   `action` VARCHAR(30) NOT NULL,
   `referral_id` VARCHAR(100) NULL,
   `patient_name` VARCHAR(255) NULL,
+  `patient_name_ciphertext` TEXT NULL,
   `details` VARCHAR(255) NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT `fk_audit_logs_facility` FOREIGN KEY (`facility_id`) REFERENCES `facilities` (`id`) ON DELETE CASCADE,

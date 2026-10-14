@@ -101,38 +101,40 @@ try {
         ]);
     }
 
+    $identity = [
+        'first_name' => $firstName,
+        'middle_name' => inVal($input, 'middle_name'),
+        'last_name' => $lastName,
+        'suffix' => inVal($input, 'suffix'),
+        'dob' => $dob,
+        'gender' => $gender,
+        'civil_status' => $civilStatus,
+        'phone' => $phone,
+        'region' => inVal($input, 'region'),
+        'province' => inVal($input, 'province'),
+        'city_municipality' => inVal($input, 'city_municipality'),
+        'barangay' => inVal($input, 'barangay'),
+        'zip_code' => inVal($input, 'zip_code'),
+        'philhealth_member' => $philhealthMember,
+        'philhealth_number' => inVal($input, 'philhealth_number'),
+        'philhealth_status_type' => $philhealthStatusType,
+        'is_4ps_member' => $is4psMember,
+    ];
+
     $stmt = $pdo->prepare('
         INSERT INTO patients (
-            facility_id, first_name, middle_name, last_name, suffix, dob, gender, civil_status, phone,
-            region, province, city_municipality, barangay, zip_code,
-            philhealth_member, philhealth_number, philhealth_status_type, is_4ps_member,
+            facility_id, identity_ciphertext, identity_blind_index, identity_key_version,
             created_by_user_id
         ) VALUES (
-            :facility_id, :first_name, :middle_name, :last_name, :suffix, :dob, :gender, :civil_status, :phone,
-            :region, :province, :city_municipality, :barangay, :zip_code,
-            :philhealth_member, :philhealth_number, :philhealth_status_type, :is_4ps_member,
+            :facility_id, :identity_ciphertext, :identity_blind_index, :identity_key_version,
             :created_by_user_id
         )
     ');
     $stmt->execute([
         ':facility_id'             => (int)$loggedInUser['facility']['id'],
-        ':first_name'              => $firstName,
-        ':middle_name'             => inVal($input, 'middle_name'),
-        ':last_name'               => $lastName,
-        ':suffix'                  => inVal($input, 'suffix'),
-        ':dob'                     => $dob,
-        ':gender'                  => $gender,
-        ':civil_status'            => $civilStatus,
-        ':phone'                   => $phone,
-        ':region'                  => inVal($input, 'region'),
-        ':province'                => inVal($input, 'province'),
-        ':city_municipality'       => inVal($input, 'city_municipality'),
-        ':barangay'                => inVal($input, 'barangay'),
-        ':zip_code'                => inVal($input, 'zip_code'),
-        ':philhealth_member'       => $philhealthMember,
-        ':philhealth_number'       => inVal($input, 'philhealth_number'),
-        ':philhealth_status_type'  => $philhealthStatusType,
-        ':is_4ps_member'           => $is4psMember,
+        ':identity_ciphertext'     => encryptLocalPatientIdentity($identity),
+        ':identity_blind_index'    => localPatientIdentityBlindIndex($firstName, $lastName, $dob),
+        ':identity_key_version'    => LOCAL_DATA_ENVELOPE_VERSION,
         ':created_by_user_id'      => (int)$loggedInUser['id']
     ]);
 

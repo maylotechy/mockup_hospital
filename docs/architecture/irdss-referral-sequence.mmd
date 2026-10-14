@@ -1,0 +1,68 @@
+sequenceDiagram
+    autonumber
+    actor Doctor
+    participant Sender as Sending Hospital System
+    participant IOL as IRDSS IOL
+    participant Term as IOL Terminology API
+    participant Onto as Ontoserver
+    participant Match as Matching Engine
+    participant Receiver as Receiving Hospital System
+
+    Doctor->>Sender: Open patient and create referral
+    Sender->>Term: Search approved complaint, diagnosis or service ValueSet
+    Term->>Onto: ValueSet expand with search filter
+    Onto-->>Term: Matching standard concepts
+    Term-->>Sender: System, code and official display
+    Doctor->>Sender: Select codes and enter clinical narrative
+    Sender->>Sender: Build FHIR transaction Bundle
+    Sender->>IOL: POST signed FHIR referral Bundle
+
+    IOL->>IOL: Authenticate facility and verify signature, timestamp and nonce
+    IOL->>IOL: Check idempotency and duplicate identifiers
+    IOL->>IOL: Validate Bundle structure, profiles and references
+    IOL->>Term: Validate submitted terminology codes
+    Term->>Onto: Validate code against pinned ValueSet version
+    Onto-->>Term: Validation result
+    Term-->>IOL: Validation result
+
+    alt Bundle or terminology is invalid
+        IOL-->>Sender: FHIR OperationOutcome with field-level issues
+    else Referral is valid
+        IOL->>IOL: Store original Bundle and normalized referral data
+        IOL->>Match: Request eligible receiving facilities
+
+        alt Triage level is 5
+            Match->>Match: Apply deterministic emergency routing
+            Note over Match: Select the most capable eligible and available facility without ordinary AI ranking
+        else Triage level is 1 to 4
+            Match->>Match: Rank eligible facilities using capability, availability, distance, load and acuity
+        end
+
+        Match-->>IOL: Recommended receiving facilities
+        IOL->>IOL: Create or update ServiceRequest and tracking Task
+        IOL-->>Receiver: Notify new referral through WebSocket or webhook
+        IOL-->>Sender: Return accepted transaction and referral identifier
+
+        Receiver->>IOL: Retrieve referral details
+        IOL-->>Receiver: Patient, Encounter, Conditions, Observations and ServiceRequest
+        Receiver->>IOL: Update Task to received
+        IOL-->>Sender: Notify referral received
+
+        alt Receiving hospital accepts
+            Receiver->>IOL: Update Task to accepted
+            IOL-->>Sender: Notify referral accepted
+            Receiver->>IOL: Record patient arrival
+            IOL-->>Sender: Notify patient arrived
+            Receiver->>IOL: Complete referral or discharge patient
+            IOL-->>Sender: Notify referral completed
+        else Receiving hospital rejects or cannot provide service
+            Receiver->>IOL: Reject with a coded and textual reason
+            IOL->>Match: Recalculate eligible receiving facilities
+            IOL-->>Sender: Notify rejection and updated recommendations
+        else Patient is referred onward
+            Receiver->>IOL: Submit a new linked FHIR referral Bundle
+            IOL->>IOL: Preserve the original referral and create a linked onward referral
+            IOL->>Match: Match the onward referral
+            IOL-->>Sender: Notify that patient was referred onward
+        end
+    end

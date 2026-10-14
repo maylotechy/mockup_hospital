@@ -1,0 +1,21 @@
+{
+  "resourceType": "ValueSet",
+  "id": "irdss-triage-acuity",
+  "url": "https://irdss.gov.ph/fhir/ValueSet/triage-acuity",
+  "version": "0.1.0",
+  "name": "IRDSSTriageAcuity",
+  "title": "IRDSS Triage Acuity",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-10-06",
+  "publisher": "IRDSS Project",
+  "description": "The five prototype triage-acuity levels used by IRDSS. Level 5 is the highest acuity.",
+  "compose": {
+    "include": [
+      {
+        "system": "https://irdss.gov.ph/fhir/CodeSystem/triage-acuity",
+        "version": "0.1.0"
+      }
+    ]
+  }
+}

@@ -1,0 +1,69 @@
+flowchart TB
+    subgraph CLIENTS[Hospital Systems]
+        direction LR
+        SA_UI[Standalone Web Application]
+        SA_API[Standalone PHP Backend]
+        SA_DB[(Hospital MySQL Database)]
+        EXT_HIS[External HIS or EMR]
+        EXT_ADAPTER[External FHIR Adapter]
+
+        SA_UI --> SA_API
+        SA_API --> SA_DB
+        EXT_HIS --> EXT_ADAPTER
+    end
+
+    subgraph IOL_PLATFORM[IRDSS Interoperability Layer]
+        direction TB
+        API[REST and FHIR API Gateway]
+        SECURITY[Facility Authentication, Signature, Timestamp and Nonce Validation]
+        IDEMPOTENCY[Idempotency and Duplicate Protection]
+        FHIR_VALIDATOR[FHIR Bundle, Profile and Reference Validation]
+        TERM_API[IOL Terminology API and Cache]
+        REFERRAL[Referral Orchestrator]
+        ROUTING[Routing and Matching Engine]
+        WORKFLOW[ServiceRequest and Task Workflow]
+        NOTIFICATIONS[Notification Dispatcher]
+        AUDIT[Audit and Provenance Service]
+
+        API --> SECURITY
+        SECURITY --> IDEMPOTENCY
+        IDEMPOTENCY --> FHIR_VALIDATOR
+        FHIR_VALIDATOR --> REFERRAL
+        FHIR_VALIDATOR --> TERM_API
+        REFERRAL --> ROUTING
+        REFERRAL --> WORKFLOW
+        REFERRAL --> AUDIT
+        WORKFLOW --> NOTIFICATIONS
+    end
+
+    subgraph DATA[Central Data Services]
+        PG[(PostgreSQL Referral Database)]
+        FILES[(Protected Document and Attachment Storage)]
+        FACILITY[(Facility Registry, Capabilities and Availability)]
+        CACHE[(Terminology and Application Cache)]
+    end
+
+    subgraph EXTERNAL[External Standards and Services]
+        ONTO[(Ontoserver)]
+        IDENTITY[NIDAS or Approved Identity Provider]
+        PSGC[PSGC and Approved Reference Registries]
+    end
+
+    SA_API -->|HTTPS and FHIR JSON| API
+    EXT_ADAPTER -->|HTTPS and FHIR JSON| API
+    API -->|FHIR response| SA_API
+    API -->|FHIR response| EXT_ADAPTER
+
+    SECURITY --> IDENTITY
+    TERM_API -->|Expand, lookup and validate| ONTO
+    TERM_API --> CACHE
+    ROUTING --> FACILITY
+    FACILITY --> PSGC
+
+    REFERRAL --> PG
+    WORKFLOW --> PG
+    AUDIT --> PG
+    REFERRAL --> FILES
+
+    NOTIFICATIONS -->|WebSocket| SA_UI
+    NOTIFICATIONS -->|Webhook or polling fallback| EXT_ADAPTER

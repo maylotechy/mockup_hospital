@@ -33,7 +33,8 @@ function buildAuthResponsePayload($user) {
             'id'        => $user['id'],
             'username'  => $user['username'],
             'full_name' => $user['full_name'],
-            'role'      => $user['role']
+            'role'      => $user['role'],
+            'license_number' => $user['license_number'] ?? null
         ],
         'facility' => $user['facility']
     ];
@@ -43,6 +44,21 @@ function buildAuthResponsePayload($user) {
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $user = getLoggedInUser();
     if ($user) {
+        // Older active sessions may predate license-number support. Refresh the
+        // clinical user's value so the printable form works without a logout/login.
+        if (!array_key_exists('license_number', $user) && !empty($user['id'])
+            && in_array(strtolower((string)($user['role'] ?? '')), ['doctor', 'nurse'], true)) {
+            try {
+                $licensePdo = getDbConnection();
+                $licenseStmt = $licensePdo->prepare('SELECT license_number FROM users WHERE id = :id LIMIT 1');
+                $licenseStmt->execute([':id' => (int)$user['id']]);
+                $licenseRow = $licenseStmt->fetch();
+                $user['license_number'] = $licenseRow['license_number'] ?? null;
+                $_SESSION['user']['license_number'] = $user['license_number'];
+            } catch (Exception $e) {
+                $user['license_number'] = null;
+            }
+        }
         sendJsonResponse(array_merge([
             'authenticated' => true
         ], buildAuthResponsePayload($user)));
@@ -89,7 +105,7 @@ try {
     // 1. Try local MySQL users lookup first (for Doctors and Nurses)
     // Facility Admins authenticate centrally via IRDSS (IOL PostgreSQL)
     $stmt = $pdo->prepare('
-        SELECT u.id, u.username, u.password, u.full_name, u.role, u.is_active,
+        SELECT u.id, u.username, u.password, u.full_name, u.role, u.license_number, u.is_active,
                f.id as facility_id, f.code as facility_code, f.name as facility_name,
                f.tier_level, f.is_assessment_completed, f.api_key
         FROM users u
@@ -115,6 +131,7 @@ try {
             'username'  => $row['username'],
             'full_name' => $row['full_name'],
             'role'      => $row['role'],
+            'license_number' => $row['license_number'],
             'facility'  => [
                 'id'                      => (int)$row['facility_id'],
                 'code'                    => $row['facility_code'],

@@ -16,7 +16,7 @@ requireRole(['facility_admin']);
 try {
     $pdo = getDbConnection();
     $stmt = $pdo->prepare('
-        SELECT id, user_full_name, user_role, action, referral_id, patient_name, details, created_at
+        SELECT id, user_full_name, user_role, action, referral_id, patient_name, patient_name_ciphertext, details, created_at
         FROM audit_logs
         WHERE facility_id = :facility_id
         ORDER BY created_at DESC
@@ -24,6 +24,16 @@ try {
     ');
     $stmt->execute([':facility_id' => (int)($loggedInUser['facility']['id'] ?? 0)]);
     $rows = $stmt->fetchAll();
+    foreach ($rows as &$row) {
+        if (!empty($row['patient_name_ciphertext'])) {
+            $row['patient_name'] = decryptLocalSensitiveValue(
+                $row['patient_name_ciphertext'],
+                'audit_logs.patient_name'
+            );
+        }
+        unset($row['patient_name_ciphertext']);
+    }
+    unset($row);
 
     sendJsonResponse(['success' => true, 'data' => $rows]);
 } catch (Exception $e) {

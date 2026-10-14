@@ -1,0 +1,31 @@
+---
+title: Central IoL Referral Workflow
+---
+flowchart TD
+    RECEIVE([Receive routing Bundle<br/>No direct patient identifiers])
+    VALIDATE[Authenticate and validate]
+    DB[(Central PostgreSQL<br/>Routing and workflow details only)]
+    RULE[Rule-based facility screening]
+    BROADCAST[Send clinical summary<br/>to eligible facilities]
+    COLLECT[Collect confirmations]
+    CONFIRMED{Any confirmed facilities?}
+    RETRY[Notify sender and reassess]
+    RANK[Rank all confirmed facilities]
+    CHOOSE[Send ranking to referrer<br/>Referrer chooses destination]
+    FINAL[Finalize selected facility]
+    AUTHORIZE[Authorize selected receiver<br/>Short-lived transfer permission]
+    DIRECT[Direct hospital-to-hospital Bundle<br/>Encrypted with receiver's public key]
+    STATUS([Record status updates<br/>Patient identity stays at hospitals])
+
+    RECEIVE --> VALIDATE --> DB --> RULE --> BROADCAST --> COLLECT --> CONFIRMED
+    CONFIRMED -->|No| RETRY --> RULE
+    CONFIRMED -->|Yes| RANK --> CHOOSE --> FINAL --> AUTHORIZE
+    AUTHORIZE -.->|Authorizes hospital-to-hospital transfer| DIRECT
+    DIRECT -->|Status updates only| STATUS
+
+    classDef endpoint fill:#ffffff,color:#172033,stroke:#334155,stroke-width:2px;
+    classDef hospital fill:#eff6ff,color:#172033,stroke:#2563eb;
+    classDef central fill:#f0fdfa,color:#172033,stroke:#0f766e;
+    class RECEIVE,STATUS endpoint;
+    class CHOOSE,DIRECT hospital;
+    class VALIDATE,DB,RULE,BROADCAST,COLLECT,CONFIRMED,RETRY,RANK,FINAL,AUTHORIZE central;

@@ -5,6 +5,7 @@
 // ========================================================
 
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/referral_patient_display.php';
 
 $loggedInUser = getLoggedInUser();
 if (!$loggedInUser) {
@@ -27,5 +28,15 @@ if ($curlErrno) {
 }
 
 $isSuccess = ($httpCode >= 200 && $httpCode < 300);
+
+if ($isSuccess && is_array($response) && array_is_list($response)) {
+    try {
+        $response = addReceivingPatientDisplayIds(getDbConnection(), (int)$loggedInUser['facility']['id'], $response);
+    } catch (Throwable $error) {
+        error_log('Unable to resolve receiving hospital patient display IDs.');
+        foreach ($response as &$referral) $referral['patient_display_id'] = 'Not registered yet';
+        unset($referral);
+    }
+}
 
 sendRawJsonResponse($response, $isSuccess ? 200 : $httpCode);

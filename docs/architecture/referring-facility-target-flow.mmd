@@ -1,0 +1,23 @@
+---
+title: Referring Facility Workflow
+---
+flowchart TD
+    START([Prepare patient referral])
+    LOCAL[Store full Bundle locally<br/>Encrypted hospital database]
+    SEND[Send routing Bundle to IoL<br/>No direct patient identifiers]
+    RULE[IoL screens eligible facilities<br/>Rule-based criteria]
+    CONFIRM[Eligible facilities confirm<br/>Capability and availability]
+    RANK[IoL ranks confirmed facilities]
+    CHOOSE[Clinician chooses from ranking]
+    FINAL[Finalize destination in IoL]
+    TRANSFER[Transfer full Bundle directly<br/>Encrypted for selected receiver]
+    STATUS([Track referral status])
+
+    START --> LOCAL --> SEND --> RULE --> CONFIRM --> RANK --> CHOOSE --> FINAL --> TRANSFER --> STATUS
+
+    classDef endpoint fill:#ffffff,color:#172033,stroke:#334155,stroke-width:2px;
+    classDef hospital fill:#eff6ff,color:#172033,stroke:#2563eb;
+    classDef central fill:#f0fdfa,color:#172033,stroke:#0f766e;
+    class START,STATUS endpoint;
+    class LOCAL,SEND,CHOOSE,TRANSFER hospital;
+    class RULE,CONFIRM,RANK,FINAL central;

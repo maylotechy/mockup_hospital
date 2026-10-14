@@ -1,5 +1,7 @@
 # Implementation Plan & Todos
 
+[All project plans](README.md)
+
 Planning notes only — nothing in this file has been implemented yet.
 
 ---

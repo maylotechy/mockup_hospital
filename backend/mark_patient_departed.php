@@ -45,7 +45,7 @@ if (empty($referralId) || !in_array(strtoupper($outcome), $validOutcomes, true))
 $pdo = getDbConnection();
 $facilityId = (int)($loggedInUser['facility']['id'] ?? 0);
 
-$localPatientStmt = $pdo->prepare('SELECT id, transferred_details_snapshot FROM patients WHERE source_referral_id = :rid AND facility_id = :fid LIMIT 1');
+$localPatientStmt = $pdo->prepare('SELECT id, transferred_details_snapshot, transferred_snapshot_ciphertext FROM patients WHERE source_referral_id = :rid AND facility_id = :fid LIMIT 1');
 $localPatientStmt->execute([':rid' => $referralId, ':fid' => $facilityId]);
 $localPatientRow = $localPatientStmt->fetch();
 
@@ -85,8 +85,11 @@ $isSuccess = ($httpCode >= 200 && $httpCode < 300);
 
 if ($isSuccess) {
     $patientName = null;
-    if ($localPatientRow && !empty($localPatientRow['transferred_details_snapshot'])) {
-        $snap = json_decode($localPatientRow['transferred_details_snapshot'], true);
+    if ($localPatientRow) {
+        $snap = decryptLocalTransferSnapshot(
+            $localPatientRow['transferred_snapshot_ciphertext'] ?? null,
+            $localPatientRow['transferred_details_snapshot'] ?? null
+        );
         $patientName = is_array($snap) ? ($snap['full_name'] ?? null) : null;
     }
     logAuditEvent($loggedInUser, 'PATIENT_DEPARTED', $referralId, $patientName, strtoupper($outcome));
@@ -97,16 +100,16 @@ if ($isSuccess) {
 // show the current "Mark as Out" state without a fresh round-trip to IOL every time.
 if ($isSuccess && $localPatientRow) {
     try {
-        $snapshot = !empty($localPatientRow['transferred_details_snapshot']) ? json_decode($localPatientRow['transferred_details_snapshot'], true) : [];
-        if (!is_array($snapshot)) {
-            $snapshot = [];
-        }
+        $snapshot = decryptLocalTransferSnapshot(
+            $localPatientRow['transferred_snapshot_ciphertext'] ?? null,
+            $localPatientRow['transferred_details_snapshot'] ?? null
+        );
         $snapshot['departed_at'] = $response['departed_at'] ?? date('c');
         $snapshot['departure_outcome'] = strtoupper($outcome);
         $snapshot['departure_remarks'] = $remarks !== '' ? $remarks : null;
 
-        $updStmt = $pdo->prepare('UPDATE patients SET transferred_details_snapshot = :snapshot WHERE id = :id');
-        $updStmt->execute([':snapshot' => json_encode($snapshot), ':id' => $localPatientRow['id']]);
+        $updStmt = $pdo->prepare('UPDATE patients SET transferred_details_snapshot = NULL, transferred_snapshot_ciphertext = :snapshot WHERE id = :id');
+        $updStmt->execute([':snapshot' => encryptLocalTransferSnapshot($snapshot), ':id' => $localPatientRow['id']]);
     } catch (Exception $e) {
         // Best-effort local mirror -- the authoritative record already succeeded at IOL above
     }

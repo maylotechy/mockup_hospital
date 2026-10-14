@@ -9,6 +9,7 @@
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/crypto_helper.php';
+require_once __DIR__ . '/patient_transfer.php';
 
 $user = getLoggedInUser();
 if (!$user) {
@@ -27,7 +28,7 @@ try {
     $pdo = getDbConnection();
 
     $stmt = $pdo->prepare('
-        SELECT id, transferred_details_snapshot
+        SELECT id, transferred_details_snapshot, transferred_snapshot_ciphertext
         FROM patients
         WHERE source_referral_id = :rid AND facility_id = :fid
         LIMIT 1
@@ -35,8 +36,11 @@ try {
     $stmt->execute([':rid' => $referralId, ':fid' => $facilityId]);
     $row = $stmt->fetch();
 
-    if ($row && !empty($row['transferred_details_snapshot'])) {
-        $snapshot = json_decode($row['transferred_details_snapshot'], true);
+    if ($row && (!empty($row['transferred_snapshot_ciphertext']) || !empty($row['transferred_details_snapshot']))) {
+        $snapshot = decryptLocalTransferSnapshot(
+            $row['transferred_snapshot_ciphertext'] ?? null,
+            $row['transferred_details_snapshot'] ?? null
+        );
         if (is_array($snapshot)) {
             $snapshot['_source'] = 'local';
             // Lets the frontend jump straight to the Refer Patient flow for this same
@@ -97,7 +101,12 @@ if ($curlErrno || !$response) {
 
 $decoded = json_decode($response, true);
 if (is_array($decoded) && $httpCode >= 200 && $httpCode < 300) {
-    $decoded['_source'] = 'central';
+    try {
+        $decoded = decryptDirectPatientDetails($decoded, $user);
+    } catch (Throwable $e) {
+        sendJsonResponse(['detail' => 'The sending hospital could not securely transfer the patient record. Please try again.'], 503);
+    }
+    $decoded['_source'] = $decoded['_source'] ?? 'central';
     http_response_code($httpCode);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode($decoded);
